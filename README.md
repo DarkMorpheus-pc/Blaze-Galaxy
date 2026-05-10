@@ -65,5 +65,5 @@ Check the Releases https://github.com/DarkMorpheus-pc/Blaze-Galaxy/releases/new 
 
 👤 Maintainer
 
-Bulut (DarkMorpheus)
+Bulut Ars.E (DarkMorpheus)
 Lead Developer of BlazeOS & Blaze Galaxy
