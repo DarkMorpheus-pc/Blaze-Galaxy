@@ -37,7 +37,7 @@ Blaze Galaxy (Fedora),Fedora Workstation,Innovation & New Tech,The latest kernel
 
 🧩 Desktop Experience
 
-    Environment: Heavily customized Openbox for extreme speed.
+    Environment: Heavily customized for extreme speed.
 
     Compositor: Picom with custom configurations for blur and smooth animations.
 
