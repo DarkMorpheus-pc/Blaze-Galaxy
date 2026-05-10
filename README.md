@@ -1,75 +1,68 @@
-Blaze Galaxy is a next-generation, high-performance operating system built on the solid foundations of Arch Linux.
+🌌 Blaze Galaxy: The Multi-Base Ecosystem
 
-"From evolution to expansion — Welcome to the Galaxy." 🌌
+Blaze Galaxy is a next-generation, high-performance operating system ecosystem. Moving beyond a single distribution, it now offers a unified experience across multiple Linux foundations, specifically tailored for performance, aesthetics, and intelligent tooling.
 
+    "From evolution to expansion — Welcome to the Galaxy." 🌌
 
-🌌 The Vision
+🔭 The Vision
 
-Blaze Galaxy is not just another Linux distribution.
+Blaze Galaxy is the next evolutionary stage following the SolarEvolutionX (SolEvoX) series. It has expanded into a complete desktop ecosystem that provides the same "Expressive" experience regardless of the base you choose. Whether you prefer the rock-solid stability of Debian or the bleeding-edge features of Fedora, Blaze Galaxy delivers a consistent, optimized environment.
 
-It is the next evolutionary stage following the SolarEvolutionX (SolEvoX) series — expanding from a single optimized system into a complete desktop ecosystem focused on performance, aesthetics, and intelligent tooling.
+Edition,Base,Target,Focus
+Blaze Galaxy (Debian),Debian Stable/Sid,Stability & Production,Long-term reliability with Blaze speed.
+Blaze Galaxy (Fedora),Fedora Workstation,Innovation & New Tech,The latest kernels and packages with Galaxy tweaks.
 
 ✨ Why Blaze Galaxy?
-🎨 Material You / Expressive UI: A fully integrated dynamic theming experience across the system.
-🎮 Gaming-Ready: Preconfigured environment for modern Linux gaming with optimized performance.
-🚀 Lightweight Power: ~2.7GB ISO with minimal overhead and maximum responsiveness.
-🛠️ Developer Environment: Built-in tools for coding, modding, and system control.
-📦 Hybrid Installation: GUI (Calamares) or pure CLI — your choice.
-⚡ Performance & System Tweaks
 
-Blaze Galaxy is tuned for real-world performance:
+    🎨 Material You / Expressive UI: A fully integrated dynamic theming experience (Material 3) across the entire system.
 
-ZRAM enabled by default for better memory management
-Optimized CPU scheduler behavior
-Preconfigured GameMode support
-Low-latency system parameters
-Minimal background services
+    🎮 Gaming-Ready: Preconfigured environment for modern Linux gaming with out-of-the-box optimizations.
+
+    🚀 Lightweight Power: Highly compressed ISOs with minimal overhead and maximum responsiveness.
+
+    🛠️ Developer First: Built-in tools for coding, modding, and system control.
+
+    ⚡ Performance Tuned: ZRAM enabled, optimized CPU schedulers, and low-latency system parameters by default.
+
+🛠️ Technical Stack
+⚡ System Optimizations
+
+    ZRAM: Advanced memory management for better multitasking.
+
+    Kernel Tweaks: Low-latency parameters for a fluid desktop feel.
+
+    Minimalist Core: No bloatware, only essential services enabled.
+
+    GameMode: Integrated support for peak hardware utilization during gaming.
+
+🧩 Desktop Experience
+
+    Environment: Heavily customized Openbox for extreme speed.
+
+    Compositor: Picom with custom configurations for blur and smooth animations.
+
+    Visuals: Custom panel, app launcher, and Material You-inspired dynamic color system.
+
 🎮 Gaming Stack
 
-Everything you need, ready out-of-the-box:
+    Steam & Proton: Fully supported and ready.
 
-Steam with Proton support
-Lutris for game management
-Wine & Winetricks preinstalled
-Vulkan drivers configured
-MangoHud for performance monitoring
-🧩 Custom Desktop Experience
+    Management: Lutris, Wine, and Winetricks preinstalled.
 
-A lightweight but visually rich environment:
+    Drivers: Vulkan and performance-ready graphics drivers preconfigured.
 
-Openbox (heavily customized)
-Picom compositor (blur & smooth animations)
-Custom panel & launcher setup
-Material You-inspired dynamic color system
+    Monitoring: MangoHud for real-time performance tracking.
 
-🛠️ Developer Environment: Built-in tools for coding, modding, and system control.
-📦 Hybrid Installation: GUI (Calamares) or pure CLI — your choice.
-⚡ Performance & System Tweaks
+📦 Installation
 
-Blaze Galaxy is tuned for real-world performance:
+Blaze Galaxy supports a Hybrid Installation method to suit your expertise:
 
-ZRAM enabled by default for better memory management
-Optimized CPU scheduler behavior
-Preconfigured GameMode support
-Low-latency system parameters
-Minimal background services
-🎮 Gaming Stack
+    GUI (Calamares): For a quick, visual, and easy setup.
 
-Everything you need, ready out-of-the-box:
+    CLI: For those who want full control over the installation process.
 
-Steam with Proton support
-Lutris for game management
-Wine & Winetricks preinstalled
-Vulkan drivers configured
-MangoHud for performance monitoring
-🧩 Custom Desktop Experience
-
-A lightweight but visually rich environment:
-
-Openbox (heavily customized)
-Picom compositor (blur & smooth animations)
-Custom panel & launcher setup
-Material You-inspired dynamic color system
-
+Check the Releases section to download the ISO for your preferred base (Debian or Fedora).
 👤 Maintainer
-Bulut (DarkMorpheus) 
+
+Bulut (DarkMorpheus)
+Lead Developer of BlazeOS & Blaze Galaxy
