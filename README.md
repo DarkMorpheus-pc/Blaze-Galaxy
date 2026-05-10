@@ -61,7 +61,7 @@ Blaze Galaxy supports a Hybrid Installation method to suit your expertise:
 
     CLI: For those who want full control over the installation process.
 
-Check the Releases section to download the ISO for your preferred base (Debian or Fedora).
+Check the Releases https://github.com/DarkMorpheus-pc/Blaze-Galaxy/releases/new section to download the ISO for your preferred base (Debian or Fedora).
 👤 Maintainer
 
 Bulut (DarkMorpheus)
