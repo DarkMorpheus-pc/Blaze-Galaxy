@@ -1,5 +1,7 @@
 🌌 Blaze Galaxy: The Multi-Base Ecosystem
 
+https://t.me/blaze_galaxy_solarevolution
+
 Blaze Galaxy is a next-generation, high-performance operating system ecosystem. Moving beyond a single distribution, it now offers a unified experience across multiple Linux foundations, specifically tailored for performance, aesthetics, and intelligent tooling.
 
     "From evolution to expansion — Welcome to the Galaxy." 🌌
