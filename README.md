@@ -1,6 +1,6 @@
 🌌 Blaze Galaxy: The Multi-Base Ecosystem
 
-support: https://t.me/blaze_galaxy_solarevolution
+support: https://t.me/BlazeOS_Community
 
 backup link : https://archive.org/details/blaze-os-galaxy-solar-evolution
 
