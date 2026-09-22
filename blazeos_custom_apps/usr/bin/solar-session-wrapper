@@ -1,0 +1,71 @@
+#!/bin/bash
+# SolarUI Wayland Session Wrapper for GDM / Display Managers
+export XDG_CURRENT_DESKTOP="SolarUI:gnome:niri"
+export XDG_SESSION_TYPE="wayland"
+export XDG_SESSION_DESKTOP="SolarUI"
+export DESKTOP_SESSION="SolarUI"
+export MOZ_ENABLE_WAYLAND="1"
+export QT_QPA_PLATFORM="wayland;xcb"
+export GDK_BACKEND="wayland,x11"
+export SDL_VIDEODRIVER="wayland"
+export CLUTTER_BACKEND="wayland"
+export WLR_NO_HARDWARE_CURSORS="1"
+export __GL_GSYNC_ALLOWED="0"
+export __GL_VRR_ALLOWED="0"
+
+LOG_DIR="${HOME}/.local/share/solarui"
+mkdir -p "$LOG_DIR" 2>/dev/null || :
+LOG_FILE="${LOG_DIR}/session.log"
+
+echo "=== SolarUI Session Started: $(date) ===" >> "$LOG_FILE" 2>&1
+echo "User: $(whoami) (UID: $(id -u)), Home: $HOME" >> "$LOG_FILE" 2>&1
+
+# Ensure the session VT is switched to and activated as soon as Niri starts
+(
+    for i in $(seq 1 50); do
+        if ls "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"/niri.*.sock >/dev/null 2>&1; then
+            sleep 0.3
+            VT_TARGET="${XDG_VTNR:-2}"
+            echo "Niri socket ready, switching to VT ${VT_TARGET}..." >> "$LOG_FILE" 2>&1
+            /usr/bin/chvt "$VT_TARGET" 2>> "$LOG_FILE" || sudo /usr/bin/chvt "$VT_TARGET" 2>> "$LOG_FILE" || :
+            if [ -n "$XDG_SESSION_ID" ]; then
+                loginctl activate "$XDG_SESSION_ID" 2>> "$LOG_FILE" || :
+            fi
+            break
+        fi
+        sleep 0.2
+    done
+) &
+
+# Auto-launch Anaconda Welcome Screen / Installer on Live ISO session
+(
+    if grep -qE 'rd\.live\.image|root=live:' /proc/cmdline 2>/dev/null || [ -d /run/initramfs/live ]; then
+        for i in $(seq 1 50); do
+            for w in "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"/wayland-*; do
+                if [ -S "$w" ] && [ ! -L "$w" ]; then
+                    export WAYLAND_DISPLAY="$(basename "$w")"
+                    break
+                fi
+            done
+            if [ -n "$WAYLAND_DISPLAY" ]; then
+                sleep 4
+                echo "Live environment detected with WAYLAND_DISPLAY=${WAYLAND_DISPLAY}, launching Anaconda installer..." >> "$LOG_FILE" 2>&1
+                if [ -x /usr/bin/liveinst ]; then
+                    /usr/bin/liveinst >> "$LOG_FILE" 2>&1 &
+                elif [ -x /usr/share/anaconda/gnome/fedora-welcome ]; then
+                    /usr/share/anaconda/gnome/fedora-welcome >> "$LOG_FILE" 2>&1 &
+                fi
+                break
+            fi
+            sleep 0.5
+        done
+    fi
+) &
+
+/usr/bin/solar-session >> "$LOG_FILE" 2>&1
+EXIT_CODE=$?
+
+if [ $EXIT_CODE -ne 0 ]; then
+    echo "SolarUI session exited with code $EXIT_CODE, starting fallback GNOME session..." >> "$LOG_FILE" 2>&1
+    exec /usr/bin/gnome-session >> "$LOG_FILE" 2>&1
+fi
