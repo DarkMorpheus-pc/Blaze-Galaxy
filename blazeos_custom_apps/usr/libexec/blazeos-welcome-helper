@@ -1,0 +1,300 @@
+#!/usr/bin/env bash
+# =============================================================================
+# BlazeOS Welcome Helper — privileged backend
+# pkexec ile TEK parça root olarak çalışır. Sihirbaz (yad) bunu pkexec ile
+# çağırır ve stdout'unu --progress penceresine borular. Tüm root işlemleri
+# burada toplandığı için Polkit yalnızca BİR kez şifre sorar; pkexec'i
+# while-read borusuna sokmaktan kaynaklanan askı/sonsuz-döngü riski ortadan
+# kalkar.
+#
+# Kullanım:
+#   blazeos-welcome-helper update
+#   blazeos-welcome-helper waydroid
+#   blazeos-welcome-helper install-de <paket/grup...>
+# =============================================================================
+
+set -u
+
+# Root değilsek anlamsız
+if [ "$(id -u)" -ne 0 ]; then
+    echo "ERR: bu yardımcı root gerektirir" >&2
+    exit 1
+fi
+
+# dnf'in arka plandaki PackageKit / otomatik güncelleme ile kilitlenmesini
+# önle (giriş sonrası gnome-software/PackageKit /var/lib/dnf/lock'u tutabilir).
+stop_pk() {
+    echo "# PackageKit geçici durduruluyor (dnf kilidi için)..."
+    systemctl stop packagekit.service 2>/dev/null || true
+    systemctl stop packagekit-offline-update.service 2>/dev/null || true
+    # dnf makedcache zamanlayıcısı varsa o da beklesin
+    systemctl stop dnf-makecache.service 2>/dev/null || true
+}
+
+ACTION="${1:-}"
+shift || true
+
+case "$ACTION" in
+    update-all)
+        # Tam güncelleme: sistem + çekirdek + sürücüler + güvenlik + bileşenler
+        stop_pk
+        echo "# [1/4] Depo meta verisi yenileniyor..."
+        dnf -y --refresh makecache 2>&1 || true
+        echo "# [2/4] Güvenlik yamalar uygulanıyor..."
+        dnf -y --refresh upgrade --security 2>&1 || true
+        echo "# [3/4] Tüm paketler güncelleniyor (çekirdek + sürücüler dahil)..."
+        dnf -y upgrade 2>&1
+        rc=$?
+        echo "# [4/4] Tamamlandı. Çıkış kodu: $rc"
+        exit $rc
+        ;;
+
+    update-drivers)
+        # Yalnızca donanım sürücüleri ve çekirdek (kernel + firmware)
+        stop_pk
+        echo "# Donanım sürücüleri ve çekirdek güncelleniyor..."
+        dnf -y --refresh upgrade \
+            'kernel*' \
+            '*-firmware' \
+            '*-kmod' \
+            'mesa-*' \
+            'vulkan-*' \
+            'libdrm*' \
+            'xorg-x11-drv-*' 2>&1
+        rc=$?
+        echo "# Sürücü güncellemesi tamamlandı. Çıkış kodu: $rc"
+        exit $rc
+        ;;
+
+    update-security)
+        # Yalnızca güvenlik yamaları (kritik/önemli CVE'ler)
+        stop_pk
+        echo "# Güvenlik yamaları uygulanıyor..."
+        dnf -y --refresh upgrade --security 2>&1
+        rc=$?
+        # Güvenlik yamalarından bağımsız olarak dnf advisory var mı göster
+        echo "# Mevcut güvenlik bildirimleri:"
+        dnf updateinfo list security 2>/dev/null | tail -10 || true
+        echo "# Güvenlik güncellemesi tamamlandı. Çıkış kodu: $rc"
+        exit $rc
+        ;;
+
+    update-packages)
+        # Yalnızca uygulama bileşenleri — çekirdek ve donanım sürücüleri hariç
+        stop_pk
+        echo "# Uygulama bileşenleri güncelleniyor (çekirdek/sürücü hariç)..."
+        # Çekirdek ve firmware paketlerini dışla, geri kalanı güncelle
+        dnf -y --refresh upgrade \
+            --exclude='kernel*' \
+            --exclude='*-firmware' \
+            --exclude='*-kmod' \
+            --exclude='mesa-*' \
+            --exclude='vulkan-*' \
+            --exclude='libdrm*' 2>&1
+        rc=$?
+        echo "# Bileşen güncellemesi tamamlandı. Çıkış kodu: $rc"
+        exit $rc
+        ;;
+
+    update)
+        # Geriye dönük uyumluluk — eski çağrılar için hâlâ çalışır, update-all'a yönlendir
+        stop_pk
+        echo "# Tam güncelleme (geriye dönük uyumluluk) başlatılıyor..."
+        dnf -y --refresh upgrade 2>&1
+        rc=$?
+        echo "# dnf çıkış kodu: $rc"
+        exit $rc
+        ;;
+
+    waydroid)
+        # Context Check: waydroid kurulumu — paket önce, init sonra
+        # Sorun 1: waydroid kurulu değilse "direk kurulum bitti" diyordu —
+        #   çünkü waydroid paketi ISO'da yok (COPR repo'su build zamanı kaldırıldı),
+        #   init komutu bulunmadığı için sessizce 127 döndürüp çıkıyordu.
+        # Sorun 2: "birkaç dakika sonra bar geliyor" — COPR repo ekleme +
+        #   paket indirmesi sessizdi, progress bar bildirilmiyordu.
+        # Çözüm: önce COPR repo ekle + dnf install ile paketi kur
+        #   (ilerleme adım adım raporlanıyor), sonra init yap.
+
+        # Adım 1: waydroid zaten kurulu mu?
+        if ! command -v waydroid >/dev/null 2>&1; then
+            echo "# [1/4] Waydroid paketi bulunamadı — COPR repo ekleniyor..."
+            dnf -y config-manager \
+                --add-repo "https://download.copr.fedorainfracloud.org/results/aleasto/waydroid/fedora-$(rpm -E '%{fedora}')-x86_64/aleasto-waydroid.repo" \
+                2>&1 || true
+            # COPR başarısız olursa Fedora resmi repo'sunu dene (F40+ artık paketli)
+            echo "# [2/4] Waydroid paketi kuruluyor (~30-60 MB)..."
+            if ! dnf -y install waydroid waydroid-selinux 2>&1; then
+                echo "# HATA: Waydroid paketi kurulamadı. İnternet bağlantısını kontrol et."
+                exit 1
+            fi
+        else
+            echo "# [1/4] Waydroid paketi zaten kurulu, atlanıyor..."
+            echo "# [2/4] (mevcut kurulum kullanılacak)"
+        fi
+
+        echo "# [3/4] Çekirdek modülleri yükleniyor (binder/ashmem)..."
+        modprobe binder_linux devices=binder,hwbinder,vndbinder 2>/dev/null || true
+        modprobe ashmem_linux 2>/dev/null || true
+
+        echo "# [4/4] Android sistem imajları indiriliyor (~700 MB-1.5 GB)..."
+        echo "# İnternet hızına göre birkaç dakika sürebilir."
+        waydroid init -s GAPPS \
+            -c https://ota.waydro.id/system \
+            -v https://ota.waydro.id/vendor 2>&1
+        rc=$?
+
+        if [ "$rc" -eq 0 ] && [ -f /var/lib/waydroid/images/system.img ]; then
+            if systemd-detect-virt -q 2>/dev/null; then
+                echo "# Sanal makine algılandı — yazılım render ayarlanıyor..."
+                if [ -f /var/lib/waydroid/waydroid_base.prop ]; then
+                    sed -i '/^ro\.hardware\.gralloc=/d' /var/lib/waydroid/waydroid_base.prop
+                    echo 'ro.hardware.gralloc=default' >> /var/lib/waydroid/waydroid_base.prop
+                fi
+            fi
+            echo "# init başarılı — konteyner servisi başlatılıyor..."
+            systemctl enable --now waydroid-container.service 2>&1 || true
+            echo "# Waydroid hazır. Uygulama menüsünden 'Waydroid' ile açabilirsin."
+            echo "# (İlk açılış 1-2 dk yavaş olabilir — Android ön-yükleniyor.)"
+        else
+            echo "# waydroid init başarısız (kod: $rc)."
+            echo "# En yaygın sebep: internet bağlantısı yok/yavaş ya da sunucu yoğun."
+        fi
+        exit $rc
+        ;;
+
+    install-de)
+        if [ "$#" -eq 0 ]; then
+            echo "ERR: kurulacak paket belirtilmedi" >&2
+            exit 2
+        fi
+        stop_pk
+        echo "# Kuruluyor: $*"
+        dnf install -y "$@" 2>&1
+        rc=$?
+        echo "# dnf çıkış kodu: $rc"
+        # Yeni masaüstü Fedora logoları getirmiş olabilir (KDE start-here vb.) —
+        # BlazeOS logolarını yeniden uygula.
+        if [ "$rc" -eq 0 ] && [ -x /usr/libexec/blazeos-apply-logos ]; then
+            echo "# BlazeOS logoları uygulanıyor..."
+            /usr/libexec/blazeos-apply-logos 2>&1 || true
+        fi
+        exit $rc
+        ;;
+
+    remove-gnome)
+        # KRİTİK: GDM'in giriş ekranı gnome-shell'dir. GNOME'u kaldırmadan ÖNCE
+        # yeni masaüstüne uygun bir giriş yöneticisine geçmezsek, kullanıcı
+        # hiçbir masaüstüne giremez. Bu yüzden önce DM değiştir, sonra kaldır.
+        stop_pk
+        DE="${1:-}"
+        case "$DE" in
+            KDE*)  DM="sddm" ;;
+            *)     DM="lightdm" ;;   # XFCE/MATE/Cinnamon/COSMIC/Hyprland
+        esac
+        echo "# Giriş yöneticisi kuruluyor: $DM"
+        dnf install -y "$DM" 2>&1 || true
+        echo "# $DM etkinleştiriliyor, GDM devre dışı bırakılıyor..."
+        systemctl disable gdm.service 2>&1 || true
+        systemctl enable "${DM}.service" 2>&1 || true
+        echo "# GNOME masaüstü paketleri kaldırılıyor..."
+        # gnome-shell kaldırılınca GDM ve GNOME oturumu da bağımlılık olarak gider.
+        # Çalışan oturum, çıkışa kadar bellekteki dosyalarla ayakta kalır.
+        dnf remove -y \
+            gnome-shell gnome-session gnome-session-wayland-session \
+            gnome-shell-extensions gnome-classic-session \
+            gnome-initial-setup gnome-tour 2>&1 || true
+        echo "# GNOME kaldırıldı. Oturumu kapatıp $DM üzerinden yeni masaüstüne gir."
+        exit 0
+        ;;
+
+    set-dock)
+        # Context Check: dock/panel uzantı yönetimi — karşılıklı dışlama GARANTİLİ
+        # İki uzantı da paket olarak kurulu (ISO'ya gömülü); burada yalnızca
+        # GNOME Shell'in enabled-extensions listesini değiştiriyoruz. Önce
+        # İKİSİNİ DE listeden çıkarıp sonra istenen tekini eklemek, çakışma/
+        # kalıntı ihtimalini sıfırlıyor — sıra önemli değil, sonuç idempotent.
+        DOCK_CHOICE="${1:-none}"
+        DTD_UUID="dash-to-dock@micxgx.gmail.com"
+        DTP_UUID="dash-to-panel@jderose9.github.com"
+
+        # Hedef kullanıcının gerçek oturum dconf veritabanına yazmak için
+        # çağıran kullanıcının UID/DBUS'unu kullanıyoruz (pkexec PKEXEC_UID verir).
+        TARGET_UID="${PKEXEC_UID:-$(logname 2>/dev/null | xargs id -u 2>/dev/null)}"
+        if [ -z "$TARGET_UID" ]; then
+            echo "ERR: hedef kullanıcı UID'i bulunamadı" >&2
+            exit 3
+        fi
+        DBUS_ADDR="unix:path=/run/user/${TARGET_UID}/bus"
+
+        run_as_user_gsettings() {
+            sudo -u "#${TARGET_UID}" \
+                DBUS_SESSION_BUS_ADDRESS="$DBUS_ADDR" \
+                XDG_RUNTIME_DIR="/run/user/${TARGET_UID}" \
+                gsettings "$@"
+        }
+
+        # Context Check: uzantı sürüm doğrulaması — Dash to Panel "OUT OF DATE"
+        # Fedora'nın paketlediği dash-to-panel (sürüm 72) henüz GNOME 50'nin
+        # shell-version listesinde değil; GNOME Shell bunu otomatik reddediyor
+        # (enabled-extensions'a eklesek bile YÜKLENMİYOR). Resmi/belgelenmiş
+        # workaround: sürüm doğrulamasını kapat.
+        run_as_user_gsettings set org.gnome.shell disable-extension-version-validation true 2>/dev/null || true
+
+        echo "# Mevcut uzantı listesi okunuyor..."
+        CURRENT=$(run_as_user_gsettings get org.gnome.shell enabled-extensions 2>/dev/null || echo "@as []")
+
+        # İKİSİNİ DE listeden çıkar (python ile güvenli liste işleme — sed/grep
+        # ile string listesi düzenlemek kırılgan olur).
+        CLEANED=$(python3 - "$CURRENT" "$DTD_UUID" "$DTP_UUID" <<'PYEOF'
+import sys, ast
+raw, dtd, dtp = sys.argv[1], sys.argv[2], sys.argv[3]
+try:
+    lst = ast.literal_eval(raw.replace("@as ", "", 1)) if raw.strip() != "@as []" else []
+except Exception:
+    lst = []
+lst = [x for x in lst if x not in (dtd, dtp)]
+print(repr(lst))
+PYEOF
+)
+
+        case "$DOCK_CHOICE" in
+            dash-to-dock)
+                echo "# Dash to Dock etkinleştiriliyor (Dash to Panel kapatılıyor)..."
+                NEW_LIST=$(python3 -c "
+l = $CLEANED
+l.append('$DTD_UUID')
+print(repr(l))
+")
+                run_as_user_gsettings set org.gnome.shell enabled-extensions "$NEW_LIST"
+                ;;
+            dash-to-panel)
+                # Context Check: Dash to Panel ŞU AN ÇAĞRILMIYOR (Welcome/Merkezi
+                # seçeneği sunmuyor) — Fedora paketi (sürüm 72) GNOME 50 ile
+                # "Unrecognized parameter affectsInputRegion" hatasıyla çöküyor
+                # (upstream home-sweet-gnome/dash-to-panel#2289). Kod burada
+                # upstream düzelip Fedora paketleyince hızla geri açılabilsin
+                # diye duruyor; şu an erişilemez (dead code, zararsız).
+                echo "# Dash to Panel etkinleştiriliyor (Dash to Dock kapatılıyor)..."
+                NEW_LIST=$(python3 -c "
+l = $CLEANED
+l.append('$DTP_UUID')
+print(repr(l))
+")
+                run_as_user_gsettings set org.gnome.shell enabled-extensions "$NEW_LIST"
+                ;;
+            none|*)
+                echo "# Dock/panel uzantıları devre dışı bırakılıyor (varsayılan GNOME)..."
+                run_as_user_gsettings set org.gnome.shell enabled-extensions "$CLEANED"
+                ;;
+        esac
+        echo "# Dock ayarı uygulandı. Değişiklik anında görünür olmalı."
+        exit 0
+        ;;
+
+    *)
+        echo "ERR: bilinmeyen işlem: $ACTION" >&2
+        echo "Kullanım: blazeos-welcome-helper {update|waydroid|install-de <pkgs>|remove-gnome <DE>|set-dock <none|dash-to-dock|dash-to-panel>}" >&2
+        exit 64
+        ;;
+esac

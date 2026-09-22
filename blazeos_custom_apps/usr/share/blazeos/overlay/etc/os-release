@@ -1,0 +1,14 @@
+NAME="BlazeOS Galaxy"
+VERSION="SolarEvolution (44)"
+ID=blazeos
+ID_LIKE=fedora
+VERSION_ID=44
+VERSION_CODENAME="SolarEvolution"
+PRETTY_NAME="BlazeOS Galaxy SolarEvolution"
+ANSI_COLOR="0;31"
+LOGO=blazeos-logo
+HOME_URL="https://blazeos.com.tr/"
+DOCUMENTATION_URL="https://blazeos.com.tr/"
+SUPPORT_URL="https://blazeos.com.tr/"
+BUG_REPORT_URL="https://blazeos.com.tr/"
+DEFAULT_HOSTNAME="blazeos"

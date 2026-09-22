@@ -1,0 +1,277 @@
+// BlazeOS SolarUI - Hybrid KDE + Niri & Noctalia Desktop Configuration
+// Flawless combination of:
+// - Top: Noctalia Bar (all CachyOS features, control center, audio, visualizer, calendar)
+// - Center: KDE-style Floating & Tiling Windows with CachyOS Spring Physics & Kawase Blur
+// - Bottom: SolarUI KDE-style Taskbar (Start menu, open window tasks, vector SVGs, zero emojis)
+
+spawn-at-startup "solar-shell" "autostart"
+
+// Suppress unbranded raw compositor hotkey overlay in favor of SolarUI Welcome HUD
+hotkey-overlay {
+    skip-at-startup
+}
+
+input {
+    keyboard {
+        xkb {
+            layout "tr,us"
+            options "grp:alt_shift_toggle"
+        }
+    }
+
+    touchpad {
+        tap
+        dwt
+        natural-scroll
+        accel-speed 0.2
+    }
+
+    mouse {
+        accel-speed 0.0
+    }
+}
+
+output "eDP-1" {
+    scale 1.0
+}
+
+output "Virtual-1" {
+    scale 1.0
+}
+
+layout {
+    gaps 14
+    center-focused-column "never"
+    background-color "transparent" // Required for Noctalia wallpaper & glassmorphism
+
+    preset-column-widths {
+        proportion 0.33333
+        proportion 0.5
+        proportion 0.66667
+        proportion 1.0
+    }
+
+    default-column-width { proportion 0.5; }
+
+    focus-ring {
+        width 3
+        active-color "#38c8ff"
+        inactive-color "#40484d"
+    }
+
+    border {
+        off
+    }
+
+    struts {
+        bottom 48 // Reserved space for KDE taskbar
+    }
+}
+
+// CachyOS Tuned Spring Physics Animations (Critically damped, zero overshoot, ultra fluid)
+animations {
+    workspace-switch {
+        spring damping-ratio=1.0 stiffness=1000 epsilon=0.0001
+    }
+    window-open {
+        duration-ms 200
+        curve "ease-out-quad"
+    }
+    window-close {
+        duration-ms 200
+        curve "ease-out-cubic"
+    }
+    horizontal-view-movement {
+        spring damping-ratio=1.0 stiffness=900 epsilon=0.0001
+    }
+    window-movement {
+        spring damping-ratio=1.0 stiffness=800 epsilon=0.0001
+    }
+    window-resize {
+        spring damping-ratio=1.0 stiffness=1000 epsilon=0.0001
+    }
+    config-notification-open-close {
+        spring damping-ratio=0.6 stiffness=1200 epsilon=0.001
+    }
+    screenshot-ui-open {
+        duration-ms 300
+        curve "ease-out-quad"
+    }
+    overview-open-close {
+        spring damping-ratio=1.0 stiffness=900 epsilon=0.0001
+    }
+}
+
+// Window Geometries & Glassmorphism Blur (KDE Plasma Style Floating Windows)
+window-rule {
+    geometry-corner-radius 20
+    clip-to-geometry true
+    open-floating true
+}
+
+window-rule {
+    background-effect {
+        blur true
+        xray false
+    }
+}
+
+// Default primary workspace and dedicated background workspace for parked/minimized windows
+workspace "1"
+workspace "background"
+
+// SolarUI Windows 11 Snap Layouts HUD Window Rule
+window-rule {
+    match app-id="^solar-snap$"
+    open-floating true
+    default-floating-position x=0 y=54 relative-to="top"
+    default-column-width { fixed 440; }
+    default-window-height { fixed 260; }
+    geometry-corner-radius 16
+    clip-to-geometry true
+}
+
+// Dialog & System Utility Windows Rule (Open Floating)
+window-rule {
+    match is-floating=true
+    geometry-corner-radius 16
+    clip-to-geometry true
+}
+
+window-rule {
+    match app-id=r#"^org\.gnome\.FileRoller$"#
+    match app-id=r#"^org\.gnome\.NautilusPreviewer$"#
+    match app-id=r#"^polkit-gnome-authentication-agent-1$"#
+    match app-id=r#"^pavucontrol$"#
+    open-floating true
+}
+
+// SolarUI KDE Taskbar Window Rule
+window-rule {
+    match app-id="solar-shell"
+    open-floating true
+    default-floating-position x=0 y=0 relative-to="bottom-left"
+    default-column-width { proportion 1.0; }
+    default-window-height { fixed 44; }
+}
+
+// Noctalia Settings Window Rule
+window-rule {
+    match app-id="dev.noctalia.Noctalia"
+    open-floating true
+    default-column-width { fixed 1080; }
+    default-window-height { fixed 920; }
+}
+
+// SolarUI Settings Window Rule
+window-rule {
+    match app-id="^solar-settings$"
+    open-floating true
+    default-column-width { fixed 740; }
+    default-window-height { fixed 600; }
+}
+
+// SolarUI Welcome & Shortcuts Window Rule
+window-rule {
+    match app-id="^solar-welcome$"
+    open-floating true
+    default-column-width { fixed 660; }
+    default-window-height { fixed 520; }
+}
+
+// Steam & Dialog Window Rules
+window-rule {
+    match app-id="steam"
+    exclude title=r#"^[Ss]team$"#
+    open-floating true
+}
+
+// SolarUI Google Pixel Clock Widget
+window-rule {
+    match app-id="^solar-clock$"
+    open-floating true
+    open-focused false
+    default-floating-position x=0 y=70 relative-to="top"
+    default-column-width { fixed 460; }
+    default-window-height { fixed 280; }
+    geometry-corner-radius 0
+    clip-to-geometry false
+    background-effect {
+        blur false
+    }
+}
+
+// Layer Shell Rules for Noctalia
+layer-rule {
+    match namespace="^noctalia-(desktop-widget|wallpaper).*"
+    place-within-backdrop true
+}
+
+layer-rule {
+    match namespace="^noctalia-(bar-[^\"]+|notification|dock|panel|attached-panel|osd)$"
+    background-effect {
+        xray false
+    }
+}
+
+binds {
+    // ── Workspace & Window Navigation ──────────────────────────────
+    Mod+Left  { focus-column-left; }
+    Mod+Down  { focus-window-down; }
+    Mod+Up    { focus-window-up; }
+    Mod+Right { focus-column-right; }
+
+    Mod+Ctrl+Left  { move-column-left; }
+    Mod+Ctrl+Right { move-column-right; }
+
+    // ── Window Actions (KDE Habits) ────────────────────────────────
+    Mod+Q     { close-window; }
+    Alt+F4    { close-window; }
+    Mod+Y     { spawn-sh "solar-shell minimize"; }
+    Mod+Ctrl+Down { spawn-sh "solar-shell minimize"; }
+    Mod+T     { toggle-window-floating; }
+    Mod+F     { toggle-window-floating; }
+    Mod+M     { maximize-column; }
+    Mod+Shift+F { fullscreen-window; }
+    Mod+Z     { spawn-sh "solar-shell snap"; }
+    Mod+Shift+V { switch-focus-between-floating-and-tiling; }
+    Mod+Tab   { toggle-overview; }
+    Mod+D     { spawn "solar-shell" "route" "dashboard"; }
+
+    // ── SolarUI Panels & Settings (Routed via SolarSurfaceRouter) ──
+    Mod+Space           { spawn "solar-shell" "route" "launcher"; }
+    Mod+S               { spawn "solar-shell" "route" "control-center"; }
+    Mod+I               { spawn "solar-shell" "route" "settings"; }
+    Mod+Comma           { spawn "noctalia" "msg" "settings-toggle"; }
+    Mod+Shift+S         { spawn "solar-shell" "route" "settings"; }
+    Mod+Shift+Q         { spawn "solar-shell" "route" "session"; }
+    Mod+Alt+R           { spawn "solar-shell" "supervisor"; }
+    Mod+Alt+S           { spawn "solar-shell" "settings"; }
+    Mod+F1              { spawn "solar-shell" "welcome"; }
+    Mod+Shift+Escape    { spawn "solar-shell" "welcome"; }
+
+    // ── Quick App Launchers ────────────────────────────────────────
+    Mod+Return { spawn "alacritty"; }
+    Ctrl+Alt+T { spawn "alacritty"; }
+    Mod+E      { spawn "nautilus"; }
+    Mod+B      { spawn "google-chrome-stable"; }
+
+    // ── Audio & Media Keys ─────────────────────────────────────────
+    XF86AudioRaiseVolume allow-when-locked=true { spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "5%+"; }
+    XF86AudioLowerVolume allow-when-locked=true { spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "5%-"; }
+    XF86AudioMute        allow-when-locked=true { spawn "wpctl" "set-mute" "@DEFAULT_AUDIO_SINK@" "toggle"; }
+
+    // ── Brightness Keys ────────────────────────────────────────────
+    XF86MonBrightnessUp   allow-when-locked=true { spawn "brightnessctl" "set" "+5%"; }
+    XF86MonBrightnessDown allow-when-locked=true { spawn "brightnessctl" "set" "5%-"; }
+
+    // ── Screenshots ────────────────────────────────────────────────
+    F10       { spawn "sh" "-c" "grim -g \"$(slurp)\" - | satty --filename -"; }
+    Print     { spawn "sh" "-c" "grim -g \"$(slurp)\" - | satty --filename -"; }
+    Alt+Print { spawn "sh" "-c" "grim - | satty --filename -"; }
+
+    // ── Session ────────────────────────────────────────────────────
+    Mod+Shift+E { quit; }
+    Ctrl+Alt+Delete { quit; }
+    Mod+L       { spawn "noctalia" "msg" "session" "lock"; }
+}

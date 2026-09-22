@@ -1,0 +1,11 @@
+[Unit]
+Description=SolarUI Session Manager
+BindsTo=graphical-session.target
+Before=graphical-session.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/true
+Nice=-10
+OOMScoreAdjust=-500

@@ -1,0 +1,12 @@
+[Unit]
+Description=SolarUI Core Platform Daemon (BlazeOS)
+PartOf=solarui-session.target
+After=graphical-session-pre.target
+
+[Service]
+ExecStart=/usr/bin/solar-core
+Restart=always
+RestartSec=500ms
+
+[Install]
+WantedBy=solarui-session.target

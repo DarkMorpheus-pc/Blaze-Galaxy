@@ -1,0 +1,38 @@
+#!/bin/bash
+# ==============================================================================
+# FireHub Wayland-Native Launcher Wrapper for BlazeOS
+# Ensures proper Wayland Ozone backend, sandbox flags, and GPU stability.
+# ==============================================================================
+
+FIREHUB_BIN="/opt/FireHub/firehub"
+
+if [ ! -x "$FIREHUB_BIN" ]; then
+    echo "Hata: FireHub ikilisi bulunamadı: $FIREHUB_BIN" >&2
+    exit 1
+fi
+
+FLAGS=()
+
+# 1. Wayland detection: enable Ozone native Wayland backend
+if [ -n "$WAYLAND_DISPLAY" ] || [ "$XDG_SESSION_TYPE" = "wayland" ]; then
+    FLAGS+=(
+        "--ozone-platform-hint=auto"
+        "--enable-features=WaylandWindowDecorations"
+    )
+fi
+
+# 2. Virtual machine / software rendering / QEMU / KVM GPU safety
+if [ ! -e /dev/dri/renderD128 ] || grep -qiE "qemu|kvm|virtualbox|vmware" /sys/class/dmi/id/product_name 2>/dev/null; then
+    FLAGS+=(
+        "--disable-gpu-sandbox"
+    )
+fi
+
+# 3. Sandbox handling for unprivileged environments or root
+if [ "$(id -u)" -eq 0 ]; then
+    FLAGS+=(
+        "--no-sandbox"
+    )
+fi
+
+exec "$FIREHUB_BIN" "${FLAGS[@]}" "$@"

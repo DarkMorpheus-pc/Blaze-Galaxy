@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=SolarUI Karşılama ve Kısayollar
+GenericName=Kısayol Bilgilendirmesi
+Comment=SolarUI KDE Pencere Serbestliği ve Kısayol Rehberi
+Exec=solar-shell welcome
+Icon=solarui
+Terminal=false
+Type=Application
+Categories=Utility;Documentation;
+Keywords=solarui;welcome;shortcuts;help;
+StartupNotify=true
+StartupWMClass=solar-welcome

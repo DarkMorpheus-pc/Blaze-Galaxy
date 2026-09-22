@@ -1,0 +1,30 @@
+[package]
+name = "solar-shell"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+solar-common = { workspace = true }
+solar-niri = { workspace = true }
+serde = { workspace = true }
+tokio = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+chrono = { workspace = true }
+freedesktop-desktop-entry = { workspace = true }
+walkdir = { workspace = true }
+niri-ipc = { workspace = true }
+toml = { workspace = true }
+gdk-pixbuf = "0.22"
+gdk4 = "0.11"
+gtk4 = { version = "0.11", features = ["v4_12"] }
+cairo-rs = "0.22"
+pangocairo = "0.22"
+async-channel = "2.3"
+async-trait = { workspace = true }

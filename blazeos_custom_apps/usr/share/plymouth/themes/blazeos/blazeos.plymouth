@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=BlazeOS
+Description=BlazeOS Galaxy SolarEvolution boot splash — ember pulse on dark background
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/blazeos
+ScriptFile=/usr/share/plymouth/themes/blazeos/blazeos.script

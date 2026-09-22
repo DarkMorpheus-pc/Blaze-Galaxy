@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=SolarUI
+Comment=SolarUI Masaüstü Ortamı
+Exec=/usr/bin/solar-session
+TryExec=/usr/bin/solar-session
+Icon=solarui
+Type=Application
+DesktopNames=SolarUI;niri
+Keywords=wayland;compositor;desktop;solarui;blazeos;

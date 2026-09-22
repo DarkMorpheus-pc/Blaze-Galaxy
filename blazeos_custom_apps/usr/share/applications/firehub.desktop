@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=FireHub
+Exec=/usr/bin/firehub %U
+Terminal=false
+Type=Application
+Icon=firehub
+StartupWMClass=FireHub
+Comment=BlazeOS işletim sistemine özel DarkMorpheus_Studio (Bulut Ars. E.) tarafından geliştirilen FireHub uygulama mağazası
+MimeType=application/vnd.debian.binary-package;application/x-rpm;application/vnd.flatpak.ref;application/x-flatpak;
+Categories=System;PackageManager;Utility;

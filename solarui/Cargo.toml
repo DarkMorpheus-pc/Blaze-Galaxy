@@ -1,0 +1,40 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/solar-common",
+    "crates/solar-niri",
+    "crates/solar-adapter",
+    "crates/solar-core",
+    "crates/solar-shell",
+    "crates/solar-session",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.89"
+authors = ["BlazeOS Team <contact@blazeos.org>"]
+license = "GPL-3.0-or-later"
+repository = "https://github.com/projectblaze/solarui"
+
+[workspace.dependencies]
+tokio = { version = "1.43", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+thiserror = "2.0"
+anyhow = "1.0"
+futures-util = "0.3"
+zbus = { version = "5.5", default-features = false, features = ["tokio"] }
+niri-ipc = "26.4"
+async-trait = "0.1"
+chrono = "0.4"
+freedesktop-desktop-entry = "0.7"
+walkdir = "2.5"
+toml = "0.8"
+
+# Local crates
+solar-common = { path = "crates/solar-common" }
+solar-niri = { path = "crates/solar-niri" }
+solar-adapter = { path = "crates/solar-adapter" }

@@ -1,0 +1,99 @@
+#!/bin/bash
+# BlazeOS — Limine Bootloader Kurulum Scripti
+# Bu script, GRUB yerine Limine kurmak isteyen kullanıcılar için
+# kurulum sonrası çalıştırılır.
+set -euo pipefail
+
+LOG="/var/log/blazeos-limine-install.log"
+ESP=""
+
+log() { echo "[$(date '+%H:%M:%S')] $*" | tee -a "$LOG"; }
+error() { log "HATA: $*"; exit 1; }
+
+# EFI sistem bölümünü bul
+find_esp() {
+    findmnt -n -o TARGET /boot/efi 2>/dev/null && return
+    # Alternatif: blkid ile ara
+    blkid -t TYPE=vfat -o device | while read -r dev; do
+        local mp
+        mp=$(findmnt -n -o TARGET "$dev" 2>/dev/null || echo "")
+        if [[ "$mp" == */efi* || "$mp" == */boot* ]]; then
+            echo "$mp"
+            return
+        fi
+    done
+}
+
+log "=== BlazeOS Limine Kurulum Başlıyor ==="
+
+# UEFI kontrolü
+if [[ ! -d /sys/firmware/efi ]]; then
+    error "Bu sistem UEFI desteklemiyor. Limine yalnızca UEFI sistemlerde desteklenir."
+fi
+
+# Limine paketini kur (Fedora COPR'dan)
+log "Limine paketi kuruluyor..."
+if ! rpm -q limine &>/dev/null; then
+    dnf copr enable -y ericzhang456/limine 2>>"$LOG" || {
+        log "COPR eklenemedi, manuel kurulum deneniyor..."
+    }
+    dnf install -y limine 2>>"$LOG" || error "Limine paketi kurulamadı."
+fi
+
+# ESP'yi bul
+ESP=$(find_esp) || error "EFI Sistem Bölümü bulunamadı."
+log "EFI Sistem Bölümü: $ESP"
+
+# Limine EFI binary'sini kopyala
+mkdir -p "$ESP/EFI/blazeos-limine"
+if [[ -f /usr/share/limine/BOOTX64.EFI ]]; then
+    cp /usr/share/limine/BOOTX64.EFI "$ESP/EFI/blazeos-limine/"
+elif [[ -f /usr/share/limine/limine-uefi-cd.bin ]]; then
+    cp /usr/share/limine/*.EFI "$ESP/EFI/blazeos-limine/" 2>/dev/null || true
+fi
+
+# Kernel ve initramfs bul
+KERN=$(ls /boot/vmlinuz-* 2>/dev/null | grep -v rescue | sort -V | tail -1)
+INIT=$(ls /boot/initramfs-*.img 2>/dev/null | grep -v rescue | sort -V | tail -1)
+ROOT_UUID=$(findmnt -n -o UUID /)
+
+[[ -z "$KERN" ]] && error "Kernel bulunamadı (/boot/vmlinuz-*)"
+[[ -z "$INIT" ]] && error "initramfs bulunamadı (/boot/initramfs-*.img)"
+[[ -z "$ROOT_UUID" ]] && error "Root UUID bulunamadı"
+
+KERN_VER=$(basename "$KERN" | sed 's/vmlinuz-//')
+log "Kernel: $KERN_VER"
+
+# Limine konfigürasyon dosyası oluştur
+cat > "$ESP/EFI/blazeos-limine/limine.conf" << LIMEOF
+TIMEOUT=5
+GRAPHICS=yes
+DEFAULT_ENTRY=1
+
+/:BlazeOS Linux ($KERN_VER)
+    PROTOCOL=linux
+    KERNEL_PATH=boot:///vmlinuz-${KERN_VER}
+    CMDLINE=root=UUID=${ROOT_UUID} ro quiet rhgb nvidia-drm.modeset=1
+    MODULE_PATH=boot:///initramfs-${KERN_VER}.img
+LIMEOF
+
+log "Limine konfigürasyonu oluşturuldu: $ESP/EFI/blazeos-limine/limine.conf"
+
+# EFI boot entry ekle
+ESP_DISK=$(lsblk -no PKNAME "$(findmnt -n -o SOURCE "$ESP")" 2>/dev/null | head -1)
+ESP_PARTNUM=$(lsblk -no PARTN "$(findmnt -n -o SOURCE "$ESP")" 2>/dev/null)
+
+if [[ -n "$ESP_DISK" && -n "$ESP_PARTNUM" ]]; then
+    efibootmgr --create \
+        --disk "/dev/$ESP_DISK" \
+        --part "$ESP_PARTNUM" \
+        --loader '\EFI\blazeos-limine\BOOTX64.EFI' \
+        --label "BlazeOS (Limine)" \
+        --unicode 2>>"$LOG" && log "EFI boot entry eklendi." || log "EFI boot entry eklenemedi (manuel eklemeniz gerekebilir)."
+fi
+
+# GRUB'u devre dışı bırak (isteğe bağlı)
+# systemctl disable grub-boot-indeterminate.service 2>/dev/null || true
+
+log "=== Limine kurulumu tamamlandı! ==="
+log "Sistemin yeniden başlatıldığında Limine boot menüsü görünecektir."

@@ -1,0 +1,9 @@
+[window]
+opacity = 0.92
+
+[window.padding]
+x = 12
+y = 12
+
+[font]
+size = 11

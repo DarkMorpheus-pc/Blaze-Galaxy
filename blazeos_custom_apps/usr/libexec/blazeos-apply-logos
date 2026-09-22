@@ -1,0 +1,120 @@
+#!/usr/bin/env bash
+# =============================================================================
+# blazeos-apply-logos — Sistemdeki tüm Fedora logolarını BlazeOS amblemiyle
+# değiştirir. Idempotent ve güvenlidir: birden fazla kez çalıştırılabilir,
+# hiçbir koşulda hata döndürmez (%post ve DE kurulumu sırasında çağrılır).
+#
+# Neden gerekli: KDE/diğer masaüstleri KURULUMDAN SONRA eklendiği için, branding
+# RPM'i onların 'start-here' ikonlarını build anında damgalayamaz. Bu betik DE
+# kurulduktan sonra tekrar çağrılır ve yeni gelen Fedora logolarını da değiştirir.
+# =============================================================================
+set -u
+
+# --- BlazeOS logo kaynağını bul -------------------------------------------
+SRC=""
+for c in \
+    /usr/share/icons/hicolor/256x256/apps/blazeos-logo.png \
+    /usr/share/icons/hicolor/128x128/apps/blazeos-logo.png \
+    /usr/share/blazeos/icons/blazeos-logo-256.png \
+    /usr/share/blazeos/fastfetch/logo.png \
+    /usr/share/backgrounds/blazeos/blazeos-logo.png ; do
+    [ -f "$c" ] && { SRC="$c"; break; }
+done
+[ -z "$SRC" ] && { echo "blazeos-apply-logos: BlazeOS logo kaynağı bulunamadı, atlanıyor."; exit 0; }
+
+HAVE_MAGICK=0
+command -v magick >/dev/null 2>&1 && HAVE_MAGICK=1
+
+# --- Bir PNG hedefini BlazeOS logosuyla değiştir (boyutu koruyarak) --------
+replace_png() {
+    local dst="$1"
+    [ -f "$dst" ] || return 0
+    if [ "$HAVE_MAGICK" -eq 1 ]; then
+        local dim
+        dim=$(magick identify -format '%wx%h' "$dst" 2>/dev/null | head -1)
+        [ -z "$dim" ] && dim="256x256"
+        magick "$SRC" -resize "$dim" -background none -gravity center \
+               -extent "$dim" "$dst" 2>/dev/null || cp -f "$SRC" "$dst"
+    else
+        cp -f "$SRC" "$dst"   # boyut tüketici tarafından ölçeklenir
+    fi
+}
+
+# --- Bir SVG hedefini, PNG'yi SVG'ye sararak değiştir ----------------------
+# (start-here ikonları çoğunlukla SVG'dir; PNG'yi base64 ile gömeriz, her
+#  SVG tüketicisi render eder.)
+replace_svg() {
+    local dst="$1"
+    [ -f "$dst" ] || return 0
+    local b64
+    b64=$(base64 -w0 "$SRC" 2>/dev/null) || return 0
+    cat > "$dst" <<SVG || true
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="256" height="256" viewBox="0 0 256 256">
+<image width="256" height="256" preserveAspectRatio="xMidYMid meet" xlink:href="data:image/png;base64,${b64}"/>
+</svg>
+SVG
+}
+
+echo "blazeos-apply-logos: kaynak = $SRC"
+
+# --- 1) Sabit konumlardaki Fedora PNG logoları ----------------------------
+for f in \
+    /usr/share/pixmaps/fedora-logo-icon.png \
+    /usr/share/pixmaps/fedora_logo.png \
+    /usr/share/pixmaps/fedora_logo_med.png \
+    /usr/share/pixmaps/system-logo-white.png \
+    /usr/share/pixmaps/fedora-gdm-logo.png ; do
+    replace_png "$f"
+done
+
+# --- 2) Icon temalarındaki start-here* + fedora-logo* (tüm boyut/varyantlar) -
+#     find ile: start-here-kde, -kde-symbolic, -kde-plasma, -kde-fedora,
+#     -symbolic, sade start-here + fedora-logo-icon hepsi yakalanır.
+for theme in hicolor Adwaita AdwaitaLegacy breeze breeze-dark oxygen Bluecurve; do
+    base="/usr/share/icons/$theme"
+    [ -d "$base" ] || continue
+    while IFS= read -r f; do
+        [ -f "$f" ] || continue
+        case "$f" in
+            *.png) replace_png "$f" ;;
+            *.svg) replace_svg "$f" ;;
+        esac
+    done < <(find "$base" -type f \( \
+                -iname 'start-here.png'        -o -iname 'start-here.svg' \
+             -o -iname 'start-here-kde*.png'   -o -iname 'start-here-kde*.svg' \
+             -o -iname 'start-here-symbolic.svg' \
+             -o -iname 'fedora-logo-icon*.png' -o -iname 'fedora-logo-icon*.svg' \
+             -o -iname 'fedora_logo*.png' \
+             \) 2>/dev/null)
+done
+
+# --- 2.5) Cinnamon menü etiketi: "Menu" -> "Blaze" ------------------------
+# Cinnamon menü applet'i, instance ayarını ilk oturumda şema VARSAYILANINDAN
+# üretir. Bu betik DE kurulumundan SONRA (henüz Cinnamon'a girilmeden) çalıştığı
+# için varsayılanı şimdi değiştirince ilk Cinnamon girişinde etiket "Blaze"
+# gelir. Güvenli: dosya/py yoksa veya şema farklıysa sessizce atlar.
+CIN_SCHEMA="/usr/share/cinnamon/applets/menu@cinnamon.org/settings-schema.json"
+if [ -f "$CIN_SCHEMA" ] && command -v python3 >/dev/null 2>&1; then
+    python3 - "$CIN_SCHEMA" <<'PYEOF' 2>/dev/null || true
+import json, sys
+p = sys.argv[1]
+try:
+    with open(p, encoding="utf-8") as f:
+        d = json.load(f)
+    if isinstance(d, dict) and isinstance(d.get("menu-label"), dict):
+        d["menu-label"]["default"] = "Blaze"
+        with open(p, "w", encoding="utf-8") as f:
+            json.dump(d, f, indent=4, ensure_ascii=False)
+except Exception:
+    pass
+PYEOF
+fi
+
+# --- 3) Icon önbelleklerini güncelle --------------------------------------
+for d in /usr/share/icons/hicolor /usr/share/icons/Adwaita \
+         /usr/share/icons/breeze /usr/share/icons/breeze-dark ; do
+    [ -d "$d" ] && gtk-update-icon-cache -qtf "$d" 2>/dev/null || true
+done
+
+echo "blazeos-apply-logos: tamamlandı."
+exit 0

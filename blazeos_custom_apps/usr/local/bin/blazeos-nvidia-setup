@@ -1,0 +1,77 @@
+#!/bin/bash
+# BlazeOS NVIDIA İlk Başlatma Sürücü Kurulumu
+# Yalnızca NVIDIA GPU tespit edildiğinde çalışır, bir kez çalışıp biter.
+set -euo pipefail
+
+DONE_FLAG="/var/lib/blazeos/nvidia-setup-done"
+LOG="/var/log/blazeos-nvidia-setup.log"
+mkdir -p /var/lib/blazeos
+
+log() { echo "[$(date '+%H:%M:%S')] $*" | tee -a "$LOG"; }
+
+detect_nvidia() {
+    lspci 2>/dev/null | grep -iq "nvidia"
+}
+
+# Zaten yapıldıysa çık
+if [[ -f "$DONE_FLAG" ]]; then
+    log "NVIDIA kurulumu zaten tamamlanmış, atlanıyor."
+    exit 0
+fi
+
+# GPU yoksa işareti koy ve çık
+if ! detect_nvidia; then
+    log "NVIDIA GPU bulunamadı, kurulum atlandı."
+    touch "$DONE_FLAG"
+    exit 0
+fi
+
+log "NVIDIA GPU tespit edildi: $(lspci | grep -i nvidia | head -1)"
+log "RPM Fusion ve NVIDIA sürücüleri kuruluyor..."
+
+FEDORA_VER=$(rpm -E %fedora)
+
+# RPM Fusion depolarını ekle
+dnf install -y \
+    "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-${FEDORA_VER}.noarch.rpm" \
+    "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-${FEDORA_VER}.noarch.rpm" \
+    2>>"$LOG" || {
+    log "HATA: RPM Fusion eklenemedi. İnternet bağlantısını kontrol edin."
+    exit 1
+}
+
+# NVIDIA kernel modülü + CUDA desteği
+dnf install -y akmod-nvidia xorg-x11-drv-nvidia-cuda 2>>"$LOG" || {
+    log "HATA: NVIDIA sürücüleri kurulamadı."
+    exit 1
+}
+
+log "NVIDIA sürücüleri kuruldu. Kernel modülü derleniyor (bu birkaç dakika alabilir)..."
+
+# akmods tamamlanana kadar bekle (en fazla 5 dakika)
+for i in $(seq 1 60); do
+    if modinfo -F version nvidia &>/dev/null; then
+        log "NVIDIA modülü hazır."
+        break
+    fi
+    sleep 5
+done
+
+# DRM modeset — Wayland için zorunlu
+grubby --update-kernel=ALL \
+    --args="nvidia-drm.modeset=1 nvidia-drm.fbdev=1" 2>>"$LOG"
+log "nvidia-drm.modeset=1 kernel parametresi eklendi."
+
+# nouveau blacklist
+cat > /etc/modprobe.d/blazeos-nouveau-blacklist.conf << 'MODEOF'
+blacklist nouveau
+options nouveau modeset=0
+MODEOF
+log "nouveau blacklist oluşturuldu."
+
+# initramfs yenile
+dracut --force 2>>"$LOG"
+log "initramfs yenilendi."
+
+touch "$DONE_FLAG"
+log "=== BlazeOS NVIDIA kurulumu tamamlandı. Lütfen yeniden başlatın. ==="

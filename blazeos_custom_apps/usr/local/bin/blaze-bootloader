@@ -1,0 +1,365 @@
+#!/bin/bash
+# ==============================================================================
+# Blaze SolarEvolution — Bootloader Management Tool (blaze-bootloader)
+# Easily switch, install, and update between GNU GRUB2 and Limine Bootloader.
+# ==============================================================================
+set -e
+
+SYSROOT=""
+COMMAND="${1:-status}"
+
+# Parse optional --sysroot
+shift || true
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --sysroot=*)
+            SYSROOT="${1#*=}"
+            shift
+            ;;
+        --sysroot)
+            SYSROOT="$2"
+            shift 2
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
+
+# Ensure SYSROOT has no trailing slash
+SYSROOT="${SYSROOT%/}"
+
+# Colors
+C_RESET="\033[0m"
+C_BOLD="\033[1m"
+C_CYAN="\033[36m"
+C_GREEN="\033[32m"
+C_YELLOW="\033[33m"
+C_RED="\033[31m"
+
+log_info() { echo -e "${C_CYAN}${C_BOLD}[INFO]${C_RESET} $*"; }
+log_ok()   { echo -e "${C_GREEN}${C_BOLD}[OK]${C_RESET} $*"; }
+log_warn() { echo -e "${C_YELLOW}${C_BOLD}[UYARI]${C_RESET} $*"; }
+log_err()  { echo -e "${C_RED}${C_BOLD}[HATA]${C_RESET} $*" >&2; }
+
+find_esp_dir() {
+    local target_esp="${SYSROOT}/boot/efi"
+    if [[ -d "$target_esp" ]]; then
+        echo "$target_esp"
+        return 0
+    fi
+    # Fallback to mounted ESP
+    local mp
+    mp=$(findmnt -n -o TARGET /boot/efi 2>/dev/null || true)
+    if [[ -n "$mp" && -d "$mp" ]]; then
+        echo "$mp"
+        return 0
+    fi
+    return 1
+}
+
+find_root_uuid() {
+    local fstab="${SYSROOT}/etc/fstab"
+    local uuid=""
+    if [[ -f "$fstab" ]]; then
+        # Search for mount point / (root)
+        uuid=$(awk '$2 == "/" { if ($1 ~ /^UUID=/) { split($1, a, "="); print a[2] } }' "$fstab" | head -1)
+    fi
+    if [[ -z "$uuid" ]]; then
+        uuid=$(findmnt -n -o UUID "${SYSROOT:-/}" 2>/dev/null || true)
+    fi
+    echo "$uuid"
+}
+
+do_status() {
+    echo -e "${C_CYAN}${C_BOLD}=== [ BlazeOS Önyükleyici (Bootloader) Durumu ] ===${C_RESET}\n"
+    
+    local esp
+    esp=$(find_esp_dir || true)
+    if [[ -z "$esp" ]]; then
+        echo -e "  EFI Sistem Bölümü: ${C_RED}Bulunamadı veya UEFI devrede değil.${C_RESET}"
+        return 1
+    fi
+    echo -e "  ${C_BOLD}EFI Bölümü:${C_RESET} $esp"
+    
+    # Check Limine installation
+    if [[ -f "$esp/EFI/limine/BOOTX64.EFI" ]]; then
+        echo -e "  ${C_BOLD}Limine Bootloader:${C_RESET} ${C_GREEN}Kurulu${C_RESET} ($esp/EFI/limine/BOOTX64.EFI)"
+    else
+        echo -e "  ${C_BOLD}Limine Bootloader:${C_RESET} ${C_YELLOW}Kurulu değil${C_RESET}"
+    fi
+
+    # Check GRUB installation
+    if [[ -f "$esp/EFI/fedora/shimx64.efi" || -f "$esp/EFI/fedora/grubx64.efi" ]]; then
+        echo -e "  ${C_BOLD}GNU GRUB2:${C_RESET}         ${C_GREEN}Kurulu${C_RESET} ($esp/EFI/fedora/shimx64.efi)"
+    else
+        echo -e "  ${C_BOLD}GNU GRUB2:${C_RESET}         ${C_YELLOW}Kurulu değil${C_RESET}"
+    fi
+
+    # EFI Boot Entries
+    if [[ -d /sys/firmware/efi ]] && command -v efibootmgr &>/dev/null; then
+        echo -e "\n${C_BOLD}=== [ Aktif EFI Boot Sıralaması ] ===${C_RESET}"
+        local order
+        order=$(efibootmgr | grep -E '^BootOrder:' || true)
+        echo "  $order"
+        efibootmgr | grep -E '^Boot[0-9]+' | while read -r line; do
+            if echo "$line" | grep -iq "limine"; then
+                echo -e "  ${C_GREEN}* $line (Limine)${C_RESET}"
+            elif echo "$line" | grep -iq "fedora"; then
+                echo -e "  ${C_CYAN}* $line (Fedora GRUB)${C_RESET}"
+            else
+                echo "    $line"
+            fi
+        done
+    fi
+    echo ""
+}
+
+do_switch_to_limine() {
+    log_info "Limine Bootloader kurulumu ve yapılandırması başlatılıyor..."
+
+    local esp
+    esp=$(find_esp_dir) || {
+        log_err "EFI Sistem Bölümü bulunamadı ($SYSROOT/boot/efi)."
+        exit 1
+    }
+
+    # 1. Install Limine EFI binary
+    local limine_src="/usr/share/limine/BOOTX64.EFI"
+    if [[ ! -f "$limine_src" && -f "${SYSROOT}/usr/share/limine/BOOTX64.EFI" ]]; then
+        limine_src="${SYSROOT}/usr/share/limine/BOOTX64.EFI"
+    fi
+
+    if [[ ! -f "$limine_src" ]]; then
+        log_err "Limine EFI ikilisi ($limine_src) bulunamadı!"
+        exit 1
+    fi
+
+    mkdir -p "$esp/EFI/limine"
+    cp -f "$limine_src" "$esp/EFI/limine/BOOTX64.EFI"
+    log_ok "Limine EFI ikilisi kopyalandı: $esp/EFI/limine/BOOTX64.EFI"
+
+    # 2. Sync newest kernel & initramfs to $esp/blazeos/
+    local boot_dir="${SYSROOT}/boot"
+    local kern
+    local init
+    kern=$(ls -v "${boot_dir}"/vmlinuz-* 2>/dev/null | grep -v rescue | tail -1 || true)
+    init=$(ls -v "${boot_dir}"/initramfs-*.img 2>/dev/null | grep -v rescue | tail -1 || true)
+
+    if [[ -z "$kern" || -z "$init" ]]; then
+        log_warn "Çekirdek veya initramfs $boot_dir altında bulunamadı. Mevcut /boot aranıyor..."
+        kern=$(ls -v /boot/vmlinuz-* 2>/dev/null | grep -v rescue | tail -1 || true)
+        init=$(ls -v /boot/initramfs-*.img 2>/dev/null | grep -v rescue | tail -1 || true)
+    fi
+
+    mkdir -p "$esp/blazeos"
+    if [[ -n "$kern" && -n "$init" ]]; then
+        local kern_ver
+        kern_ver=$(basename "$kern" | sed 's/vmlinuz-//')
+        log_info "En güncel çekirdek tespit edildi: $kern_ver"
+        cp -f "$kern" "$esp/blazeos/vmlinuz"
+        cp -f "$init" "$esp/blazeos/initramfs.img"
+        log_ok "Çekirdek ve initramfs EFI bölümüne senkronize edildi ($esp/blazeos/)."
+    else
+        log_warn "Çekirdek kopyalanamadı, limine.conf varolan dosyaları referans alacak."
+    fi
+
+    # 3. Create limine.conf
+    local root_uuid
+    root_uuid=$(find_root_uuid)
+    if [[ -z "$root_uuid" ]]; then
+        root_uuid="LABEL=BlazeOS"
+    fi
+
+    cat > "$esp/EFI/limine/limine.conf" << LIMEOF
+# ==============================================================================
+# Blaze SolarEvolution — Limine Bootloader Configuration
+# Ultra-fast, responsive, modern UEFI boot menu
+# ==============================================================================
+timeout: 5
+graphics: yes
+default_entry: 1
+
+interface_branding: Blaze SolarEvolution (Limine Bootloader)
+interface_branding_colour: 6
+
+/Blaze SolarEvolution Linux
+    protocol: linux
+    kernel_path: boot():/blazeos/vmlinuz
+    module_path: boot():/blazeos/initramfs.img
+    cmdline: root=UUID=${root_uuid} ro quiet rhgb splash
+
+/Blaze SolarEvolution (Kurtarma Modu)
+    protocol: linux
+    kernel_path: boot():/blazeos/vmlinuz
+    module_path: boot():/blazeos/initramfs.img
+    cmdline: root=UUID=${root_uuid} ro single
+
+/GNU GRUB2 (Fedora)
+    protocol: efi
+    path: boot():/EFI/fedora/shimx64.efi
+LIMEOF
+    mkdir -p "$esp/EFI/BOOT"
+    cp -f "$esp/EFI/limine/limine.conf" "$esp/EFI/BOOT/limine.conf" 2>/dev/null || true
+    cp -f "$esp/EFI/limine/limine.conf" "$esp/limine.conf" 2>/dev/null || true
+    log_ok "Limine yapılandırması oluşturuldu: $esp/EFI/limine/limine.conf"
+
+    # Also install as default UEFI fallback (/EFI/BOOT/BOOTX64.EFI)
+    if [[ -f "$esp/EFI/BOOT/BOOTX64.EFI" && ! -f "$esp/EFI/BOOT/BOOTX64.EFI.grub-backup" ]]; then
+        cp -f "$esp/EFI/BOOT/BOOTX64.EFI" "$esp/EFI/BOOT/BOOTX64.EFI.grub-backup"
+    fi
+    cp -f "$limine_src" "$esp/EFI/BOOT/BOOTX64.EFI"
+    log_ok "Limine UEFI fallback (/EFI/BOOT/BOOTX64.EFI) olarak da kuruldu."
+
+    # 4. BIOS Limine Support: install limine-bios.sys and limine.conf to all candidate locations
+    local bios_sys="/usr/share/limine/limine-bios.sys"
+    if [[ ! -f "$bios_sys" && -f "${SYSROOT}/usr/share/limine/limine-bios.sys" ]]; then
+        bios_sys="${SYSROOT}/usr/share/limine/limine-bios.sys"
+    fi
+    if [[ -f "$bios_sys" ]]; then
+        for target_loc in "${boot_dir}" "${boot_dir}/limine" "${SYSROOT}/" "${SYSROOT}/limine" "$esp" "$esp/limine"; do
+            if [[ -d "$target_loc" ]]; then
+                cp -f "$bios_sys" "$target_loc/limine-bios.sys" 2>/dev/null || true
+            fi
+        done
+        if [[ -f "$esp/blazeos/vmlinuz" && -d "$boot_dir" ]]; then
+            cp -f "$esp/blazeos/vmlinuz" "$boot_dir/blazeos/vmlinuz" 2>/dev/null || true
+            cp -f "$esp/blazeos/initramfs.img" "$boot_dir/blazeos/initramfs.img" 2>/dev/null || true
+        elif [[ -n "$kern" && -n "$init" && -d "$boot_dir" ]]; then
+            cp -f "$kern" "$boot_dir/blazeos/vmlinuz" 2>/dev/null || true
+            cp -f "$init" "$boot_dir/blazeos/initramfs.img" 2>/dev/null || true
+        fi
+        if [[ -f "$esp/limine.conf" ]]; then
+            for conf_loc in "${boot_dir}" "${boot_dir}/limine" "${SYSROOT}/" "${SYSROOT}/limine"; do
+                if [[ -d "$conf_loc" ]]; then
+                    cp -f "$esp/limine.conf" "$conf_loc/limine.conf" 2>/dev/null || true
+                fi
+            done
+        fi
+        log_ok "Limine BIOS (limine-bios.sys) tüm olası kök ve /boot konumlarına yerleştirildi."
+
+        # Run limine bios-install if limine utility is present
+        local limine_bin
+        limine_bin=$(command -v limine 2>/dev/null || true)
+        if [[ -z "$limine_bin" && -x "${SYSROOT}/usr/bin/limine" ]]; then
+            limine_bin="${SYSROOT}/usr/bin/limine"
+        fi
+        if [[ -n "$limine_bin" ]]; then
+            local target_dev
+            target_dev=$(findmnt -n -o SOURCE "${SYSROOT}/boot" 2>/dev/null || findmnt -n -o SOURCE "${SYSROOT:-/}" 2>/dev/null || true)
+            if [[ -n "$target_dev" ]]; then
+                local disk_name
+                disk_name=$(lsblk -no PKNAME "$target_dev" 2>/dev/null | head -1 || true)
+                if [[ -z "$disk_name" ]]; then
+                    # Could be /dev/mapper/... check underlying device
+                    disk_name=$(lsblk -no PKNAME $(lsblk -no KNAME "$target_dev" 2>/dev/null | head -1) 2>/dev/null | head -1 || true)
+                fi
+                if [[ -z "$disk_name" ]]; then
+                    # Fallback detection for disk
+                    disk_name=$(echo "$target_dev" | sed -E 's/[0-9]+$//' | sed 's#/dev/##')
+                fi
+                if [[ -n "$disk_name" && -b "/dev/$disk_name" ]]; then
+                    log_info "Limine BIOS önyükleyicisi diske yazılıyor: /dev/$disk_name..."
+                    if "$limine_bin" bios-install "/dev/$disk_name" &>/dev/null; then
+                        log_ok "Limine BIOS MBR/GPT aşamaları başarıyla kuruldu (/dev/$disk_name)."
+                    else
+                        log_warn "Limine bios-install çalıştırılamadı."
+                    fi
+                fi
+            fi
+        fi
+    fi
+
+    # 5. Register with efibootmgr if running on live UEFI system
+    if [[ -d /sys/firmware/efi ]] && command -v efibootmgr &>/dev/null; then
+        local esp_mount
+        esp_mount=$(findmnt -n -o SOURCE "$esp" 2>/dev/null || true)
+        if [[ -n "$esp_mount" ]]; then
+            local esp_disk
+            local esp_part
+            esp_disk=$(lsblk -no PKNAME "$esp_mount" 2>/dev/null | head -1 || true)
+            esp_part=$(lsblk -no PARTN "$esp_mount" 2>/dev/null | head -1 || true)
+
+            if [[ -n "$esp_disk" && -n "$esp_part" ]]; then
+                log_info "EFI NVRAM kaydı yapılıyor: /dev/$esp_disk disk, Bölüm $esp_part..."
+                # Delete existing BlazeOS / Limine entry if duplicate
+                efibootmgr | grep -i "BlazeOS (Limine)" | while read -r line; do
+                    local bnum
+                    bnum=$(echo "$line" | sed -E 's/^Boot([0-9A-Fa-f]+).*/\1/')
+                    if [[ -n "$bnum" ]]; then
+                        efibootmgr -b "$bnum" -B &>/dev/null || true
+                    fi
+                done
+
+                # Create new entry
+                if efibootmgr --create --disk "/dev/$esp_disk" --part "$esp_part" \
+                    --loader '\EFI\limine\BOOTX64.EFI' \
+                    --label "BlazeOS (Limine)" \
+                    --unicode &>/dev/null; then
+                    log_ok "BlazeOS (Limine) EFI NVRAM BootOrder başına başarıyla eklendi!"
+                else
+                    log_warn "efibootmgr kaydı oluşturulamadı (KVM/QEMU veya kısıtlı ortam olabilir)."
+                fi
+            fi
+        fi
+    fi
+
+    log_ok "Limine önyükleyicisi başarıyla etkinleştirildi!"
+}
+
+do_switch_to_grub() {
+    log_info "GNU GRUB2 önyükleyicisine geri geçiş yapılıyor..."
+
+    local esp
+    esp=$(find_esp_dir || true)
+    if [[ -n "$esp" && -f "$esp/EFI/BOOT/BOOTX64.EFI.grub-backup" ]]; then
+        cp -f "$esp/EFI/BOOT/BOOTX64.EFI.grub-backup" "$esp/EFI/BOOT/BOOTX64.EFI"
+        log_ok "UEFI fallback ($esp/EFI/BOOT/BOOTX64.EFI) GRUB2 olarak geri yüklendi."
+    fi
+
+    if [[ -d /sys/firmware/efi ]] && command -v efibootmgr &>/dev/null; then
+        local fedora_bootnum=""
+        while read -r line; do
+            if echo "$line" | grep -qi "fedora"; then
+                fedora_bootnum=$(echo "$line" | sed -E 's/^Boot([0-9A-Fa-f]+).*/\1/')
+                break
+            fi
+        done < <(efibootmgr)
+
+        if [[ -n "$fedora_bootnum" ]]; then
+            local current_order
+            current_order=$(efibootmgr | grep -E '^BootOrder:' | sed 's/BootOrder: //')
+            # Move fedora_bootnum to front
+            local new_order
+            new_order=$(echo "$current_order" | tr ',' '\n' | grep -v "^${fedora_bootnum}$" | paste -sd, -)
+            new_order="${fedora_bootnum},${new_order}"
+            efibootmgr -o "$new_order" &>/dev/null || true
+            log_ok "Fedora GRUB2 ($fedora_bootnum) EFI BootOrder başına taşındı: $new_order"
+        else
+            log_warn "Fedora GRUB2 EFI girdisi bulunamadı."
+        fi
+    else
+        log_warn "UEFI / efibootmgr devrede değil."
+    fi
+
+    log_ok "GNU GRUB2 önyükleyicisi birincil olarak ayarlandı."
+}
+
+case "$COMMAND" in
+    status)
+        do_status
+        ;;
+    switch-to-limine|limine)
+        do_switch_to_limine
+        ;;
+    switch-to-grub|grub|grub2)
+        do_switch_to_grub
+        ;;
+    update)
+        do_switch_to_limine
+        ;;
+    *)
+        echo "Kullanım: blaze-bootloader {status|switch-to-limine|switch-to-grub|update} [--sysroot=/mnt/sysroot]"
+        exit 1
+        ;;
+esac

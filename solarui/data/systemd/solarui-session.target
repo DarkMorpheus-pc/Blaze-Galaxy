@@ -1,0 +1,5 @@
+[Unit]
+Description=SolarUI Wayland Session Target
+BindsTo=graphical-session.target
+Wants=solar-core.service solar-shell.service
+After=graphical-session.target

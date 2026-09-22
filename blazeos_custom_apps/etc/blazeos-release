@@ -1,0 +1,6 @@
+BlazeOS Galaxy SolarEvolution
+Codename: SolarEvolution
+Variant: Workstation Live
+Base: Fedora 44 (kernel 6.19.x)
+Version: 2.0
+Changes: Niri WM, FireHub 1.8.1, NVIDIA fix, Limine support

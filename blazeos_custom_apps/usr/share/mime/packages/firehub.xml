@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+<mime-type type="application/vnd.debian.binary-package">
+  <glob pattern="*.deb"/>
+    
+  <icon name="x-office-document" />
+</mime-type>
+<mime-type type="application/x-rpm">
+  <glob pattern="*.rpm"/>
+    
+  <icon name="x-office-document" />
+</mime-type>
+<mime-type type="application/vnd.flatpak.ref">
+  <glob pattern="*.flatpakref"/>
+    
+  <icon name="x-office-document" />
+</mime-type>
+<mime-type type="application/x-flatpak">
+  <glob pattern="*.flatpak"/>
+    
+  <icon name="x-office-document" />
+</mime-type>
+</mime-info>

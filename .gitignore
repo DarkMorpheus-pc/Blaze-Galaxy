@@ -1,0 +1,77 @@
+# BlazeOS SolarEvolution 5 — Git Ignore
+
+# ============================================================
+# Build outputs
+# ============================================================
+*.iso
+*.img
+*.squashfs
+*.ppm
+
+# ============================================================
+# Large build directories (NOT committed, must be built locally)
+# ============================================================
+work_f45/LiveOS/
+work_f45/initrd*/
+work_f45/iso_mods/
+work_f45/stock_initrd_inspect/
+f45_base/
+
+# Build working rootfs itself is large (3GB+) - exclude from git
+# Only the custom overlay in blazeos_custom_apps/ is tracked
+work_f45/rootfs/
+
+# Large prebuilt Electron binaries (>100MB limit on GitHub)
+blazeos_custom_apps/opt/FireHub/
+
+
+# ============================================================
+# Old build artifacts
+# ============================================================
+work/
+build_clean.sh.bak
+build_f45_final.sh.bak
+test_screen.ppm
+
+# ============================================================
+# Logs, caches, temp files
+# ============================================================
+*.log
+*.tmp
+/tmp/
+
+# ============================================================
+# SSH / GPG / credentials (just in case)
+# ============================================================
+*.pem
+id_rsa
+id_rsa.pub
+id_ed25519
+id_ed25519.pub
+*.key
+.env
+.secrets
+
+# ============================================================
+# Python
+# ============================================================
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# ============================================================
+# Rust / Cargo build artifacts
+# ============================================================
+target/
+Cargo.lock
+
+# ============================================================
+# Editor / OS
+# ============================================================
+.DS_Store
+.vscode/
+*.swp
+*.swo
+*~

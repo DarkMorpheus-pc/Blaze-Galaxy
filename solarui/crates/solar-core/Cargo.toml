@@ -1,0 +1,25 @@
+[package]
+name = "solar-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+solar-common = { workspace = true }
+solar-niri = { workspace = true }
+solar-adapter = { workspace = true }
+niri-ipc = { workspace = true }
+tokio = { workspace = true }
+zbus = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+futures-util = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"

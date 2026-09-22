@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=SolarUI Ayarları
+GenericName=Masaüstü ve Görev Çubuğu Ayarları
+Comment=SolarUI Masaüstü, Görev Çubuğu ve Noctalia Yapılandırması
+Exec=solar-shell settings
+Icon=solarui
+Terminal=false
+Type=Application
+Categories=Settings;DesktopSettings;GTK;
+Keywords=solarui;settings;taskbar;theme;noctalia;
+StartupNotify=true
+StartupWMClass=solar-settings

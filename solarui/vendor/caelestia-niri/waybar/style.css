@@ -1,0 +1,19 @@
+* {
+	font-family: monospace;
+	font-size: 13px;
+}
+
+window#waybar {
+	background: rgba(20,20,20,0.85);
+}
+
+#clock,
+#cpu,
+#memory,
+#battery,
+custom-logo {
+	padding: 0 10px;
+	margin: 6px;
+	border-radius: 10px;
+	background: rgba(255,255,255,0.08);
+}

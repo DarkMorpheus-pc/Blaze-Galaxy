@@ -1,0 +1,187 @@
+#!/bin/bash
+# ==============================================================================
+# BlazeOS Post-Installation Firstboot Setup
+# Ensures proper user session, cleans liveuser, sets GDM, applies bootloader
+# ==============================================================================
+set -e
+
+LOG="/var/log/blazeos-postinstall.log"
+exec >> "$LOG" 2>&1
+echo "=== Starting BlazeOS Post-Install at $(date) ==="
+
+# 1. Purge liveuser if still lingering
+if id -u liveuser &>/dev/null; then
+    echo "Purging lingering liveuser account..."
+    userdel -rf liveuser 2>/dev/null || true
+    rm -rf /home/liveuser /var/lib/AccountsService/users/liveuser /etc/sudoers.d/liveuser
+fi
+
+# 2. Configure GDM custom.conf
+echo "Ensuring GDM configuration..."
+mkdir -p /etc/gdm
+cat > /etc/gdm/custom.conf << 'GDMEOF'
+# GDM configuration storage
+[daemon]
+WaylandEnable=true
+DefaultSession=solarui.desktop
+InitialSetupEnable=false
+
+[security]
+
+[debug]
+GDMEOF
+
+# 3. Configure AccountsService for all human users (UID >= 1000)
+echo "Configuring user sessions in AccountsService..."
+mkdir -p /var/lib/AccountsService/users
+while IFS=: read -r user pass uid gid gecos home shell; do
+    if [ "$uid" -ge 1000 ] && [ "$uid" -lt 65534 ] && [ "$user" != "liveuser" ]; then
+        echo "Found user: $user (UID: $uid)"
+        cat > "/var/lib/AccountsService/users/$user" << ASCEOF
+[User]
+Session=solarui
+SessionType=wayland
+Icon=/usr/share/icons/hicolor/256x256/apps/solarui.png
+ASCEOF
+        chmod 0600 "/var/lib/AccountsService/users/$user"
+        chown root:root "/var/lib/AccountsService/users/$user"
+
+        for g in wheel video audio render input; do
+            usermod -aG "$g" "$user" 2>/dev/null || true
+        done
+
+        if [ -d "$home" ]; then
+            mkdir -p "$home/.config/solarui" "$home/.config/noctalia"
+            if [ ! -f "$home/.config/noctalia/settings.toml" ] && [ -f /etc/skel/.config/noctalia/settings.toml ]; then
+                cp -f /etc/skel/.config/noctalia/settings.toml "$home/.config/noctalia/"
+            fi
+            if [ ! -f "$home/.config/solarui/niri.kdl" ] && [ -f /etc/solarui/niri.kdl ]; then
+                cp -f /etc/solarui/niri.kdl "$home/.config/solarui/"
+            fi
+            chown -R "$user:$user" "$home/.config" 2>/dev/null || true
+        fi
+    fi
+done < /etc/passwd
+
+# 4. Check desktop choice
+if [ -f /etc/blazeos-desktop-choice ]; then
+    CHOICE=$(cat /etc/blazeos-desktop-choice | tr -d ' \n\r')
+    echo "Desktop choice: $CHOICE"
+    case "$CHOICE" in
+        solarui|solarui_pure)
+            echo "Applying SolarUI session..."
+            if [ -f /usr/share/wayland-sessions/gnome.desktop ]; then
+                if ! grep -q "^NoDisplay=" /usr/share/wayland-sessions/gnome.desktop; then
+                    sed -i '/^\[Desktop Entry\]/a NoDisplay=true' /usr/share/wayland-sessions/gnome.desktop
+                else
+                    sed -i 's/^NoDisplay=.*/NoDisplay=true/' /usr/share/wayland-sessions/gnome.desktop
+                fi
+            fi
+            sed -i 's/^DefaultSession=.*/DefaultSession=solarui.desktop/' /etc/gdm/custom.conf 2>/dev/null || true
+            ;;
+        gnome)
+            echo "Applying GNOME session..."
+            sed -i 's/^NoDisplay=.*/NoDisplay=false/' /usr/share/wayland-sessions/gnome.desktop 2>/dev/null || true
+            sed -i 's/^DefaultSession=.*/DefaultSession=gnome.desktop/' /etc/gdm/custom.conf 2>/dev/null || true
+            ;;
+        niri)
+            echo "Applying Niri session..."
+            sed -i 's/^NoDisplay=.*/NoDisplay=false/' /usr/share/wayland-sessions/niri.desktop 2>/dev/null || true
+            sed -i 's/^DefaultSession=.*/DefaultSession=niri.desktop/' /etc/gdm/custom.conf 2>/dev/null || true
+            ;;
+        kde)
+            echo "Applying KDE Plasma session..."
+            if ! rpm -q plasma-workspace-wayland &>/dev/null; then
+                echo "Installing KDE Plasma desktop packages..."
+                dnf install -y --setopt=install_weak_deps=False plasma-workspace-wayland kde-settings 2>&1 || true
+            fi
+            if [ -f /usr/share/wayland-sessions/plasma.desktop ]; then
+                sed -i 's/^DefaultSession=.*/DefaultSession=plasma.desktop/' /etc/gdm/custom.conf 2>/dev/null || true
+                for u in /var/lib/AccountsService/users/*; do
+                    [ -f "$u" ] && sed -i 's/^Session=.*/Session=plasma/' "$u" 2>/dev/null || true
+                done
+            fi
+            ;;
+        cosmic)
+            echo "Applying COSMIC session..."
+            if ! rpm -q cosmic-session &>/dev/null; then
+                echo "Installing COSMIC desktop packages..."
+                dnf install -y --setopt=install_weak_deps=False cosmic-session 2>&1 || true
+            fi
+            if [ -f /usr/share/wayland-sessions/cosmic.desktop ]; then
+                sed -i 's/^DefaultSession=.*/DefaultSession=cosmic.desktop/' /etc/gdm/custom.conf 2>/dev/null || true
+                for u in /var/lib/AccountsService/users/*; do
+                    [ -f "$u" ] && sed -i 's/^Session=.*/Session=cosmic/' "$u" 2>/dev/null || true
+                done
+            fi
+            ;;
+        hyprland)
+            echo "Applying Hyprland session..."
+            if ! rpm -q hyprland &>/dev/null; then
+                echo "Installing Hyprland packages..."
+                dnf install -y --setopt=install_weak_deps=False hyprland foot wofi 2>&1 || true
+            fi
+            if [ -f /usr/share/wayland-sessions/hyprland.desktop ]; then
+                sed -i 's/^DefaultSession=.*/DefaultSession=hyprland.desktop/' /etc/gdm/custom.conf 2>/dev/null || true
+                for u in /var/lib/AccountsService/users/*; do
+                    [ -f "$u" ] && sed -i 's/^Session=.*/Session=hyprland/' "$u" 2>/dev/null || true
+                done
+            fi
+            ;;
+        cinnamon)
+            echo "Applying Cinnamon session..."
+            if ! rpm -q cinnamon &>/dev/null; then
+                echo "Installing Cinnamon desktop packages..."
+                dnf install -y --setopt=install_weak_deps=False @cinnamon-desktop-environment 2>&1 || true
+            fi
+            CIN_DESK="cinnamon.desktop"
+            [ -f /usr/share/wayland-sessions/cinnamon-wayland.desktop ] && CIN_DESK="cinnamon-wayland.desktop"
+            sed -i "s/^DefaultSession=.*/DefaultSession=${CIN_DESK}/" /etc/gdm/custom.conf 2>/dev/null || true
+            for u in /var/lib/AccountsService/users/*; do
+                [ -f "$u" ] && sed -i 's/^Session=.*/Session=cinnamon/' "$u" 2>/dev/null || true
+            done
+            ;;
+        xfce)
+            echo "Applying XFCE session..."
+            if ! rpm -q xfce4-session &>/dev/null; then
+                echo "Installing XFCE desktop packages..."
+                dnf install -y --setopt=install_weak_deps=False @xfce-desktop-environment 2>&1 || true
+            fi
+            sed -i 's/^DefaultSession=.*/DefaultSession=xfce.desktop/' /etc/gdm/custom.conf 2>/dev/null || true
+            for u in /var/lib/AccountsService/users/*; do
+                [ -f "$u" ] && sed -i 's/^Session=.*/Session=xfce/' "$u" 2>/dev/null || true
+            done
+            ;;
+        sway)
+            echo "Applying Sway session..."
+            if ! rpm -q sway &>/dev/null; then
+                echo "Installing Sway packages..."
+                dnf install -y --setopt=install_weak_deps=False sway foot wofi waybar 2>&1 || true
+            fi
+            if [ -f /usr/share/wayland-sessions/sway.desktop ]; then
+                sed -i 's/^DefaultSession=.*/DefaultSession=sway.desktop/' /etc/gdm/custom.conf 2>/dev/null || true
+                for u in /var/lib/AccountsService/users/*; do
+                    [ -f "$u" ] && sed -i 's/^Session=.*/Session=sway/' "$u" 2>/dev/null || true
+                done
+            fi
+            ;;
+    esac
+fi
+
+# 5. Check bootloader choice
+if [ -f /etc/blazeos-bootloader-choice ]; then
+    BOOT_CHOICE=$(cat /etc/blazeos-bootloader-choice | tr -d ' \n\r')
+    echo "Bootloader choice: $BOOT_CHOICE"
+    if [ "$BOOT_CHOICE" = "limine" ]; then
+        if [ -x /usr/local/bin/blaze-bootloader ]; then
+            echo "Switching to Limine..."
+            /usr/local/bin/blaze-bootloader switch-to-limine || true
+        fi
+    fi
+fi
+
+# 6. Self disable this service so it never runs again
+echo "Disabling blazeos-postinstall.service..."
+systemctl disable blazeos-postinstall.service 2>/dev/null || true
+echo "=== BlazeOS Post-Install Complete at $(date) ==="
+exit 0

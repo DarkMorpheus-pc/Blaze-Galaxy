@@ -1,0 +1,17 @@
+[Unit]
+Description=BlazeOS NVIDIA İlk Başlatma Sürücü Kurulumu
+Documentation=https://blazeos.com.tr
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=!/var/lib/blazeos/nvidia-setup-done
+ConditionVirtualization=!container
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/blazeos-nvidia-setup
+StandardOutput=journal+console
+StandardError=journal+console
+TimeoutStartSec=600
+
+[Install]
+WantedBy=multi-user.target

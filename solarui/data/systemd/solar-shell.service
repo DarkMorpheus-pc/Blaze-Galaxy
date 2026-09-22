@@ -1,0 +1,12 @@
+[Unit]
+Description=SolarUI Material 3 Desktop Shell
+PartOf=solarui-session.target
+After=solar-core.service
+
+[Service]
+ExecStart=/usr/bin/solar-shell
+Restart=always
+RestartSec=200ms
+
+[Install]
+WantedBy=solarui-session.target

@@ -1,0 +1,648 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+BlazeOS Control Center (blazeos-control)
+Flagship System Management Suite for Blaze SolarEvolution 5
+Written natively in GTK4 + Libadwaita for maximum performance, responsiveness, and Wayland integration.
+"""
+
+import os
+import sys
+import subprocess
+import threading
+import re
+import gi
+
+gi.require_version("Gtk", "4.0")
+gi.require_version("Adw", "1")
+from gi.repository import Gtk, Adw, GLib, Gio
+
+APP_ID = "org.blazeos.control"
+DISTRO_NAME = "Blaze SolarEvolution 5"
+
+DESKTOPS_DEF = [
+    {
+        "id": "solarui",
+        "name": "SolarUI",
+        "desc_tr": "Varsayılan saf Solar Evolution arayüzü (Niri + Noctalia).",
+        "desc_en": "Default pure Solar Evolution interface (Niri + Noctalia).",
+        "session": "solarui",
+        "session_desktop": "solarui.desktop",
+        "session_type": "wayland",
+        "packages": None,
+        "check_files": ["/usr/share/wayland-sessions/solarui.desktop"],
+    },
+    {
+        "id": "gnome",
+        "name": "GNOME",
+        "desc_tr": "Standart ve modern GNOME masaüstü ortamı.",
+        "desc_en": "Standard and modern GNOME desktop environment.",
+        "session": "gnome",
+        "session_desktop": "gnome.desktop",
+        "session_type": "wayland",
+        "packages": None,
+        "check_files": ["/usr/share/wayland-sessions/gnome.desktop"],
+    },
+    {
+        "id": "niri",
+        "name": "Niri (Saf)",
+        "desc_tr": "Kaydırmalı saf Niri pencere yöneticisi.",
+        "desc_en": "Scrollable pure Niri tiling Wayland compositor.",
+        "session": "niri",
+        "session_desktop": "niri.desktop",
+        "session_type": "wayland",
+        "packages": None,
+        "check_files": ["/usr/share/wayland-sessions/niri.desktop", "/usr/bin/niri"],
+    },
+    {
+        "id": "kde",
+        "name": "KDE Plasma",
+        "desc_tr": "Özelleştirilebilir KDE Plasma Wayland masaüstü.",
+        "desc_en": "Highly customizable KDE Plasma Wayland desktop.",
+        "session": "plasma",
+        "session_desktop": "plasma.desktop",
+        "session_type": "wayland",
+        "packages": "plasma-workspace-wayland kde-settings",
+        "check_files": ["/usr/share/wayland-sessions/plasma.desktop"],
+    },
+    {
+        "id": "cosmic",
+        "name": "COSMIC",
+        "desc_tr": "Rust tabanlı bağımsız modern COSMIC masaüstü.",
+        "desc_en": "Modern Rust-based independent COSMIC desktop.",
+        "session": "cosmic",
+        "session_desktop": "cosmic.desktop",
+        "session_type": "wayland",
+        "packages": "cosmic-session",
+        "check_files": ["/usr/share/wayland-sessions/cosmic.desktop"],
+    },
+    {
+        "id": "hyprland",
+        "name": "Hyprland",
+        "desc_tr": "Dinamik döşemeli akıcı ve modern Wayland ortamı.",
+        "desc_en": "Dynamic tiling Wayland compositor with fluid animations.",
+        "session": "hyprland",
+        "session_desktop": "hyprland.desktop",
+        "session_type": "wayland",
+        "packages": "hyprland foot wofi",
+        "check_files": ["/usr/share/wayland-sessions/hyprland.desktop", "/usr/bin/hyprland"],
+    },
+    {
+        "id": "cinnamon",
+        "name": "Cinnamon",
+        "desc_tr": "Geleneksel ve modern Cinnamon masaüstü.",
+        "desc_en": "Traditional and modern Cinnamon desktop.",
+        "session": "cinnamon",
+        "session_desktop": "cinnamon.desktop",
+        "session_type": "wayland",
+        "packages": "@cinnamon-desktop-environment",
+        "check_files": ["/usr/share/wayland-sessions/cinnamon-wayland.desktop", "/usr/share/xsessions/cinnamon.desktop"],
+    },
+    {
+        "id": "xfce",
+        "name": "XFCE",
+        "desc_tr": "Hafif ve hızlı XFCE masaüstü ortamı.",
+        "desc_en": "Lightweight and fast XFCE desktop environment.",
+        "session": "xfce",
+        "session_desktop": "xfce.desktop",
+        "session_type": "x11",
+        "packages": "@xfce-desktop-environment",
+        "check_files": ["/usr/share/xsessions/xfce.desktop", "/usr/bin/xfce4-session"],
+    },
+    {
+        "id": "sway",
+        "name": "Sway",
+        "desc_tr": "i3 uyumlu hafif döşemeli Wayland ortamı.",
+        "desc_en": "i3-compatible lightweight tiling Wayland compositor.",
+        "session": "sway",
+        "session_desktop": "sway.desktop",
+        "session_type": "wayland",
+        "packages": "sway foot wofi waybar",
+        "check_files": ["/usr/share/wayland-sessions/sway.desktop", "/usr/bin/sway"],
+    },
+]
+
+
+class BlazeControlWindow(Adw.PreferencesWindow):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.is_tr = os.environ.get("LANG", "").startswith("tr")
+        self.set_title("BlazeOS Merkezi" if self.is_tr else "BlazeOS Control")
+        self.set_default_size(920, 680)
+
+        self.build_updates_page()
+        self.build_desktop_page()
+        self.build_performance_page()
+        self.build_tools_page()
+        self.build_info_page()
+
+    # --------------------------------------------------------------------------
+    # 1. UPDATES PAGE
+    # --------------------------------------------------------------------------
+    def build_updates_page(self):
+        page = Adw.PreferencesPage()
+        page.set_title("Güncelleme" if self.is_tr else "Updates")
+        page.set_icon_name("view-refresh-symbolic")
+        page.set_name("updates")
+
+        pref_group = Adw.PreferencesGroup(
+            title="Sistem Güncellemeleri" if self.is_tr else "System Updates",
+            description="En son güvenlik yamalarını, çekirdeği ve paketleri denetle." if self.is_tr
+                        else "Check and apply the latest security patches, kernel, and software packages."
+        )
+        page.add(pref_group)
+
+        # Full Update
+        row_full = Adw.ActionRow(
+            title="Tam Güncelleme" if self.is_tr else "Full System Update",
+            subtitle="Tüm sistem paketleri, çekirdek, donanım sürücüleri ve güvenlik yamaları." if self.is_tr
+                     else "All system packages, kernel, firmware, and user applications."
+        )
+        btn_full = Gtk.Button(label="Güncelle" if self.is_tr else "Update", valign=Gtk.Align.CENTER)
+        btn_full.add_css_class("suggested-action")
+        btn_full.connect("clicked", lambda _: self.run_task(
+            "Tam Güncelleme" if self.is_tr else "Full System Update",
+            ["pkexec", "/usr/libexec/blazeos-welcome-helper", "update-all"]
+        ))
+        row_full.add_suffix(btn_full)
+        pref_group.add(row_full)
+
+        # Drivers & Kernel
+        row_drv = Adw.ActionRow(
+            title="Sürücüler ve Çekirdek" if self.is_tr else "Drivers & Kernel Only",
+            subtitle="Kernel, Mesa, Vulkan, firmware ve donanım modülleri." if self.is_tr
+                     else "Linux kernel, system firmware, Mesa 3D and graphics drivers."
+        )
+        btn_drv = Gtk.Button(label="Uygula" if self.is_tr else "Apply", valign=Gtk.Align.CENTER)
+        btn_drv.connect("clicked", lambda _: self.run_task(
+            "Sürücü Güncellemesi" if self.is_tr else "Driver Update",
+            ["pkexec", "/usr/libexec/blazeos-welcome-helper", "update-drivers"]
+        ))
+        row_drv.add_suffix(btn_drv)
+        pref_group.add(row_drv)
+
+        # Security Patches
+        row_sec = Adw.ActionRow(
+            title="Yalnızca Güvenlik Yamaları" if self.is_tr else "Security Patches Only",
+            subtitle="Kritik CVE güvenlik açığı yamaları (hızlı yama)." if self.is_tr
+                     else "Fast security updates without upgrading package feature versions."
+        )
+        btn_sec = Gtk.Button(label="Uygula" if self.is_tr else "Apply", valign=Gtk.Align.CENTER)
+        btn_sec.connect("clicked", lambda _: self.run_task(
+            "Güvenlik Güncellemesi" if self.is_tr else "Security Update",
+            ["pkexec", "/usr/libexec/blazeos-welcome-helper", "update-security"]
+        ))
+        row_sec.add_suffix(btn_sec)
+        pref_group.add(row_sec)
+
+        # DNF Cache Cleaner
+        row_clean = Adw.ActionRow(
+            title="Önbellek ve Paket Temizliği" if self.is_tr else "Clean DNF Cache & Packages",
+            subtitle="İndirme önbelleğini temizler ve disk alanı kurtarır." if self.is_tr
+                     else "Cleans downloaded package cache and frees disk space."
+        )
+        btn_clean = Gtk.Button(label="Temizle" if self.is_tr else "Clean", valign=Gtk.Align.CENTER)
+        btn_clean.connect("clicked", lambda _: self.run_task(
+            "Önbellek Temizliği" if self.is_tr else "Cache Cleaner",
+            ["pkexec", "dnf", "clean", "all"]
+        ))
+        row_clean.add_suffix(btn_clean)
+        pref_group.add(row_clean)
+
+        # Log & Output Group
+        log_group = Adw.PreferencesGroup(
+            title="İşlem Çıktısı ve Günlükler" if self.is_tr else "Process Output & Logs"
+        )
+        page.add(log_group)
+
+        self.expander = Adw.ExpanderRow(
+            title="Canlı Konsol Çıktısı" if self.is_tr else "Live Console Output",
+            subtitle="Çalışan işlemlerin anlık günlük akışı." if self.is_tr else "Real-time process output."
+        )
+        self.log_buffer = Gtk.TextBuffer()
+        log_view = Gtk.TextView(buffer=self.log_buffer, editable=False, monospace=True)
+        log_view.set_bottom_margin(8)
+        log_view.set_top_margin(8)
+        log_view.set_left_margin(12)
+        log_view.set_right_margin(12)
+        scrolled = Gtk.ScrolledWindow(child=log_view, min_content_height=200)
+        self.expander.add_row(scrolled)
+        log_group.add(self.expander)
+
+        self.add(page)
+
+    # --------------------------------------------------------------------------
+    # 2. DESKTOP PAGE
+    # --------------------------------------------------------------------------
+    def build_desktop_page(self):
+        page = Adw.PreferencesPage()
+        page.set_title("Masaüstü" if self.is_tr else "Desktop")
+        page.set_icon_name("user-desktop-symbolic")
+        page.set_name("desktop")
+
+        pref_group = Adw.PreferencesGroup(
+            title="Masaüstü Ortamı ve Oturum Seçimi" if self.is_tr else "Desktop Environment & Session",
+            description="Varsayılan masaüstü ortamını belirleyin veya yeni bir ortam kurun." if self.is_tr
+                        else "Choose your default desktop session or install additional environments."
+        )
+        page.add(pref_group)
+
+        # Detect current user session
+        current_session = self.get_current_session()
+
+        for de in DESKTOPS_DEF:
+            is_installed = any(os.path.exists(p) for p in de["check_files"])
+            is_current = (current_session == de["session"])
+
+            desc = de["desc_tr"] if self.is_tr else de["desc_en"]
+            if not is_installed:
+                desc += (" [Kurulu Değil]" if self.is_tr else " [Not Installed]")
+
+            row = Adw.ActionRow(
+                title=de["name"],
+                subtitle=desc
+            )
+
+            if is_current:
+                tag = Gtk.Label(label="Aktif Varsayılan" if self.is_tr else "Active Default", valign=Gtk.Align.CENTER)
+                tag.add_css_class("accent")
+                tag.add_css_class("heading")
+                row.add_suffix(tag)
+            elif is_installed:
+                btn = Gtk.Button(label="Varsayılan Yap" if self.is_tr else "Set Default", valign=Gtk.Align.CENTER)
+                btn.connect("clicked", lambda _, d=de: self.set_desktop_session(d))
+                row.add_suffix(btn)
+            else:
+                btn = Gtk.Button(label="Ortamı Kur" if self.is_tr else "Install", valign=Gtk.Align.CENTER)
+                btn.add_css_class("suggested-action")
+                btn.connect("clicked", lambda _, d=de: self.install_desktop_environment(d))
+                row.add_suffix(btn)
+
+            pref_group.add(row)
+
+        # Shell tweaks group
+        tweak_group = Adw.PreferencesGroup(
+            title="Masaüstü Kabuk Ayarları" if self.is_tr else "Desktop Shell Tweaks",
+            description="SolarUI ve GNOME ek bileşenleri." if self.is_tr else "SolarUI and GNOME shell components."
+        )
+        page.add(tweak_group)
+
+        # SolarUI Taskbar
+        row_taskbar = Adw.ActionRow(
+            title="SolarUI Alt Görev Çubuğu" if self.is_tr else "SolarUI Bottom Taskbar",
+            subtitle="SolarUI içerisinde alt başlatıcı / görev çubuğunu açıp kapatır." if self.is_tr
+                     else "Toggle the bottom application taskbar in SolarUI."
+        )
+        btn_tb = Gtk.Button(label="Aç / Kapat" if self.is_tr else "Toggle", valign=Gtk.Align.CENTER)
+        btn_tb.connect("clicked", lambda _: self.toggle_solar_taskbar())
+        row_taskbar.add_suffix(btn_tb)
+        tweak_group.add(row_taskbar)
+
+        # GNOME Dash to Dock
+        row_dock = Adw.ActionRow(
+            title="GNOME Dash to Dock" if self.is_tr else "GNOME Dash to Dock",
+            subtitle="GNOME oturumunda klasik kenar/alt dock çubuğunu açıp kapatır." if self.is_tr
+                     else "Enable or toggle persistent dock in GNOME session."
+        )
+        btn_dock = Gtk.Button(label="Aç / Kapat" if self.is_tr else "Toggle", valign=Gtk.Align.CENTER)
+        btn_dock.connect("clicked", lambda _: self.toggle_dock())
+        row_dock.add_suffix(btn_dock)
+        tweak_group.add(row_dock)
+
+        self.add(page)
+
+    # --------------------------------------------------------------------------
+    # 3. PERFORMANCE PAGE
+    # --------------------------------------------------------------------------
+    def build_performance_page(self):
+        page = Adw.PreferencesPage()
+        page.set_title("Performans" if self.is_tr else "Performance")
+        page.set_icon_name("system-run-symbolic")
+        page.set_name("performance")
+
+        pref_group = Adw.PreferencesGroup(
+            title="Performans ve Donanım Profili" if self.is_tr else "Performance & Hardware Tuning",
+            description="Oyun modu, ZRAM bellek sıkıştırması ve güç optimizasyonları." if self.is_tr
+                        else "GameMode daemon, ZRAM RAM compression, and system power profiles."
+        )
+        page.add(pref_group)
+
+        # Feral GameMode
+        row_game = Adw.ActionRow(
+            title="Feral GameMode" if self.is_tr else "Feral GameMode",
+            subtitle="Oyunlarda CPU frekansını, I/O önceliğini ve GPU performansını maksimize eder." if self.is_tr
+                     else "Optimizes CPU governor, scheduler, and GPU clocks during games."
+        )
+        btn_game = Gtk.Button(label="Etkinleştir" if self.is_tr else "Enable", valign=Gtk.Align.CENTER)
+        btn_game.add_css_class("suggested-action")
+        btn_game.connect("clicked", lambda _: self.run_task(
+            "GameMode",
+            ["systemctl", "--user", "enable", "--now", "gamemoded"]
+        ))
+        row_game.add_suffix(btn_game)
+        pref_group.add(row_game)
+
+        # Power Profiles
+        row_pwr = Adw.ActionRow(
+            title="Güç ve Enerji Profili" if self.is_tr else "Power Profile",
+            subtitle="Performans, Dengeli veya Güç Tasarrufu modu." if self.is_tr
+                     else "Select system power behavior (powerprofilesctl)."
+        )
+        btn_perf = Gtk.Button(label="Performans" if self.is_tr else "Performance", valign=Gtk.Align.CENTER)
+        btn_perf.connect("clicked", lambda _: self.run_task("Power Profile", ["powerprofilesctl", "set", "performance"]))
+
+        btn_bal = Gtk.Button(label="Dengeli" if self.is_tr else "Balanced", valign=Gtk.Align.CENTER)
+        btn_bal.connect("clicked", lambda _: self.run_task("Power Profile", ["powerprofilesctl", "set", "balanced"]))
+
+        btn_sav = Gtk.Button(label="Tasarruf" if self.is_tr else "Power Saver", valign=Gtk.Align.CENTER)
+        btn_sav.connect("clicked", lambda _: self.run_task("Power Profile", ["powerprofilesctl", "set", "power-saver"]))
+
+        row_pwr.add_suffix(btn_perf)
+        row_pwr.add_suffix(btn_bal)
+        row_pwr.add_suffix(btn_sav)
+        pref_group.add(row_pwr)
+
+        # ZRAM Status
+        zram_info = self.get_zram_status()
+        self.row_zram = Adw.ActionRow(
+            title="ZRAM Bellek Sıkıştırması" if self.is_tr else "ZRAM Memory Compression",
+            subtitle=zram_info
+        )
+        btn_zram_refresh = Gtk.Button(label="Yenile" if self.is_tr else "Refresh", valign=Gtk.Align.CENTER)
+        btn_zram_refresh.connect("clicked", lambda _: self.refresh_zram_status())
+        self.row_zram.add_suffix(btn_zram_refresh)
+        pref_group.add(self.row_zram)
+
+        # Kernel Optimizer Tool
+        row_opt = Adw.ActionRow(
+            title="BlazeOS Çekirdek ve G/Ç İyileştirmesi" if self.is_tr else "BlazeOS Kernel & I/O Optimizer",
+            subtitle="BBR TCP, vm.swappiness, vm.max_map_count ve disk G/Ç parametrelerini uygular." if self.is_tr
+                     else "Applies kernel sysctl tweaks, BBR TCP, swappiness, and I/O scheduler."
+        )
+        btn_opt = Gtk.Button(label="Uygula" if self.is_tr else "Apply", valign=Gtk.Align.CENTER)
+        btn_opt.connect("clicked", lambda _: self.run_task(
+            "Blaze Optimize",
+            ["pkexec", "/usr/local/bin/blaze-optimize", "gaming"]
+        ))
+        row_opt.add_suffix(btn_opt)
+        pref_group.add(row_opt)
+
+        self.add(page)
+
+    # --------------------------------------------------------------------------
+    # 4. TOOLS PAGE
+    # --------------------------------------------------------------------------
+    def build_tools_page(self):
+        page = Adw.PreferencesPage()
+        page.set_title("Araçlar" if self.is_tr else "Tools")
+        page.set_icon_name("open-menu-symbolic")
+        page.set_name("tools")
+
+        pref_group = Adw.PreferencesGroup(
+            title="BlazeOS Araçları ve Kurulum Sihirbazları" if self.is_tr else "BlazeOS Tools & Installers",
+            description="Uygulama mağazası, Android altsistemi, önyükleyici ve donanım sürücüleri." if self.is_tr
+                        else "App store, Waydroid Android container, bootloader, and proprietary drivers."
+        )
+        page.add(pref_group)
+
+        # FireHub App Store
+        row_fh = Adw.ActionRow(
+            title="FireHub Uygulama Mağazası" if self.is_tr else "FireHub App Store",
+            subtitle="Modern Wayland yerel yazılım merkezi (Flatpak, RPM ve native BlazeOS)." if self.is_tr
+                     else "Modern Wayland software hub with Flatpak and RPM integrations."
+        )
+        btn_fh = Gtk.Button(label="Başlat" if self.is_tr else "Launch", valign=Gtk.Align.CENTER)
+        btn_fh.add_css_class("suggested-action")
+        btn_fh.connect("clicked", lambda _: subprocess.Popen(["/usr/bin/firehub"]))
+        row_fh.add_suffix(btn_fh)
+        pref_group.add(row_fh)
+
+        # Waydroid Setup
+        row_wd = Adw.ActionRow(
+            title="Waydroid Android Altsistemi" if self.is_tr else "Waydroid Android Subsystem",
+            subtitle="Wayland üzerinde donanım hızlandırmalı tam Android ortamı kurucusu." if self.is_tr
+                     else "Full hardware-accelerated Android container on Wayland."
+        )
+        btn_wd = Gtk.Button(label="Kurulumu Başlat" if self.is_tr else "Setup", valign=Gtk.Align.CENTER)
+        btn_wd.connect("clicked", lambda _: subprocess.Popen(["/usr/local/bin/blazeos-waydroid-setup"]))
+        row_wd.add_suffix(btn_wd)
+        pref_group.add(row_wd)
+
+        # Limine / GRUB Bootloader
+        row_lim = Adw.ActionRow(
+            title="Önyükleyici Yöneticisi (Limine / GRUB2)" if self.is_tr else "Bootloader Manager (Limine / GRUB2)",
+            subtitle="Ultra hızlı modern Limine veya klasik GRUB2 arasında geçiş yap." if self.is_tr
+                     else "Switch between ultra-fast Limine and standard GNU GRUB2."
+        )
+        btn_lim = Gtk.Button(label="Limine'ye Geç" if self.is_tr else "Switch to Limine", valign=Gtk.Align.CENTER)
+        btn_lim.connect("clicked", lambda _: self.run_task(
+            "Limine Bootloader",
+            ["pkexec", "/usr/local/bin/blaze-bootloader", "switch-to-limine"]
+        ))
+        btn_grub = Gtk.Button(label="GRUB'a Geç" if self.is_tr else "Switch to GRUB", valign=Gtk.Align.CENTER)
+        btn_grub.connect("clicked", lambda _: self.run_task(
+            "GRUB2 Bootloader",
+            ["pkexec", "/usr/local/bin/blaze-bootloader", "switch-to-grub"]
+        ))
+        row_lim.add_suffix(btn_lim)
+        row_lim.add_suffix(btn_grub)
+        pref_group.add(row_lim)
+
+        # NVIDIA Setup
+        row_nv = Adw.ActionRow(
+            title="NVIDIA Sürücü Yöneticisi" if self.is_tr else "NVIDIA Driver Setup",
+            subtitle="Tescilli NVIDIA sürücülerini ve CUDA bileşenlerini kur." if self.is_tr
+                     else "Configure proprietary NVIDIA drivers and CUDA acceleration."
+        )
+        btn_nv = Gtk.Button(label="Yapılandır" if self.is_tr else "Configure", valign=Gtk.Align.CENTER)
+        btn_nv.connect("clicked", lambda _: self.run_task(
+            "NVIDIA Setup",
+            ["pkexec", "/usr/local/bin/blazeos-nvidia-setup"]
+        ))
+        row_nv.add_suffix(btn_nv)
+        pref_group.add(row_nv)
+
+        self.add(page)
+
+    # --------------------------------------------------------------------------
+    # 5. INFO PAGE
+    # --------------------------------------------------------------------------
+    def build_info_page(self):
+        page = Adw.PreferencesPage()
+        page.set_title("Bilgi" if self.is_tr else "Info")
+        page.set_icon_name("dialog-information-symbolic")
+        page.set_name("info")
+
+        pref_group = Adw.PreferencesGroup(
+            title="Sistem ve Donanım Bilgisi" if self.is_tr else "System & Hardware Specs",
+            description=f"{DISTRO_NAME} donanım ve yazılım özeti." if self.is_tr else f"{DISTRO_NAME} system overview."
+        )
+        page.add(pref_group)
+
+        # Fastfetch output view inside a clean styled ScrolledWindow
+        self.info_buffer = Gtk.TextBuffer()
+        info_view = Gtk.TextView(buffer=self.info_buffer, editable=False, monospace=True)
+        info_view.set_bottom_margin(12)
+        info_view.set_top_margin(12)
+        info_view.set_left_margin(16)
+        info_view.set_right_margin(16)
+
+        scrolled = Gtk.ScrolledWindow(child=info_view, min_content_height=380)
+        pref_group.add(scrolled)
+
+        self.load_system_info()
+        self.add(page)
+
+    # --------------------------------------------------------------------------
+    # HELPERS & LOGIC
+    # --------------------------------------------------------------------------
+    def run_task(self, name, command):
+        self.set_visible_page_name("updates")
+        self.expander.set_expanded(True)
+        cmd_str = " ".join(command)
+        self.log_buffer.set_text(f"=== {name} Başlatıldı ===\nKomut: {cmd_str}\n\n")
+
+        def task_thread():
+            try:
+                p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+                for line in p.stdout:
+                    GLib.idle_add(self.append_log, line)
+                p.wait()
+                GLib.idle_add(self.append_log, f"\n=== {name} Tamamlandı (Çıkış Kodu: {p.returncode}) ===\n")
+                if p.returncode == 0:
+                    GLib.idle_add(self.show_toast, f"{name} başarıyla tamamlandı.")
+                else:
+                    GLib.idle_add(self.show_toast, f"{name} hata ile sonuçlandı (Kod: {p.returncode}).")
+            except Exception as ex:
+                GLib.idle_add(self.append_log, f"\nHATA: {ex}\n")
+                GLib.idle_add(self.show_toast, f"Hata: {ex}")
+
+        threading.Thread(target=task_thread, daemon=True).start()
+
+    def append_log(self, text):
+        end_iter = self.log_buffer.get_end_iter()
+        self.log_buffer.insert(end_iter, text)
+
+    def get_current_session(self):
+        user = os.environ.get("USER", "liveuser")
+        acc_file = f"/var/lib/AccountsService/users/{user}"
+        if os.path.exists(acc_file):
+            try:
+                with open(acc_file, "r") as f:
+                    for line in f:
+                        if line.startswith("Session="):
+                            return line.split("=", 1)[1].strip()
+            except Exception:
+                pass
+        return "solarui"
+
+    def set_desktop_session(self, de):
+        user = os.environ.get("USER", "liveuser")
+        session_name = de["session"]
+        session_desktop = de["session_desktop"]
+        session_type = de["session_type"]
+        acc_file = f"/var/lib/AccountsService/users/{user}"
+        content = f"[User]\nSession={session_name}\nSessionType={session_type}\nXSession={session_name}\nIcon=/usr/share/icons/hicolor/256x256/apps/solarui.png\n"
+
+        hide_gnome = "true" if session_name == "solarui" else "false"
+
+        def do_write():
+            script = (
+                f"mkdir -p /var/lib/AccountsService/users && "
+                f"cat > {acc_file} << 'EOF'\n{content}EOF\n"
+                f"chmod 0600 {acc_file}\n"
+                f"restorecon -F {acc_file} 2>/dev/null || true\n"
+                f"if [ -f /usr/share/wayland-sessions/gnome.desktop ]; then "
+                f"  sed -i '/^NoDisplay=/d' /usr/share/wayland-sessions/gnome.desktop; "
+                f"  sed -i '/^\\[Desktop Entry\\]/a NoDisplay={hide_gnome}' /usr/share/wayland-sessions/gnome.desktop; "
+                f"fi\n"
+                f"if [ -f /etc/gdm/custom.conf ]; then "
+                f"  sed -i 's/^DefaultSession=.*/DefaultSession={session_desktop}/' /etc/gdm/custom.conf 2>/dev/null || true; "
+                f"fi\n"
+            )
+            res = subprocess.run(["pkexec", "sh", "-c", script], capture_output=True, text=True)
+            if res.returncode == 0:
+                msg = (f"Varsayılan masaüstü {de['name']} olarak ayarlandı. Oturumu kapattığınızda geçerli olur."
+                       if self.is_tr else f"Default session set to {de['name']}. Active on next login.")
+            else:
+                msg = f"Hata: {res.stderr}"
+            GLib.idle_add(self.show_toast, msg)
+
+        threading.Thread(target=do_write, daemon=True).start()
+
+    def install_desktop_environment(self, de):
+        if not de.get("packages"):
+            self.show_toast("Bu ortam zaten kuruludur." if self.is_tr else "This desktop is already installed.")
+            return
+
+        cmd = ["pkexec", "dnf", "install", "-y", "--setopt=install_weak_deps=False"] + de["packages"].split()
+        self.run_task(f"{de['name']} Kurulumu", cmd)
+
+    def toggle_dock(self):
+        cmd = "gnome-extensions enable dash-to-dock@vswitch.com 2>/dev/null || gnome-extensions toggle dash-to-dock@micxgx.gmail.com 2>/dev/null || true"
+        subprocess.run(["sh", "-c", cmd])
+        self.show_toast("Dash to Dock durumu güncellendi." if self.is_tr else "Dash to Dock toggled.")
+
+    def toggle_solar_taskbar(self):
+        subprocess.run(["solar-shell", "toggle-taskbar"], stderr=subprocess.DEVNULL)
+        self.show_toast("SolarUI Görev Çubuğu durumu güncellendi." if self.is_tr else "SolarUI Taskbar toggled.")
+
+    def get_zram_status(self):
+        try:
+            with open("/proc/swaps", "r") as f:
+                content = f.read()
+            if "zram" in content:
+                for line in content.splitlines():
+                    if "zram" in line:
+                        parts = line.split()
+                        size_mb = int(parts[2]) // 1024
+                        return f"Aktif - {size_mb} MB ZRAM Sıkıştırılmış Takas Belleği (zstd)" if self.is_tr else f"Active - {size_mb} MB Compressed ZRAM Swap (zstd)"
+            return "ZRAM yapılandırılmamış" if self.is_tr else "ZRAM not active"
+        except Exception:
+            return "Bilinmiyor" if self.is_tr else "Unknown"
+
+    def refresh_zram_status(self):
+        self.row_zram.set_subtitle(self.get_zram_status())
+        self.show_toast("ZRAM durumu yenilendi." if self.is_tr else "ZRAM status refreshed.")
+
+    def load_system_info(self):
+        def load_thread():
+            try:
+                cmd = ["/usr/bin/fastfetch", "--pipe", "false"]
+                if os.path.exists("/usr/share/blazeos/fastfetch/config.jsonc"):
+                    cmd = ["/usr/bin/fastfetch", "--config", "/usr/share/blazeos/fastfetch/config.jsonc", "--pipe", "false"]
+                out = subprocess.check_output(cmd, stderr=subprocess.DEVNULL).decode("utf-8", errors="replace")
+                # Clean ANSI escape sequences for GTK TextView display
+                out = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', out)
+                out = re.sub(r'\x1b\].*?\x07', '', out)
+            except Exception:
+                uname_out = os.uname()
+                out = f"OS: {DISTRO_NAME}\nKernel: {uname_out.release} ({uname_out.machine})\nDesktop: SolarUI (Niri Wayland)\n"
+            GLib.idle_add(lambda: self.info_buffer.set_text(out))
+
+        threading.Thread(target=load_thread, daemon=True).start()
+
+    def show_toast(self, message):
+        toast = Adw.Toast.new(message)
+        toast.set_timeout(3)
+        self.add_toast(toast)
+
+
+class BlazeControlApp(Adw.Application):
+    def __init__(self):
+        super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.FLAGS_NONE)
+
+    def do_activate(self):
+        win = self.props.active_window
+        if not win:
+            win = BlazeControlWindow(application=self)
+        win.present()
+
+
+def main():
+    app = BlazeControlApp()
+    return app.run(sys.argv)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
