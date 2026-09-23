@@ -273,5 +273,5 @@ binds {
     // ── Session ────────────────────────────────────────────────────
     Mod+Shift+E { quit; }
     Ctrl+Alt+Delete { quit; }
-    Mod+L       { spawn "noctalia" "msg" "session" "lock"; }
+    Mod+L       { spawn "solar-lock"; }
 }

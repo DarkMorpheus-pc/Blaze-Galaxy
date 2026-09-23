@@ -30,13 +30,15 @@ ShellRoot {
     Background {}
     Drawers {}
     AreaPicker {}
-    Lock {
-        id: lock
-    }
+    // Lock and IdleMonitors are handled natively by Noctalia / SolarUI session management (solar-lock).
+    // Disabling Caelestia internal idle lock prevents random 3-minute lockscreen freezes and VM crashes.
+    // Lock {
+    //     id: lock
+    // }
 
     Shortcuts {}
     BatteryMonitor {}
-    IdleMonitors {
-        lock: lock
-    }
+    // IdleMonitors {
+    //     lock: lock
+    // }
 }

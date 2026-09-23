@@ -28,7 +28,25 @@ fn main() -> Result<()> {
     std::env::set_var("CLUTTER_BACKEND", "wayland");
 
     // ChromeOS Ash Performance & Low-Power Idle Optimizations
-    std::env::set_var("QSG_RENDER_LOOP", "threaded");
+    let is_vm = std::path::Path::new("/sys/class/dmi/id/product_name")
+        .exists()
+        && std::fs::read_to_string("/sys/class/dmi/id/product_name")
+            .map(|s| {
+                let lower = s.to_lowercase();
+                lower.contains("virtualbox")
+                    || lower.contains("vmware")
+                    || lower.contains("qemu")
+                    || lower.contains("kvm")
+                    || lower.contains("bochs")
+            })
+            .unwrap_or(false);
+
+    if is_vm {
+        info!("Virtual Machine environment detected; configuring rock-solid basic QtQuick render loop.");
+        std::env::set_var("QSG_RENDER_LOOP", "basic");
+    } else if std::env::var("QSG_RENDER_LOOP").is_err() {
+        std::env::set_var("QSG_RENDER_LOOP", "threaded");
+    }
     std::env::set_var("QT_QUICK_BACKEND", "rhi");
     std::env::set_var("QSG_RHI_BACKEND", "opengl");
     std::env::set_var("QT_WAYLAND_DISABLE_WINDOWDECORATION", "1");

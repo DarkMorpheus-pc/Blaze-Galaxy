@@ -15,6 +15,7 @@ WlSessionLockSurface {
     required property Pam pam
 
     readonly property alias unlocking: unlockAnim.running
+    readonly property real safeScreenHeight: (root.screen?.height && root.screen.height > 200) ? root.screen.height : 1080
 
     contentItem.Config.screen: screen.name
     contentItem.Tokens.screen: screen.name
@@ -144,12 +145,12 @@ WlSessionLockSurface {
                 Anim {
                     target: lockContent
                     property: "implicitWidth"
-                    to: (root.screen?.height ?? 0) * lockContent.Tokens.sizes.lock.heightMult * lockContent.Tokens.sizes.lock.ratio
+                    to: root.safeScreenHeight * lockContent.Tokens.sizes.lock.heightMult * lockContent.Tokens.sizes.lock.ratio
                 }
                 Anim {
                     target: lockContent
                     property: "implicitHeight"
-                    to: (root.screen?.height ?? 0) * lockContent.Tokens.sizes.lock.heightMult
+                    to: root.safeScreenHeight * lockContent.Tokens.sizes.lock.heightMult
                 }
             }
         }
@@ -165,14 +166,14 @@ WlSessionLockSurface {
         layer.effect: MultiEffect {
             autoPaddingEnabled: false
             blurEnabled: true
-            blur: 1
-            blurMax: 64
+            blur: 0.5
+            blurMax: 16
             blurMultiplier: 1
         }
 
         Loader {
             anchors.fill: parent
-            sourceComponent: Config.lock.useWallpaper ? wallpaperBackground : screencopyBackground
+            sourceComponent: wallpaperBackground
         }
     }
 
@@ -235,8 +236,8 @@ WlSessionLockSurface {
             id: content
 
             anchors.centerIn: parent
-            width: (root.screen?.height ?? 0) * Tokens.sizes.lock.heightMult * Tokens.sizes.lock.ratio - Tokens.padding.extraLargeIncreased
-            height: (root.screen?.height ?? 0) * Tokens.sizes.lock.heightMult - Tokens.padding.extraLargeIncreased
+            width: root.safeScreenHeight * Tokens.sizes.lock.heightMult * Tokens.sizes.lock.ratio - Tokens.padding.extraLargeIncreased
+            height: root.safeScreenHeight * Tokens.sizes.lock.heightMult - Tokens.padding.extraLargeIncreased
 
             lock: root
             opacity: 0

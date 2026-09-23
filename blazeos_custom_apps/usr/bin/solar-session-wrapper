@@ -13,6 +13,11 @@ export WLR_NO_HARDWARE_CURSORS="1"
 export __GL_GSYNC_ALLOWED="0"
 export __GL_VRR_ALLOWED="0"
 
+# Check if running in a virtual machine (QEMU, KVM, VirtualBox, VMware) or software rasterizer
+if systemd-detect-virt -q 2>/dev/null || grep -qE -i 'hypervisor|qemu|kvm|virtualbox|vmware' /proc/cpuinfo /sys/class/dmi/id/product_name /sys/class/dmi/id/sys_vendor 2>/dev/null; then
+    export QSG_RENDER_LOOP="basic"
+fi
+
 LOG_DIR="${HOME}/.local/share/solarui"
 mkdir -p "$LOG_DIR" 2>/dev/null || :
 LOG_FILE="${LOG_DIR}/session.log"

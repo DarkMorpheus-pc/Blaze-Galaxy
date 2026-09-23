@@ -1,0 +1,24 @@
+#!/bin/bash
+# SolarUI Unified Session Locker
+
+# Do not lock live ISO environment
+if grep -qE 'rd\.live\.image|root=live:' /proc/cmdline 2>/dev/null || [ -d /run/initramfs/live ] || [ -f /run/live/medium ]; then
+    notify-send -u low -a "SolarUI" "Canlı Oturum" "Canlı kurulum ortamında ekran kilitleme devre dışıdır." 2>/dev/null || :
+    exit 0
+fi
+
+# 1. If Noctalia is active, use Noctalia native lockscreen
+if pgrep -x noctalia >/dev/null 2>&1; then
+    noctalia msg session lock
+    exit 0
+fi
+
+# 2. If swaylock / gtklock / waylock is installed, use that
+if command -v swaylock >/dev/null 2>&1; then
+    exec swaylock -f -c 1a1b26
+elif command -v gtklock >/dev/null 2>&1; then
+    exec gtklock
+fi
+
+# 3. Fallback to loginctl lock-session
+exec loginctl lock-session
