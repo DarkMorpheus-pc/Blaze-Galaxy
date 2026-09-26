@@ -3,7 +3,7 @@ Type=Application
 Name=Blaze House
 GenericName=System Optimizer
 Comment=BlazeOS optimization and settings hub
-Exec=blaze-house
+Exec=env WEBKIT_DISABLE_DMABUF_RENDERER=1 blaze-house
 Icon=blaze-house
 Terminal=false
 Categories=System;Settings;Utility;

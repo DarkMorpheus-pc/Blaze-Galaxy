@@ -55,7 +55,7 @@ cat > ~liveuser/.config/solarui/config.json << 'FOE'
     "dashboard_provider": "noctalia"
   },
   "taskbar": {
-    "enabled": true,
+    "enabled": false,
     "theme_mode": "dark",
     "opacity": 0.92,
     "height": 44,

@@ -15,6 +15,7 @@ export ELECTRON_OZONE_PLATFORM_HINT="wayland"
 export NVD_BACKEND="direct"
 export __GL_GSYNC_ALLOWED="0"
 export __GL_VRR_ALLOWED="0"
+export WEBKIT_DISABLE_DMABUF_RENDERER="1"
 
 # Check if running in a virtual machine (QEMU, KVM, VirtualBox, VMware) or software rasterizer
 if systemd-detect-virt -q 2>/dev/null || grep -qE -i 'hypervisor|qemu|kvm|virtualbox|vmware' /proc/cpuinfo /sys/class/dmi/id/product_name /sys/class/dmi/id/sys_vendor 2>/dev/null; then

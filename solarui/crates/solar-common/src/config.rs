@@ -62,8 +62,8 @@ impl Default for DisplayConfig {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TaskbarConfig {
     /// Whether the KDE-style bottom taskbar is enabled.
-    /// Default is TRUE: Taskbar is active by default in Blaze SolarEvolution 5!
-    #[serde(default = "default_true")]
+    /// Default is FALSE: Taskbar is optional, can be enabled in SolarUI settings!
+    #[serde(default = "default_false")]
     pub enabled: bool,
 
     /// Theme mode: "dark" or "light"
@@ -125,6 +125,9 @@ fn default_start_menu_icon() -> String {
 fn default_true() -> bool {
     true
 }
+fn default_false() -> bool {
+    false
+}
 fn default_pinned_apps() -> Vec<String> {
     vec![
         "alacritty".to_string(),
@@ -136,7 +139,7 @@ fn default_pinned_apps() -> Vec<String> {
 impl Default for TaskbarConfig {
     fn default() -> Self {
         Self {
-            enabled: true, // Default is true: Taskbar active out-of-the-box
+            enabled: false, // Default is false: Taskbar is optional, user activates via settings
             theme_mode: default_theme_mode(),
             opacity: default_opacity(),
             height: default_height(),
