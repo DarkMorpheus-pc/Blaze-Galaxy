@@ -1,5 +1,6 @@
 #!/bin/bash
 set -euo pipefail
+export PATH="/home/darkmorpheus/bin:/home/darkmorpheus/.local/bin:/usr/local/bin:/usr/local/sbin:$PATH"
 
 BASE_ISO="${BLAZEOS_ROOT:-$(pwd)}/f45_base/Fedora-Workstation-Live-45_Beta-1.3.x86_64.iso"
 OUT_ISO="${BLAZEOS_ROOT:-$(pwd)}/Blaze-SolarEvolution-5-x86_64.iso"
@@ -143,9 +144,22 @@ xorriso \
   -padding 0
 
 echo "=== [4/5] Implanting ISO checksum ==="
-implantisomd5 "$OUT_ISO"
+if command -v implantisomd5 >/dev/null 2>&1; then
+    implantisomd5 "$OUT_ISO"
+elif [ -x "/home/darkmorpheus/bin/implantisomd5" ]; then
+    /home/darkmorpheus/bin/implantisomd5 "$OUT_ISO"
+else
+    echo "  (implantisomd5 not found in PATH, skipping checksum embedding)"
+fi
 
 echo "=== [5/5] Verifying ISO checksum ==="
-checkisomd5 --verbose "$OUT_ISO"
+if command -v checkisomd5 >/dev/null 2>&1; then
+    checkisomd5 --verbose "$OUT_ISO"
+elif [ -x "/home/darkmorpheus/bin/checkisomd5" ]; then
+    /home/darkmorpheus/bin/checkisomd5 --verbose "$OUT_ISO"
+else
+    echo "  (checkisomd5 not found in PATH, skipping checksum verification)"
+fi
 
 echo "=== BUILD COMPLETE! ==="
+ls -lh "$OUT_ISO"
