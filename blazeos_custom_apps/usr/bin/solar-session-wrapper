@@ -10,6 +10,9 @@ export GDK_BACKEND="wayland,x11"
 export SDL_VIDEODRIVER="wayland"
 export CLUTTER_BACKEND="wayland"
 export WLR_NO_HARDWARE_CURSORS="1"
+export WLR_RENDERER_ALLOW_SOFTWARE="1"
+export ELECTRON_OZONE_PLATFORM_HINT="wayland"
+export NVD_BACKEND="direct"
 export __GL_GSYNC_ALLOWED="0"
 export __GL_VRR_ALLOWED="0"
 
@@ -24,23 +27,12 @@ LOG_FILE="${LOG_DIR}/session.log"
 
 echo "=== SolarUI Session Started: $(date) ===" >> "$LOG_FILE" 2>&1
 echo "User: $(whoami) (UID: $(id -u)), Home: $HOME" >> "$LOG_FILE" 2>&1
+echo "Session ID: ${XDG_SESSION_ID:-none}, VT: ${XDG_VTNR:-none}" >> "$LOG_FILE" 2>&1
 
-# Ensure the session VT is switched to and activated as soon as Niri starts
-(
-    for i in $(seq 1 50); do
-        if ls "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"/niri.*.sock >/dev/null 2>&1; then
-            sleep 0.3
-            VT_TARGET="${XDG_VTNR:-2}"
-            echo "Niri socket ready, switching to VT ${VT_TARGET}..." >> "$LOG_FILE" 2>&1
-            /usr/bin/chvt "$VT_TARGET" 2>> "$LOG_FILE" || sudo /usr/bin/chvt "$VT_TARGET" 2>> "$LOG_FILE" || :
-            if [ -n "$XDG_SESSION_ID" ]; then
-                loginctl activate "$XDG_SESSION_ID" 2>> "$LOG_FILE" || :
-            fi
-            break
-        fi
-        sleep 0.2
-    done
-) &
+# Ensure session is active in logind without touching hardware VTs
+if [ -n "$XDG_SESSION_ID" ]; then
+    loginctl activate "$XDG_SESSION_ID" 2>> "$LOG_FILE" || :
+fi
 
 # Auto-launch Anaconda Welcome Screen / Installer on Live ISO session
 (
@@ -67,10 +59,22 @@ echo "User: $(whoami) (UID: $(id -u)), Home: $HOME" >> "$LOG_FILE" 2>&1
     fi
 ) &
 
+# Launch SolarUI Session
 /usr/bin/solar-session >> "$LOG_FILE" 2>&1
 EXIT_CODE=$?
 
+# If initial launch failed, try resilient software-rendering mode before any fallback
 if [ $EXIT_CODE -ne 0 ]; then
-    echo "SolarUI session exited with code $EXIT_CODE, starting fallback GNOME session..." >> "$LOG_FILE" 2>&1
-    exec /usr/bin/gnome-session >> "$LOG_FILE" 2>&1
+    echo "SolarUI primary session exited with code $EXIT_CODE. Attempting resilient software fallback..." >> "$LOG_FILE" 2>&1
+    export WLR_RENDERER="pixman"
+    export LIBGL_ALWAYS_SOFTWARE="1"
+    export QSG_RENDER_LOOP="basic"
+    sleep 1
+    /usr/bin/solar-session >> "$LOG_FILE" 2>&1
+    EXIT_CODE=$?
 fi
+
+if [ $EXIT_CODE -ne 0 ]; then
+    echo "SolarUI session terminated with code $EXIT_CODE." >> "$LOG_FILE" 2>&1
+fi
+exit $EXIT_CODE

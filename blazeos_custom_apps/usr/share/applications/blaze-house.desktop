@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Blaze House
+GenericName=System Optimizer
+Comment=BlazeOS optimization and settings hub
+Exec=blaze-house
+Icon=blaze-house
+Terminal=false
+Categories=System;Settings;Utility;
+Keywords=optimize;debloat;system;blaze;settings;ayarlar;
+StartupNotify=true
+StartupWMClass=blaze-house

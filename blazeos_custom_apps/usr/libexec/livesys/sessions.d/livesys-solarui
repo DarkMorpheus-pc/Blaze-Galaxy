@@ -1,0 +1,119 @@
+#!/usr/bin/sh
+#
+# livesys-solarui: SolarUI setup for live image
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+# Configure GDM automatic login for liveuser
+cat > /etc/gdm/custom.conf << FOE
+[daemon]
+AutomaticLoginEnable=True
+AutomaticLogin=liveuser
+DefaultSession=solarui.desktop
+WaylandEnable=true
+InitialSetupEnable=false
+FOE
+
+# Configure AccountsService to use SolarUI as the default session
+mkdir -p /var/lib/AccountsService/users
+cat > /var/lib/AccountsService/users/liveuser << FOE
+[User]
+Session=solarui
+SessionType=wayland
+XSession=solarui
+Icon=/usr/share/icons/hicolor/256x256/apps/solarui.png
+SystemAccount=false
+FOE
+chmod 0600 /var/lib/AccountsService/users/liveuser
+restorecon -F /var/lib/AccountsService/users/liveuser 2>/dev/null || :
+systemctl try-restart accounts-daemon.service 2>/dev/null || :
+usermod -aG wheel,video,audio,render,input liveuser 2>/dev/null || :
+
+# Pre-configure liveuser home directory for SolarUI
+mkdir -p ~liveuser/.config/solarui ~liveuser/.config/xdg-desktop-portal ~liveuser/Desktop ~liveuser/.local/state/noctalia ~liveuser/.config/noctalia
+touch ~liveuser/.local/state/noctalia/.setup-complete
+cp -a /etc/solarui/niri.kdl ~liveuser/.config/solarui/ 2>/dev/null || :
+cp -a /usr/share/xdg-desktop-portal/solarui-portals.conf ~liveuser/.config/xdg-desktop-portal/ 2>/dev/null || :
+cp -a /etc/skel/.config/* ~liveuser/.config/ 2>/dev/null || :
+cp -a /etc/skel/.config/noctalia ~liveuser/.config/ 2>/dev/null || :
+cp -a /etc/skel/Desktop/* ~liveuser/Desktop/ 2>/dev/null || :
+cp -a /etc/skel/.local/* ~liveuser/.local/ 2>/dev/null || :
+
+# Make sure liveinst (installer) shows up on Desktop and menus
+if [ -f /usr/share/applications/liveinst.desktop ]; then
+    sed -i -e 's/NoDisplay=true/NoDisplay=false/' /usr/share/applications/liveinst.desktop
+    cp -a /usr/share/applications/liveinst.desktop ~liveuser/Desktop/ 2>/dev/null || :
+    chmod +x ~liveuser/Desktop/liveinst.desktop 2>/dev/null || :
+fi
+
+# Pre-configure SolarUI pinned apps with Anaconda installer for live session
+cat > ~liveuser/.config/solarui/config.json << 'FOE'
+{
+  "shell": {
+    "engine": "noctalia",
+    "launcher_provider": "noctalia",
+    "dashboard_provider": "noctalia"
+  },
+  "taskbar": {
+    "enabled": true,
+    "theme_mode": "dark",
+    "opacity": 0.92,
+    "height": 44,
+    "icon_size": 20,
+    "start_menu_icon": "solar-logo",
+    "show_pinned": true,
+    "show_tasks": true,
+    "show_tray": true,
+    "show_clock": true,
+    "pinned_apps": [
+      "liveinst",
+      "blaze-house",
+      "alacritty",
+      "nautilus",
+      "firefox"
+    ]
+  },
+  "display": {
+    "scale": 1.0,
+    "text_scale": 1.0
+  }
+}
+FOE
+chown -R liveuser:liveuser ~liveuser/.config ~liveuser/Desktop ~liveuser/.local 2>/dev/null || :
+
+# Don't require authentication for starting the installer
+cat > /usr/share/polkit-1/rules.d/20-livesys-solarui.rules << FOE
+polkit.addRule(function(action, subject) {
+    if (!subject.local)
+        return undefined;
+    if (subject.user !== 'liveuser')
+        return undefined;
+    if (action.id.indexOf('org.fedoraproject.pkexec.liveinst') !== 0)
+        return undefined;
+    return 'yes';
+});
+FOE
+
+# Disable GNOME initial setup just in case
+mkdir -p ~liveuser/.config
+: > ~liveuser/.config/gnome-initial-setup-done
+
+# Suppress anaconda spokes redundant with live session
+cat >> /etc/sysconfig/anaconda << FOE
+[NetworkSpoke]
+visited=1
+
+[PasswordSpoke]
+visited=1
+
+[UserSpoke]
+visited=1
+FOE
+
+# Pre-seed default desktop environment & bootloader choices for Anaconda
+echo "solarui" > /tmp/anaconda_desktop_choice 2>/dev/null || :
+chmod 666 /tmp/anaconda_desktop_choice 2>/dev/null || :
+echo "grub2" > /tmp/anaconda_bootloader_choice 2>/dev/null || :
+chmod 666 /tmp/anaconda_bootloader_choice 2>/dev/null || :
+
+chown -R liveuser:liveuser ~liveuser/

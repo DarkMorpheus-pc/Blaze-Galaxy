@@ -38,6 +38,7 @@ chmod 4755 "$ROOTFS/usr/bin/mount" 2>/dev/null || true
 chmod 4755 "$ROOTFS/usr/bin/umount" 2>/dev/null || true
 chmod 4755 "$ROOTFS/opt/FireHub/chrome-sandbox" 2>/dev/null || true
 chmod 755 "$ROOTFS/usr/bin/firehub" 2>/dev/null || true
+chmod 755 "$ROOTFS/usr/bin/blaze-house" 2>/dev/null || true
 chmod 755 "$ROOTFS/usr/local/bin/blazeos-control" 2>/dev/null || true
 
 echo "  -> Pre-installing trimmed Desktop Environments for Offline ISO..."
@@ -58,6 +59,7 @@ setfattr -n security.selinux -v "system_u:object_r:init_exec_t:s0" "$ROOTFS/usr/
 setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/local/bin/blazeos-welcome" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/local/bin/blazeos-control" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/firehub" 2>/dev/null || true
+setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/blaze-house" 2>/dev/null || true
 
 echo "  -> Creating ZSTD-compressed squashfs.img for Offline ISO..."
 rm -f "'"$NEW_SQUASHFS"'"

@@ -47,6 +47,7 @@ chmod 2755 "$ROOTFS/usr/bin/chage" 2>/dev/null || true
 chmod 2755 "$ROOTFS/usr/bin/lockdev" 2>/dev/null || true
 chmod 2755 "$ROOTFS/usr/libexec/utempter/utempter" 2>/dev/null || true
 chmod 755 "$ROOTFS/usr/bin/firehub" 2>/dev/null || true
+chmod 755 "$ROOTFS/usr/bin/blaze-house" 2>/dev/null || true
 chmod 755 "$ROOTFS/usr/local/bin/blazeos-control" 2>/dev/null || true
 
 echo "  -> Setting SELinux contexts with setfiles..."
@@ -70,6 +71,7 @@ setfattr -n security.selinux -v "system_u:object_r:systemd_unit_file_t:s0" "$ROO
 setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/fastfetch" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/yad" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/firehub" 2>/dev/null || true
+setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/blaze-house" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/opt/FireHub/firehub" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:systemd_unit_file_t:s0" "$ROOTFS/etc/systemd/system/blazeos-nvidia-firstboot.service" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/solar-core" 2>/dev/null || true
@@ -100,6 +102,7 @@ getfattr -d -m - "$ROOTFS/usr/lib/systemd/systemd"
 getfattr -d -m - "$ROOTFS/usr/bin/sudo"
 getfattr -d -m - "$ROOTFS/usr/local/bin/blazeos-welcome"
 getfattr -d -m - "$ROOTFS/usr/local/bin/blazeos-control"
+getfattr -d -m - "$ROOTFS/usr/bin/blaze-house"
 
 echo "  -> Compressing rootfs into LiveOS/squashfs.img with zstd & xattrs..."
 mkdir -p "'"$WORK"'"/LiveOS
