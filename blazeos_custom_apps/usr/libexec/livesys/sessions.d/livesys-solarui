@@ -114,6 +114,13 @@ FOE
 echo "solarui" > /tmp/anaconda_desktop_choice 2>/dev/null || :
 chmod 666 /tmp/anaconda_desktop_choice 2>/dev/null || :
 echo "grub2" > /tmp/anaconda_bootloader_choice 2>/dev/null || :
-chmod 666 /tmp/anaconda_bootloader_choice 2>/dev/null || :
+# Ensure networking is active and auto-connect any available ethernet NIC (e.g. QEMU/KVM virtio or real hardware)
+systemctl start systemd-resolved.service 2>/dev/null || :
+systemctl start NetworkManager.service 2>/dev/null || :
+nmcli networking on 2>/dev/null || :
+for dev in $(nmcli -t -f DEVICE,TYPE dev 2>/dev/null | grep ':ethernet$' | cut -d: -f1); do
+    nmcli device set "$dev" autoconnect yes 2>/dev/null || :
+    nmcli device connect "$dev" 2>/dev/null || :
+done
 
 chown -R liveuser:liveuser ~liveuser/
