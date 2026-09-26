@@ -10,7 +10,11 @@ PATCHED_INITRD="$WORK/initrd_work/patched_initrd"
 GRUB_CFG="$WORK/iso_mods/boot/grub2/grub.cfg"
 
 echo "=== [1/5] Building Squashfs with full SELinux labels in tmpfs ==="
-unshare -rm bash -c '
+UNSHARE_FLAGS="-rm"
+if [ "$(id -u)" -eq 0 ]; then
+    UNSHARE_FLAGS="-m"
+fi
+unshare $UNSHARE_FLAGS bash -c '
 set -euo pipefail
 MNT="/tmp/f45_build_mnt"
 mkdir -p "$MNT"
