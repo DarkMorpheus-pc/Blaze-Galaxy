@@ -12,6 +12,7 @@ Scope {
         Notifs;
         Players;
         Brightness;
+        NiriService;
         Weather.reload();
 
         if (GlobalConfig.utilities.vpn.enabled)

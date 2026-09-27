@@ -42,7 +42,13 @@ StyledRect {
                 id: place
 
                 required property string modelData
-                readonly property bool selected: modelData === root.dialog.cwd[root.dialog.cwd.length - 1]
+                readonly property bool selected: {
+                    const last = root.dialog.cwd[root.dialog.cwd.length - 1];
+                    if (place.modelData === "Home")
+                        return root.dialog.cwd.length === 1 && last === "Home";
+                    const resolvedName = Paths.getUserDirName(place.modelData);
+                    return last === place.modelData || last === resolvedName;
+                }
 
                 Layout.fillWidth: true
                 implicitHeight: placeInner.implicitHeight + Tokens.padding.medium * 2
@@ -53,10 +59,12 @@ StyledRect {
                 StateLayer {
                     color: place.selected ? Colours.palette.m3onSecondaryContainer : Colours.palette.m3onSurface
                     onClicked: {
-                        if (place.modelData === "Home")
+                        if (place.modelData === "Home") {
                             root.dialog.cwd = ["Home"];
-                        else
-                            root.dialog.cwd = ["Home", place.modelData];
+                        } else {
+                            const resolvedName = Paths.getUserDirName(place.modelData);
+                            root.dialog.cwd = ["Home", resolvedName];
+                        }
                     }
                 }
 

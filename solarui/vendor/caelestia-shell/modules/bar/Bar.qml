@@ -79,6 +79,13 @@ ColumnLayout {
         const ch = childAt(width / 2, y) as EntryWrapper;
         if (ch?.entryId === "workspaces" && Config.bar.scrollActions.workspaces) {
             // Workspace scroll
+            if (NiriService.isNiri) {
+                if (angleDelta.y > 0)
+                    NiriService.focusWorkspaceUp();
+                else if (angleDelta.y < 0)
+                    NiriService.focusWorkspaceDown();
+                return;
+            }
             const mon = (GlobalConfig.bar.workspaces.perMonitorWorkspaces ? Hypr.monitorFor(screen) : Hypr.focusedMonitor);
             const specialWs = mon?.lastIpcObject.specialWorkspace.name;
             if (specialWs?.length > 0)

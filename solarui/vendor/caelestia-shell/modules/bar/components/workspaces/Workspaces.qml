@@ -14,10 +14,12 @@ StyledClippingRect {
     required property ShellScreen screen
     required property bool fullscreen
 
-    readonly property bool onSpecial: (GlobalConfig.bar.workspaces.perMonitorWorkspaces ? Hypr.monitorFor(screen) : Hypr.focusedMonitor)?.lastIpcObject.specialWorkspace?.name !== ""
-    readonly property int activeWsId: GlobalConfig.bar.workspaces.perMonitorWorkspaces ? (Hypr.monitorFor(screen).activeWorkspace?.id ?? 1) : Hypr.activeWsId
+    readonly property bool onSpecial: Hypr.focusedMonitor ? Boolean((GlobalConfig.bar.workspaces.perMonitorWorkspaces ? Hypr.monitorFor(screen) : Hypr.focusedMonitor)?.lastIpcObject?.specialWorkspace?.name) : false
+    readonly property int activeWsId: NiriService.isNiri ? NiriService.activeWsId : (GlobalConfig.bar.workspaces.perMonitorWorkspaces ? (Hypr.monitorFor(screen).activeWorkspace?.id ?? 1) : Hypr.activeWsId)
 
     readonly property var occupied: {
+        if (NiriService.isNiri)
+            return NiriService.occupied;
         const occ = {};
         for (const ws of Hypr.workspaces.values)
             occ[ws.id] = ws.lastIpcObject.windows > 0;
@@ -98,6 +100,10 @@ StyledClippingRect {
                 const ws = (layout.childAt(event.x, event.y) as Workspace)?.ws;
                 if (!ws)
                     return;
+                if (NiriService.isNiri) {
+                    NiriService.focusWorkspace(ws);
+                    return;
+                }
                 if (Hypr.activeWsId !== ws)
                     Hypr.dispatch(Hypr.usingLua ? `hl.dsp.focus({ workspace = "${ws}" })` : `workspace ${ws}`);
                 else

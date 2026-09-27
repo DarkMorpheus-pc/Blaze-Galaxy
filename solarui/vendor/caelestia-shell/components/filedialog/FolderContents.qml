@@ -159,7 +159,7 @@ Item {
         required property int index
         required property FileSystemEntry modelData
 
-        readonly property real nonAnimHeight: icon.implicitHeight + name.anchors.topMargin + name.implicitHeight + Tokens.padding.medium * 2
+        readonly property real nonAnimHeight: iconArea.implicitHeight + name.anchors.topMargin + name.implicitHeight + Tokens.padding.medium * 2
 
         implicitWidth: Sizes.itemWidth
         implicitHeight: nonAnimHeight
@@ -179,25 +179,47 @@ Item {
             }
         }
 
-        CachingIconImage {
-            id: icon
+        Item {
+            id: iconArea
 
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.top: parent.top
             anchors.topMargin: Tokens.padding.medium
 
-            implicitSize: Sizes.itemWidth - Tokens.padding.medium * 2
+            implicitWidth: Sizes.itemWidth - Tokens.padding.medium * 2
+            implicitHeight: implicitWidth
 
-            Component.onCompleted: {
-                const file = item.modelData;
-                if (file.isImage)
-                    source = Qt.resolvedUrl(file.path);
-                else if (!file.isDir)
-                    source = Quickshell.iconPath(file.mimeType.replace("/", "-"), "application-x-zerosize");
-                else if (root.dialog.cwd.length === 1 && ["Desktop", "Documents", "Downloads", "Music", "Pictures", "Public", "Templates", "Videos"].includes(file.name))
-                    source = Quickshell.iconPath(`folder-${file.name.toLowerCase()}`);
-                else
-                    source = Quickshell.iconPath("inode-directory");
+            CachingIconImage {
+                anchors.fill: parent
+                visible: item.modelData.isImage
+                source: item.modelData.isImage ? Qt.resolvedUrl(item.modelData.path) : ""
+            }
+
+            MaterialIcon {
+                anchors.centerIn: parent
+                visible: !item.modelData.isImage
+                fontStyle: Tokens.font.icon.builders.extraLarge.scale(1.8).build()
+                color: item.modelData.isDir ? Colours.palette.m3primary : Colours.palette.m3onSurfaceVariant
+                fill: item.modelData.isDir ? 1 : 0
+
+                text: {
+                    if (!item.modelData.isDir)
+                        return "description";
+                    const n = item.modelData.name.toLowerCase();
+                    if (["downloads", "indirilenler", "i̇ndirilenler"].includes(n))
+                        return "file_download";
+                    if (["desktop", "masaüstü", "masaustu"].includes(n))
+                        return "desktop_windows";
+                    if (["documents", "belgeler"].includes(n))
+                        return "description";
+                    if (["pictures", "resimler", "photos", "fotoğraflar"].includes(n))
+                        return "image";
+                    if (["music", "müzik", "muzik"].includes(n))
+                        return "music_note";
+                    if (["videos", "videolar"].includes(n))
+                        return "video_library";
+                    return "folder";
+                }
             }
         }
 
@@ -206,7 +228,7 @@ Item {
 
             anchors.left: parent.left
             anchors.right: parent.right
-            anchors.top: icon.bottom
+            anchors.top: iconArea.bottom
             anchors.topMargin: Tokens.spacing.small
             anchors.margins: Tokens.padding.medium
 
