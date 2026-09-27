@@ -51,8 +51,21 @@ chmod 2755 "$ROOTFS/usr/bin/at" 2>/dev/null || true
 chmod 2755 "$ROOTFS/usr/bin/chage" 2>/dev/null || true
 chmod 2755 "$ROOTFS/usr/bin/lockdev" 2>/dev/null || true
 chmod 2755 "$ROOTFS/usr/libexec/utempter/utempter" 2>/dev/null || true
+if [ ! -f "$ROOTFS/usr/lib/kitty/bin/kitty" ]; then
+    echo "  -> Fetching Kitty standalone bundle..."
+    mkdir -p "$ROOTFS/usr/lib/kitty"
+    curl -sL https://github.com/kovidgoyal/kitty/releases/download/v0.49.1/kitty-0.49.1-x86_64.txz | tar -xJ -C "$ROOTFS/usr/lib/kitty"
+    ln -sf ../lib/kitty/bin/kitty "$ROOTFS/usr/bin/kitty"
+    ln -sf ../lib/kitty/bin/kitten "$ROOTFS/usr/bin/kitten"
+fi
+
 chmod 755 "$ROOTFS/usr/bin/firehub" 2>/dev/null || true
 chmod 755 "$ROOTFS/usr/bin/blaze-house" 2>/dev/null || true
+chmod 755 "$ROOTFS/usr/bin/solar-shell" 2>/dev/null || true
+chmod 755 "$ROOTFS/usr/bin/solar-session" 2>/dev/null || true
+chmod 755 "$ROOTFS/usr/bin/kitty" 2>/dev/null || true
+chmod 755 "$ROOTFS/usr/bin/kitten" 2>/dev/null || true
+chmod -R 755 "$ROOTFS/usr/lib/kitty" 2>/dev/null || true
 chmod 755 "$ROOTFS/usr/local/bin/blazeos-control" 2>/dev/null || true
 
 echo "  -> Setting SELinux contexts with setfiles..."
@@ -63,6 +76,10 @@ setfattr -n security.selinux -v "system_u:object_r:init_exec_t:s0" "$ROOTFS/usr/
 setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/local/bin/blazeos-welcome" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/local/bin/blazeos-control" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/local/bin/blazeos-nvidia-setup" 2>/dev/null || true
+setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/solar-shell" 2>/dev/null || true
+setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/solar-session" 2>/dev/null || true
+setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/lib/kitty/bin/kitty" 2>/dev/null || true
+setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/lib/kitty/bin/kitten" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/local/bin/blazeos-limine-install" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/libexec/blazeos-welcome-helper" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/blazeos-control" 2>/dev/null || true

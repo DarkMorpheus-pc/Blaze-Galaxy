@@ -64,9 +64,19 @@ pub fn detect_host_distro() -> DistroInfo {
 
         distro_type = match id.as_str() {
             "debian" | "ubuntu" | "linuxmint" | "pop" => DistroType::Debian,
-            "fedora" | "rhel" | "centos" | "almalinux" | "rocky" => DistroType::Fedora,
+            "fedora" | "rhel" | "centos" | "almalinux" | "rocky" | "blazeos" => DistroType::Fedora,
             "arch" | "cachyos" | "manjaro" | "endeavouros" => DistroType::ArchOrCachy,
-            _ => DistroType::Unknown,
+            _ => {
+                if content.contains("ID_LIKE=fedora") || content.contains("ID_LIKE=\"fedora\"") {
+                    DistroType::Fedora
+                } else if content.contains("ID_LIKE=arch") || content.contains("ID_LIKE=\"arch\"") {
+                    DistroType::ArchOrCachy
+                } else if content.contains("ID_LIKE=debian") || content.contains("ID_LIKE=\"debian\"") {
+                    DistroType::Debian
+                } else {
+                    DistroType::Unknown
+                }
+            }
         };
     }
 

@@ -1005,9 +1005,14 @@ fn build_taskbar_tab() -> GtkBox {
     tab
 }
 
+fn noctalia_settings_path() -> String {
+    let home = std::env::var("HOME").unwrap_or_else(|_| "/root".to_string());
+    format!("{}/.local/state/noctalia/settings.toml", home)
+}
+
 fn apply_taskbar_preset(preset: &str) {
-    let path = "/home/darkmorpheus/.local/state/noctalia/settings.toml";
-    if let Ok(content) = std::fs::read_to_string(path) {
+    let path = noctalia_settings_path();
+    if let Ok(content) = std::fs::read_to_string(&path) {
         if let Ok(mut doc) = content.parse::<toml::Value>() {
             if let Some(bar) = doc.get_mut("bar").and_then(|b| b.get_mut("taskbar")) {
                 if let Some(t) = bar.as_table_mut() {
@@ -1037,7 +1042,7 @@ fn apply_taskbar_preset(preset: &str) {
                 }
             }
             if let Ok(serialized) = toml::to_string_pretty(&doc) {
-                let _ = std::fs::write(path, serialized);
+                let _ = std::fs::write(&path, serialized);
                 let _ = Command::new("noctalia").args(["msg", "templates-apply"]).spawn();
             }
         }
@@ -1045,8 +1050,8 @@ fn apply_taskbar_preset(preset: &str) {
 }
 
 fn update_noctalia_taskbar_opacity(opacity: f64) {
-    let path = "/home/darkmorpheus/.local/state/noctalia/settings.toml";
-    if let Ok(content) = std::fs::read_to_string(path) {
+    let path = noctalia_settings_path();
+    if let Ok(content) = std::fs::read_to_string(&path) {
         if let Ok(mut doc) = content.parse::<toml::Value>() {
             if let Some(bar) = doc.get_mut("bar").and_then(|b| b.get_mut("taskbar")) {
                 if let Some(t) = bar.as_table_mut() {
@@ -1054,7 +1059,7 @@ fn update_noctalia_taskbar_opacity(opacity: f64) {
                 }
             }
             if let Ok(serialized) = toml::to_string_pretty(&doc) {
-                let _ = std::fs::write(path, serialized);
+                let _ = std::fs::write(&path, serialized);
                 let _ = Command::new("noctalia").args(["msg", "templates-apply"]).spawn();
             }
         }
@@ -1062,8 +1067,8 @@ fn update_noctalia_taskbar_opacity(opacity: f64) {
 }
 
 fn update_noctalia_taskbar_radius(radius: i32) {
-    let path = "/home/darkmorpheus/.local/state/noctalia/settings.toml";
-    if let Ok(content) = std::fs::read_to_string(path) {
+    let path = noctalia_settings_path();
+    if let Ok(content) = std::fs::read_to_string(&path) {
         if let Ok(mut doc) = content.parse::<toml::Value>() {
             if let Some(bar) = doc.get_mut("bar").and_then(|b| b.get_mut("taskbar")) {
                 if let Some(t) = bar.as_table_mut() {
@@ -1071,7 +1076,7 @@ fn update_noctalia_taskbar_radius(radius: i32) {
                 }
             }
             if let Ok(serialized) = toml::to_string_pretty(&doc) {
-                let _ = std::fs::write(path, serialized);
+                let _ = std::fs::write(&path, serialized);
                 let _ = Command::new("noctalia").args(["msg", "templates-apply"]).spawn();
             }
         }
@@ -1079,8 +1084,8 @@ fn update_noctalia_taskbar_radius(radius: i32) {
 }
 
 fn update_noctalia_taskbar_thickness(thickness: i32) {
-    let path = "/home/darkmorpheus/.local/state/noctalia/settings.toml";
-    if let Ok(content) = std::fs::read_to_string(path) {
+    let path = noctalia_settings_path();
+    if let Ok(content) = std::fs::read_to_string(&path) {
         if let Ok(mut doc) = content.parse::<toml::Value>() {
             if let Some(bar) = doc.get_mut("bar").and_then(|b| b.get_mut("taskbar")) {
                 if let Some(t) = bar.as_table_mut() {
@@ -1088,7 +1093,7 @@ fn update_noctalia_taskbar_thickness(thickness: i32) {
                 }
             }
             if let Ok(serialized) = toml::to_string_pretty(&doc) {
-                let _ = std::fs::write(path, serialized);
+                let _ = std::fs::write(&path, serialized);
                 let _ = Command::new("noctalia").args(["msg", "templates-apply"]).spawn();
             }
         }
@@ -1096,8 +1101,8 @@ fn update_noctalia_taskbar_thickness(thickness: i32) {
 }
 
 fn update_noctalia_shell_settings(engine: &str, launcher: &str, dash: &str) {
-    let path = "/home/darkmorpheus/.local/state/noctalia/settings.toml";
-    if let Ok(content) = std::fs::read_to_string(path) {
+    let path = noctalia_settings_path();
+    if let Ok(content) = std::fs::read_to_string(&path) {
         if let Ok(mut doc) = content.parse::<toml::Value>() {
             if let Some(table) = doc.as_table_mut() {
                 if !table.contains_key("solarui") {
@@ -1110,7 +1115,7 @@ fn update_noctalia_shell_settings(engine: &str, launcher: &str, dash: &str) {
                 }
             }
             if let Ok(serialized) = toml::to_string_pretty(&doc) {
-                let _ = std::fs::write(path, serialized);
+                let _ = std::fs::write(&path, serialized);
             }
         }
     }
@@ -1366,8 +1371,9 @@ fn build_caelestia_tab() -> GtkBox {
     let mode_dd = DropDown::new(Some(StringList::new(&["Karanlık (Dark)", "Aydınlık (Light)"])), None::<gtk4::Expression>);
     
     // Initial read
-    let scheme_path = "/home/darkmorpheus/.local/state/caelestia/scheme.json";
-    if let Ok(content) = std::fs::read_to_string(scheme_path) {
+    let home = std::env::var("HOME").unwrap_or_else(|_| "/root".to_string());
+    let scheme_path = format!("{}/.local/state/caelestia/scheme.json", home);
+    if let Ok(content) = std::fs::read_to_string(&scheme_path) {
         if content.contains("\"mode\": \"light\"") {
             mode_dd.set_selected(1);
         }
@@ -1377,15 +1383,16 @@ fn build_caelestia_tab() -> GtkBox {
         let is_light = dd.selected() == 1;
         std::thread::spawn(move || {
             let mode_str = if is_light { "light" } else { "dark" };
-            if let Ok(content) = std::fs::read_to_string(scheme_path) {
-                // Simple string replacement to avoid depending on serde_json in this crate
-                // if it's not imported or available (just safely replace the exact key)
-                let updated = content.replace("\"mode\": \"dark\"", &format!("\"mode\": \"{}\"", mode_str))
-                                     .replace("\"mode\": \"light\"", &format!("\"mode\": \"{}\"", mode_str));
-                let _ = std::fs::write(scheme_path, updated);
-                // Trigger Caelestia reload
-                let _ = Command::new("pkill").args(["-SIGUSR2", "-f", "quickshell.*caelestia"]).status();
-            }
+            let gnome_mode = if is_light { "prefer-light" } else { "prefer-dark" };
+
+            // 1. Run caelestia scheme set CLI which re-computes full light/dark Material You colors
+            let _ = Command::new("caelestia").args(["scheme", "set", "--notify", "-m", mode_str]).status();
+
+            // 2. Set GNOME desktop color-scheme for GTK apps
+            let _ = Command::new("gsettings").args(["set", "org.gnome.desktop.interface", "color-scheme", gnome_mode]).status();
+
+            // 3. Trigger Caelestia reload
+            let _ = Command::new("pkill").args(["-SIGUSR2", "-f", "quickshell.*caelestia"]).status();
         });
     });
     row_mode.append(&mode_dd);

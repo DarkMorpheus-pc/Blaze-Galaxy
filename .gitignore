@@ -23,6 +23,7 @@ work_f45/rootfs/
 
 # Large prebuilt Electron binaries (>100MB limit on GitHub)
 blazeos_custom_apps/opt/FireHub/
+blazeos_custom_apps/usr/lib/kitty/
 
 
 # ============================================================
