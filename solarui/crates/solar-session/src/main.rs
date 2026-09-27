@@ -17,7 +17,7 @@ fn main() -> Result<()> {
     info!("=========================================");
 
     // 1. Setup Wayland & Desktop environment variables
-    std::env::set_var("XDG_CURRENT_DESKTOP", "SolarUI:gnome:niri");
+    std::env::set_var("XDG_CURRENT_DESKTOP", "SolarUI");
     std::env::set_var("XDG_SESSION_TYPE", "wayland");
     std::env::set_var("XDG_SESSION_DESKTOP", "SolarUI");
     std::env::set_var("DESKTOP_SESSION", "SolarUI");

@@ -91,7 +91,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         // Set the current desktop for xdg-desktop-portal.
-        env::set_var("XDG_CURRENT_DESKTOP", "niri");
+        if let Ok(current) = env::var("XDG_CURRENT_DESKTOP") {
+            if !current.contains("SolarUI") {
+                env::set_var("XDG_CURRENT_DESKTOP", "SolarUI");
+            }
+        } else {
+            env::set_var("XDG_CURRENT_DESKTOP", "SolarUI");
+        }
         // Ensure the session type is set to Wayland for xdg-autostart and Qt apps.
         env::set_var("XDG_SESSION_TYPE", "wayland");
     }

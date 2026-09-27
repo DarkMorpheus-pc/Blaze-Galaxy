@@ -617,7 +617,7 @@ class BlazeControlWindow(Adw.PreferencesWindow):
                 out = re.sub(r'\x1b\].*?\x07', '', out)
             except Exception:
                 uname_out = os.uname()
-                out = f"OS: {DISTRO_NAME}\nKernel: {uname_out.release} ({uname_out.machine})\nDesktop: SolarUI (Niri Wayland)\n"
+                out = f"OS: {DISTRO_NAME}\nKernel: {uname_out.release} ({uname_out.machine})\nDesktop: SolarUI (Wayland)\n"
             GLib.idle_add(lambda: self.info_buffer.set_text(out))
 
         threading.Thread(target=load_thread, daemon=True).start()

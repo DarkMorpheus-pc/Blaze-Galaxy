@@ -36,8 +36,8 @@
         { "type": "uptime",   "key": " Uptime     " },
         { "type": "packages", "key": " Packages   " },
         { "type": "shell",    "key": " Shell      " },
-        { "type": "wm",       "key": " WM         " },
-        { "type": "de",       "key": " DE         " },
+        { "type": "wm",       "key": " WM         ", "format": "SolarUI ({protocol-name})" },
+        { "type": "de",       "key": " DE         ", "format": "SolarUI" },
         { "type": "terminal", "key": " Terminal   " },
         {
             "type": "custom",

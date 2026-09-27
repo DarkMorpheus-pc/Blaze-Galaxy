@@ -1,6 +1,6 @@
 #!/bin/bash
 # SolarUI Wayland Session Wrapper for GDM / Display Managers
-export XDG_CURRENT_DESKTOP="SolarUI:gnome:niri"
+export XDG_CURRENT_DESKTOP="SolarUI"
 export XDG_SESSION_TYPE="wayland"
 export XDG_SESSION_DESKTOP="SolarUI"
 export DESKTOP_SESSION="SolarUI"

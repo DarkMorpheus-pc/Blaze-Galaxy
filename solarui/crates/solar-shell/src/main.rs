@@ -508,6 +508,10 @@ fn ensure_portal_and_graphical_session() {
         }
     }
 
+    std::env::set_var("XDG_CURRENT_DESKTOP", "SolarUI");
+    std::env::set_var("XDG_SESSION_DESKTOP", "SolarUI");
+    std::env::set_var("DESKTOP_SESSION", "SolarUI");
+
     let _ = std::process::Command::new("systemctl")
         .args(["--user", "daemon-reload"])
         .status();
