@@ -179,6 +179,8 @@ Item {
             }
         }
 
+        readonly property bool isImageEntry: item.modelData.isImage || /\.(jpe?g|png|webp|gif|svg|bmp|ico)$/i.test(item.modelData.name)
+
         Item {
             id: iconArea
 
@@ -191,13 +193,13 @@ Item {
 
             CachingIconImage {
                 anchors.fill: parent
-                visible: item.modelData.isImage
-                source: item.modelData.isImage ? Qt.resolvedUrl(item.modelData.path) : ""
+                visible: item.isImageEntry
+                source: item.isImageEntry ? Qt.resolvedUrl(item.modelData.path) : ""
             }
 
             MaterialIcon {
                 anchors.centerIn: parent
-                visible: !item.modelData.isImage
+                visible: !item.isImageEntry
                 fontStyle: Tokens.font.icon.builders.extraLarge.scale(1.8).build()
                 color: item.modelData.isDir ? Colours.palette.m3primary : Colours.palette.m3onSurfaceVariant
                 fill: item.modelData.isDir ? 1 : 0

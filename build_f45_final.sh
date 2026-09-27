@@ -118,6 +118,10 @@ setfattr -n security.selinux -v "system_u:object_r:lib_t:s0" "$ROOTFS"/usr/lib64
 setfattr -n security.selinux -v "system_u:object_r:lib_t:s0" "$ROOTFS"/usr/lib64/libgtksourceview-3.0.so* 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:lib_t:s0" "$ROOTFS"/usr/lib64/libgspell-1.so* 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:lib_t:s0" "$ROOTFS"/usr/lib64/libicu*.so* 2>/dev/null || true
+setfattr -n security.selinux -v "system_u:object_r:lib_t:s0" "$ROOTFS"/usr/lib64/libjpeg*.so* 2>/dev/null || true
+setfattr -n security.selinux -v "system_u:object_r:lib_t:s0" "$ROOTFS"/usr/lib64/libjasper*.so* 2>/dev/null || true
+setfattr -n security.selinux -v "system_u:object_r:lib_t:s0" "$ROOTFS"/usr/lib64/libmng*.so* 2>/dev/null || true
+setfattr -n security.selinux -v "system_u:object_r:lib_t:s0" "$ROOTFS"/usr/lib/python3.15/site-packages/materialyoucolor/quantize/celebi*.so 2>/dev/null || true
 
 echo "  -> Verifying critical SELinux labels..."
 getfattr -d -m - "$ROOTFS/usr/lib/systemd/systemd"
