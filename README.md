@@ -1,8 +1,6 @@
 # BlazeOS SolarEvolution 5 (Blaze-Galaxy)
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/DarkMorpheus-pc/Blaze-Galaxy/main/blazeos_custom_apps/usr/share/icons/hicolor/256x256/apps/solarui.png" alt="BlazeOS Logo" width="140" />
-</p>
+[**Upgrade to BlazeOS (ISO)**](https://archive.org/details/blaze-solar-evolution-5-test)
 
 <h3 align="center">Next-Generation Hybrid Desktop Ecosystem & High-Performance Linux Distribution</h3>
 
