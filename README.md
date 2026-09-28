@@ -6,6 +6,13 @@
 
 <h3 align="center">Next-Generation Hybrid Desktop Ecosystem & High-Performance Linux Distribution</h3>
 
+<img width="1209" height="752" alt="image" src="https://github.com/user-attachments/assets/e888deac-5b91-4ea9-98e2-8026f75c3bcf" />
+<img width="1208" height="757" alt="image" src="https://github.com/user-attachments/assets/f79b5aea-0fb7-4933-a5ca-b52321aa7ab0" />
+<img width="1208" height="754" alt="image" src="https://github.com/user-attachments/assets/7b3e685d-8caf-4270-a9d6-da6324638f0b" />
+
+
+
+
 <p align="center">
   <b>"From evolution to expansion — welcome to the galaxy."</b>
 </p>
@@ -22,7 +29,9 @@ The system brings together the innovative **SolarUI (Niri Wayland + Noctalia + C
 
 ## Key Features
 
-- **SolarUI Desktop Ecosystem:** A clean, fluid desktop experience with glassmorphism support, built on the Niri Wayland window manager and the fast Noctalia shell.
+- **SolarUI Desktop Ecosystem:** A clean, fluid desktop experience with glassmorphism support, built on the Niri Wayland window manager and the fast Noctalia shell and Caelestia shell.
+- <img width="1205" height="753" alt="image" src="https://github.com/user-attachments/assets/beac43d9-0943-44c9-b951-712629f23456" />
+
 - **9 Desktop Environment Options:**
   - **SolarUI:** The default fluid Niri + Noctalia desktop (Available Offline)
   - **GNOME:** Modern and stable GNOME 50 (Available Offline)
