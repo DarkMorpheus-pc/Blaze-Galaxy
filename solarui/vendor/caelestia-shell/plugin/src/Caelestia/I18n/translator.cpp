@@ -1,10 +1,13 @@
 #include "translator.hpp"
 
+#include <qcoreapplication.h>
+#include <qcoreevent.h>
 #include <qdirlisting.h>
 #include <qendian.h>
 #include <qfile.h>
 #include <qlocale.h>
 #include <qloggingcategory.h>
+#include <qtranslator.h>
 
 #include <cstring>
 
@@ -61,6 +64,29 @@ void substitutePercentN(QString& text, int n) {
     }
 }
 
+class CaelestiaQTranslator : public QTranslator {
+public:
+    explicit CaelestiaQTranslator(Translator* t) : QTranslator(t), m_translator(t) {}
+
+    QString translate(const char* context, const char* sourceText,
+                      const char* disambiguation = nullptr, int n = -1) const override {
+        Q_UNUSED(disambiguation);
+        if (!m_translator || !sourceText || !*sourceText)
+            return QString();
+
+        const QString text = QString::fromUtf8(sourceText);
+        const QString ctx = context ? QString::fromUtf8(context) : QString();
+        const QString res = (n >= 0) ? m_translator->translatePlural(text, QString(), n, ctx)
+                                     : m_translator->translate(text, ctx);
+        if (!res.isEmpty() && res != text) {
+            return res;
+        }
+        return QString();
+    }
+private:
+    Translator* m_translator = nullptr;
+};
+
 } // namespace
 
 Translator::Translator(QObject* parent)
@@ -73,6 +99,10 @@ Translator::Translator(QObject* parent)
 
     m_language = resolveLanguage(general->language());
     loadTranslations();
+
+    if (QCoreApplication::instance()) {
+        QCoreApplication::installTranslator(new CaelestiaQTranslator(this));
+    }
 }
 
 bool Translator::trsChangedFlag() {
@@ -150,6 +180,16 @@ QStringList Translator::findSupportedLangs() {
     const QDirListing listing(resourceDir(), { u"*.mo"_s }, QDirListing::IteratorFlag::FilesOnly);
     for (const auto& f : listing)
         langs << f.completeBaseName();
+
+    const QDirListing fsListing(u"/usr/share/caelestia/translations"_s, { u"*.mo"_s }, QDirListing::IteratorFlag::FilesOnly);
+    for (const auto& f : fsListing) {
+        const auto base = f.completeBaseName();
+        if (!langs.contains(base))
+            langs << base;
+    }
+    if (!langs.contains(u"tr"_s)) {
+        langs << u"tr"_s;
+    }
     return langs;
 }
 
@@ -161,6 +201,9 @@ void Translator::loadTranslations() {
         return;
 
     QFile file(resourceDir() + m_language + u".mo"_s);
+    if (!file.exists()) {
+        file.setFileName(u"/usr/share/caelestia/translations/"_s + m_language + u".mo"_s);
+    }
     if (!file.open(QIODevice::ReadOnly)) {
         qCWarning(lcI18n) << "Failed to open catalog for" << m_language;
         return;
@@ -301,7 +344,13 @@ QString Translator::langForLocale() const {
     for (const auto& lang : langs) {
         if (m_supportedLanguages.contains(lang))
             return lang;
+        if (lang.startsWith(u"tr"_s) && m_supportedLanguages.contains(u"tr"_s))
+            return u"tr"_s;
     }
+
+    const auto name = QLocale::system().name();
+    if (name.startsWith(u"tr"_s) && m_supportedLanguages.contains(u"tr"_s))
+        return u"tr"_s;
 
     qCDebug(lcI18n) << "No catalog for any of the system UI languages";
     return {};
@@ -326,6 +375,10 @@ void Translator::setLanguage(const QString& language) {
     m_language = language;
     loadTranslations(); // Load before emitting cause trsChangedFlag reuses the signal
     emit languageChanged();
+
+    if (auto* app = QCoreApplication::instance()) {
+        QCoreApplication::postEvent(app, new QEvent(QEvent::LanguageChange));
+    }
 }
 
 } // namespace caelestia::i18n

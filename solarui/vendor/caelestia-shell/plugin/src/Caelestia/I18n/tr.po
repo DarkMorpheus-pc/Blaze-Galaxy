@@ -1,0 +1,2030 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: Caelestia Shell 5.03\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-09-28 19:10+0300\n"
+"PO-Revision-Date: 2026-09-28 19:25+0300\n"
+"Last-Translator: Antigravity AI\n"
+"Language-Team: Turkish\n"
+"Language: tr\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+
+msgid "Nexus — %1"
+msgstr "Nexus — %1"
+
+msgid "Apps"
+msgstr "Uygulamalar"
+
+msgid "Default applications"
+msgstr "Varsayılan uygulamalar"
+
+msgid "Terminal"
+msgstr "Terminal"
+
+msgid "Audio"
+msgstr "Ses"
+
+msgid "Media playback"
+msgstr "Medya oynatıcı"
+
+msgid "File manager"
+msgstr "Dosya yöneticisi"
+
+msgid "Library"
+msgstr "Kütüphane"
+
+msgid "All apps"
+msgstr "Tüm uygulamalar"
+
+msgid "Browse installed apps, set favourites and hidden"
+msgstr "Yüklü uygulamalara göz atın, favorileri ve gizlileri belirleyin"
+
+msgid "App info"
+msgstr "Uygulama bilgisi"
+
+msgid "Launcher"
+msgstr "Başlatıcı"
+
+msgid "Favourite"
+msgstr "Favori"
+
+msgid "Matched by a regex in favouriteApps — edit the config file to change"
+msgstr "favouriteApps kuralıyla eşleşti — değiştirmek için yapılandırma dosyasını düzenleyin"
+
+msgid "Pin to the top of the launcher"
+msgstr "Başlatıcının en üstüne sabitle"
+
+msgid "Hidden"
+msgstr "Gizli"
+
+msgid "Matched by a regex in hiddenApps — edit the config file to change"
+msgstr "hiddenApps kuralıyla eşleşti — değiştirmek için yapılandırma dosyasını düzenleyin"
+
+msgid "Hide from the launcher"
+msgstr "Başlatıcıdan gizle"
+
+msgid "Details"
+msgstr "Ayrıntılar"
+
+msgid "App ID"
+msgstr "Uygulama Kimliği"
+
+msgid "Command"
+msgstr "Komut"
+
+msgid "Output"
+msgstr "Çıkış"
+
+msgid "Muted"
+msgstr "Sessiz"
+
+msgid "No output devices"
+msgstr "Çıkış aygıtı yok"
+
+msgid "Input"
+msgstr "Giriş"
+
+msgid "No input devices"
+msgstr "Giriş aygıtı yok"
+
+msgid "App volumes"
+msgstr "Uygulama sesleri"
+
+msgid "No apps playing audio"
+msgstr "Ses çalan uygulama yok"
+
+msgid "1 app playing audio"
+msgstr "1 uygulama ses çalıyor"
+
+msgid "%1 apps playing audio"
+msgstr "%1 uygulama ses çalıyor"
+
+msgid "Adjust the volume of individual apps currently playing audio."
+msgstr "Şu anda ses çalan uygulamaların ses düzeyini ayrı ayrı ayarlayın."
+
+msgid "Network"
+msgstr "Ağ"
+
+msgid "Wi-Fi"
+msgstr "Wi-Fi"
+
+msgid "Show all networks (%1)"
+msgstr "Tüm ağları göster (%1)"
+
+msgid "Saved networks"
+msgstr "Kayıtlı ağlar"
+
+msgid "Add network"
+msgstr "Ağ ekle"
+
+msgid "VPN"
+msgstr "VPN"
+
+msgid "No VPN providers configured"
+msgstr "Yapılandırılmış VPN sağlayıcısı yok"
+
+msgid "Tap to select"
+msgstr "Seçmek için dokunun"
+
+msgid "Connecting..."
+msgstr "Bağlanıyor..."
+
+msgid "Disconnecting..."
+msgstr "Bağlantı kesiliyor..."
+
+msgid "Connected"
+msgstr "Bağlandı"
+
+msgid "Authentication required"
+msgstr "Kimlik doğrulama gerekli"
+
+msgid "An error occurred"
+msgstr "Bir hata oluştu"
+
+msgid "Selected"
+msgstr "Seçildi"
+
+msgid "Interface"
+msgstr "Arayüz"
+
+msgid "Current Ping"
+msgstr "Mevcut Gecikme"
+
+msgid "%1 ms"
+msgstr "%1 ms"
+
+msgid "Add provider"
+msgstr "Sağlayıcı ekle"
+
+msgid "About"
+msgstr "Hakkında"
+
+msgid "System"
+msgstr "Sistem"
+
+msgid "Hostname"
+msgstr "Ana Bilgisayar Adı"
+
+msgid "Device"
+msgstr "Cihaz"
+
+msgid "Distro"
+msgstr "Dağıtım"
+
+msgid "Kernel"
+msgstr "Çekirdek"
+
+msgid "Firmware"
+msgstr "Bellenim (Firmware)"
+
+msgid "Software"
+msgstr "Yazılım"
+
+msgid "Shell"
+msgstr "Kabuk"
+
+msgid "CLI"
+msgstr "Komut Satırı"
+
+msgid "Quickshell"
+msgstr "Quickshell"
+
+msgid "Qt"
+msgstr "Qt"
+
+msgid "Plugins"
+msgstr "Eklentiler"
+
+msgid "Loaded plugins"
+msgstr "Yüklü eklentiler"
+
+msgid "Wallpaper & style"
+msgstr "Duvar Kağıdı ve Stil"
+
+msgid "Wallpaper disabled"
+msgstr "Duvar kağıdı devre dışı"
+
+msgid "Wallpapers"
+msgstr "Duvar Kağıtları"
+
+msgid "Colours"
+msgstr "Renkler"
+
+msgid "Display wallpaper"
+msgstr "Duvar kağıdını göster"
+
+msgid "Transparency"
+msgstr "Saydamlık"
+
+msgid "Base %1, layers %2"
+msgstr "Taban %1, katmanlar %2"
+
+msgid "Dark theme"
+msgstr "Koyu tema"
+
+msgid "Browse"
+msgstr "Gözat"
+
+msgid "Select an image"
+msgstr "Bir görsel seçin"
+
+msgid "Image files"
+msgstr "Görsel dosyaları"
+
+msgid "Random"
+msgstr "Rastgele"
+
+msgid "Featured wallpaper"
+msgstr "Öne çıkan duvar kağıdı"
+
+msgid "Local wallpapers"
+msgstr "Yerel duvar kağıtları"
+
+msgid "No local wallpapers found"
+msgstr "Yerel duvar kağıdı bulunamadı"
+
+msgid "Page under construction"
+msgstr "Sayfa yapım aşamasında"
+
+msgid "This page will be available in a future update."
+msgstr "Bu sayfa gelecek bir güncellemede kullanıma sunulacaktır."
+
+msgid "Sidebar"
+msgstr "Kenar Çubuğu"
+
+msgid "General"
+msgstr "Genel"
+
+msgid "Enabled"
+msgstr "Etkin"
+
+msgid "Drag threshold"
+msgstr "Sürükleme eşiği"
+
+msgid "Pixels dragged before the sidebar opens"
+msgstr "Kenar çubuğunun açılması için sürüklenmesi gereken piksel"
+
+msgid "Tray"
+msgstr "Sistem Tepsisi"
+
+msgid "Background"
+msgstr "Arka Plan"
+
+msgid "Recolour icons"
+msgstr "Simgeleri renklendir"
+
+msgid "Compact"
+msgstr "Kompakt"
+
+msgid "Popout on hover"
+msgstr "Üzerine gelindiğinde aç"
+
+msgid "Show the tray menu popout when hovering"
+msgstr "Üzerine gelindiğinde sistem tepsisi menüsünü göster"
+
+msgid "Lock keys"
+msgstr "Kilit tuşları"
+
+msgid "Keyboard layout"
+msgstr "Klavye düzeni"
+
+msgid "Speakers"
+msgstr "Hoparlörler"
+
+msgid "Microphone"
+msgstr "Mikrofon"
+
+msgid "Bluetooth"
+msgstr "Bluetooth"
+
+msgid "Battery"
+msgstr "Pil"
+
+msgid "Status icons"
+msgstr "Durum simgeleri"
+
+msgid "Visible icons"
+msgstr "Görünür simgeler"
+
+msgid "Add entry"
+msgstr "Girdi ekle"
+
+msgid "Add new entry"
+msgstr "Yeni girdi ekle"
+
+msgid "Add"
+msgstr "Ekle"
+
+msgid "Behaviour"
+msgstr "Davranış"
+
+msgid "Show a details popout when hovering the status icons"
+msgstr "Durum simgelerinin üzerine gelindiğinde ayrıntı penceresini göster"
+
+msgid "Active window"
+msgstr "Etkin pencere"
+
+msgid "Inverted"
+msgstr "Tersine çevrilmiş"
+
+msgid "Show on hover"
+msgstr "Üzerine gelindiğinde göster"
+
+msgid "Only show the active window title while hovering"
+msgstr "Etkin pencere başlığını yalnızca üzerine gelindiğinde göster"
+
+msgid "Show a window details popout when hovering"
+msgstr "Üzerine gelindiğinde pencere ayrıntılarını göster"
+
+msgid "Workspaces"
+msgstr "Çalışma Alanları"
+
+msgid "Shown"
+msgstr "Gösterilen"
+
+msgid "Number of workspaces displayed"
+msgstr "Görüntülenen çalışma alanı sayısı"
+
+msgid "Active indicator"
+msgstr "Etkin gösterge"
+
+msgid "Active trail"
+msgstr "Etkin iz"
+
+msgid "Occupied background"
+msgstr "Dolu arka plan"
+
+msgid "Show windows"
+msgstr "Pencereleri göster"
+
+msgid "Show icons of open windows on each workspace"
+msgstr "Her çalışma alanında açık pencerelerin simgelerini göster"
+
+msgid "Windows on special workspaces"
+msgstr "Özel çalışma alanlarındaki pencereler"
+
+msgid "Max window icons"
+msgstr "Maksimum pencere simgesi"
+
+msgid "Per-monitor workspaces"
+msgstr "Monitör başına çalışma alanları"
+
+msgid "Show each monitor's workspaces independently"
+msgstr "Her monitörün çalışma alanlarını bağımsız olarak göster"
+
+msgid "Clock"
+msgstr "Saat"
+
+msgid "Show date"
+msgstr "Tarihi göster"
+
+msgid "Show icon"
+msgstr "Simgeyi göster"
+
+msgid "Taskbar"
+msgstr "Görev Çubuğu"
+
+msgid "Persistent"
+msgstr "Kalıcı"
+
+msgid "Keep the bar visible at all times"
+msgstr "Çubuğu her zaman görünür tut"
+
+msgid "Reveal the bar when the cursor reaches the screen edge"
+msgstr "İmleç ekran kenarına ulaştığında çubuğu göster"
+
+msgid "Pixels dragged before the bar reveals"
+msgstr "Çubuğun görünmesi için sürüklenmesi gereken piksel"
+
+msgid "Components"
+msgstr "Bileşenler"
+
+msgid "Indicators, window icons"
+msgstr "Göstergeler, pencere simgeleri"
+
+msgid "Title display, popout"
+msgstr "Başlık görünümü, açılır pencere"
+
+msgid "System tray icons"
+msgstr "Sistem tepsisi simgeleri"
+
+msgid "Visible indicators"
+msgstr "Görünür göstergeler"
+
+msgid "Date, icon, background"
+msgstr "Tarih, simge, arka plan"
+
+msgid "Scroll actions"
+msgstr "Kaydırma eylemleri"
+
+msgid "Scroll over the workspace indicator to switch workspaces"
+msgstr "Çalışma alanları arasında geçiş yapmak için gösterge üzerinde kaydırın"
+
+msgid "Volume"
+msgstr "Ses Seviyesi"
+
+msgid "Scroll on the top half of the bar to adjust volume"
+msgstr "Sesi ayarlamak için çubuğun üst yarısında kaydırın"
+
+msgid "Brightness"
+msgstr "Parlaklık"
+
+msgid "Scroll on the bottom half of the bar to adjust brightness"
+msgstr "Parlaklığı ayarlamak için çubuğun alt yarısında kaydırın"
+
+msgid "Reveal when the cursor reaches the screen edge"
+msgstr "İmleç ekran kenarına ulaştığında göster"
+
+msgid "Action prefix"
+msgstr "Eylem öneki"
+
+msgid "Prefix used to run actions in the launcher"
+msgstr "Başlatıcıda eylemleri çalıştırmak için kullanılan önek"
+
+msgid "Prefix must not be alphanumeric"
+msgstr "Önek alfanümerik olmamalıdır"
+
+msgid "Display"
+msgstr "Ekran"
+
+msgid "Max items shown"
+msgstr "Gösterilen maksimum öğe"
+
+msgid "Max wallpapers"
+msgstr "Maksimum duvar kağıdı"
+
+msgid "Pixels dragged before the launcher opens"
+msgstr "Başlatıcının açılması için sürüklenmesi gereken piksel"
+
+msgid "Vim keybinds"
+msgstr "Vim tuş atamaları"
+
+msgid "Navigate results with Ctrl+hjkl"
+msgstr "Sonuçlar arasında Ctrl+hjkl ile gezinin"
+
+msgid "Enable dangerous actions"
+msgstr "Tehlikeli eylemleri etkinleştir"
+
+msgid "Allow actions that shut down or log out"
+msgstr "Kapatma veya oturumu kapatma eylemlerine izin ver"
+
+msgid "Fuzzy search"
+msgstr "Bulanık arama"
+
+msgid "Actions"
+msgstr "Eylemler"
+
+msgid "Schemes"
+msgstr "Şemalar"
+
+msgid "Variants"
+msgstr "Varyantlar"
+
+msgid "Dashboard"
+msgstr "Kontrol Paneli"
+
+msgid "Tabs"
+msgstr "Sekmeler"
+
+msgid "Media"
+msgstr "Medya"
+
+msgid "Performance"
+msgstr "Performans"
+
+msgid "Weather"
+msgstr "Hava Durumu"
+
+msgid "Performance widgets"
+msgstr "Performans bileşenleri"
+
+msgid "GPU"
+msgstr "GPU"
+
+msgid "CPU"
+msgstr "CPU"
+
+msgid "Memory"
+msgstr "Bellek"
+
+msgid "Storage"
+msgstr "Depolama"
+
+msgid "Pixels dragged before the dashboard opens"
+msgstr "Kontrol panelinin açılması için sürüklenmesi gereken piksel"
+
+msgid "Utilities"
+msgstr "Araçlar"
+
+msgid "Show the utilities panel"
+msgstr "Araçlar panelini göster"
+
+msgid "Cards"
+msgstr "Kartlar"
+
+msgid "Keep awake"
+msgstr "Uyanık tut"
+
+msgid "Show the idle inhibitor card"
+msgstr "Boşta kalma engelleyici kartını göster"
+
+msgid "Screen recorder"
+msgstr "Ekran kaydedici"
+
+msgid "Show the screen recorder card"
+msgstr "Ekran kaydedici kartını göster"
+
+msgid "Quick toggles"
+msgstr "Hızlı anahtarlar"
+
+msgid "Show the quick toggles card"
+msgstr "Hızlı anahtarlar kartını göster"
+
+msgid "Toggle wireless networking"
+msgstr "Kablosuz ağı aç/kapat"
+
+msgid "Toggle the Bluetooth adapter"
+msgstr "Bluetooth bağdaştırıcısını aç/kapat"
+
+msgid "Mute or unmute the default source"
+msgstr "Varsayılan kaynağı sessize al / aç"
+
+msgid "Settings"
+msgstr "Ayarlar"
+
+msgid "Open the settings window"
+msgstr "Ayarlar penceresini aç"
+
+msgid "Game mode"
+msgstr "Oyun modu"
+
+msgid "Toggle game mode"
+msgstr "Oyun modunu aç/kapat"
+
+msgid "Do not disturb"
+msgstr "Rahatsız etmeyin"
+
+msgid "Silence notifications"
+msgstr "Bildirimleri sessize al"
+
+msgid "Connect or disconnect the VPN"
+msgstr "VPN bağlantısını kur veya kes"
+
+msgid "Forget"
+msgstr "Unut"
+
+msgid "Disconnect"
+msgstr "Bağlantıyı Kes"
+
+msgid "Connection"
+msgstr "Bağlantı"
+
+msgid "Signal"
+msgstr "Sinyal"
+
+msgid "%1%"
+msgstr "%%%1"
+
+msgid "—"
+msgstr "—"
+
+msgid "Security"
+msgstr "Güvenlik"
+
+msgid "Open"
+msgstr "Açık"
+
+msgid "Frequency"
+msgstr "Frekans"
+
+msgid "%1 MHz"
+msgstr "%1 MHz"
+
+msgid "IP address"
+msgstr "IP adresi"
+
+msgid "Gateway"
+msgstr "Ağ Geçidi"
+
+msgid "MAC address"
+msgstr "MAC adresi"
+
+msgid "Connect automatically"
+msgstr "Otomatik bağlan"
+
+msgid "Join this network when it's in range"
+msgstr "Kapsama alanındayken bu ağa bağlan"
+
+msgid "IPv4"
+msgstr "IPv4"
+
+msgid "IP assignment"
+msgstr "IP ataması"
+
+msgid "Automatic (DHCP)"
+msgstr "Otomatik (DHCP)"
+
+msgid "Automatic, DNS only"
+msgstr "Otomatik, yalnızca DNS"
+
+msgid "Manual"
+msgstr "Manuel"
+
+msgid "Address (CIDR)"
+msgstr "Adres (CIDR)"
+
+msgid "IP and prefix, e.g. 192.168.1.50/24"
+msgstr "IP ve önek, örn. 192.168.1.50/24"
+
+msgid "Enter a valid address in CIDR notation"
+msgstr "CIDR biçiminde geçerli bir adres girin"
+
+msgid "Enter a valid gateway address"
+msgstr "Geçerli bir ağ geçidi adresi girin"
+
+msgid "DNS servers"
+msgstr "DNS sunucuları"
+
+msgid "Comma-separated"
+msgstr "Virgülle ayrılmış"
+
+msgid "Enter valid DNS server addresses"
+msgstr "Geçerli DNS sunucu adresleri girin"
+
+msgid "Apply"
+msgstr "Uygula"
+
+msgid "All networks"
+msgstr "Tüm ağlar"
+
+msgid "Filters"
+msgstr "Filtreler"
+
+msgid "Saved"
+msgstr "Kayıtlı"
+
+msgid "Secured"
+msgstr "Güvenli"
+
+msgid "5 GHz"
+msgstr "5 GHz"
+
+msgid "2.4 GHz"
+msgstr "2.4 GHz"
+
+msgid "No saved networks"
+msgstr "Kayıtlı ağ yok"
+
+msgid "Unknown"
+msgstr "Bilinmiyor"
+
+msgid "Connected • %1"
+msgstr "Bağlandı • %1"
+
+msgid "Edit VPN provider"
+msgstr "VPN sağlayıcısını düzenle"
+
+msgid "Add VPN provider"
+msgstr "VPN sağlayıcısı ekle"
+
+msgid "Built-in names (wireguard, warp, tailscale, netbird) auto-fill their commands. For others, provide the connect/disconnect commands."
+msgstr "Yerleşik isimler (wireguard, warp, tailscale, netbird) komutlarını otomatik doldurur. Diğerleri için bağlanma/bağlantı kesme komutlarını girin."
+
+msgid "Provider name"
+msgstr "Sağlayıcı adı"
+
+msgid "Built-in id or a custom name"
+msgstr "Yerleşik kimlik veya özel bir ad"
+
+msgid "Provider name is required"
+msgstr "Sağlayıcı adı gereklidir"
+
+msgid "Display name"
+msgstr "Görünen ad"
+
+msgid "Shown in the list"
+msgstr "Listede gösterilen"
+
+msgid "Network interface (for WireGuard / status checks)"
+msgstr "Ağ arayüzü (WireGuard / durum kontrolleri için)"
+
+msgid "Custom commands (optional)"
+msgstr "Özel komutlar (isteğe bağlı)"
+
+msgid "Connect command"
+msgstr "Bağlanma komutu"
+
+msgid "Leave empty to use the built-in default"
+msgstr "Yerleşik varsayılanı kullanmak için boş bırakın"
+
+msgid "Disconnect command"
+msgstr "Bağlantıyı kesme komutu"
+
+msgid "Delete"
+msgstr "Sil"
+
+msgid "Cancel"
+msgstr "İptal"
+
+msgid "Save"
+msgstr "Kaydet"
+
+msgid "Ethernet"
+msgstr "Kablolu Ağ"
+
+msgid "Connect"
+msgstr "Bağlan"
+
+msgid "Status"
+msgstr "Durum"
+
+msgid "Not connected"
+msgstr "Bağlı değil"
+
+msgid "Speed"
+msgstr "Hız"
+
+msgid "Enter the details below to manually connect to a network."
+msgstr "Bir ağa manuel olarak bağlanmak için aşağıdaki bilgileri girin."
+
+msgid "Network name (SSID)"
+msgstr "Ağ adı (SSID)"
+
+msgid "e.g. MyHiddenNetwork"
+msgstr "örn. GizliAgim"
+
+msgid "Network name is required"
+msgstr "Ağ adı gereklidir"
+
+msgid "Hidden network"
+msgstr "Gizli ağ"
+
+msgid "Actively probe for a network that doesn't broadcast its name"
+msgstr "Adını yayınlamayan bir ağı etkin olarak ara"
+
+msgid "WPA/WPA2/WPA3 Personal"
+msgstr "WPA/WPA2/WPA3 Kişisel"
+
+msgid "None (open)"
+msgstr "Hiçbiri (açık)"
+
+msgid "Password"
+msgstr "Şifre"
+
+msgid "WPA passwords are at least 8 characters"
+msgstr "WPA şifreleri en az 8 karakterdir"
+
+msgid "Connection failed — check the password"
+msgstr "Bağlantı başarısız — şifreyi kontrol edin"
+
+msgid "Password must be at least 8 characters"
+msgstr "Şifre en az 8 karakter olmalıdır"
+
+msgid "SolarUI Engine"
+msgstr "SolarUI Motoru"
+
+msgid "Active Engine"
+msgstr "Etkin Motor"
+
+msgid "Noctalia"
+msgstr "Noctalia"
+
+msgid "Pure CachyOS C++23 Native Shell. Best for raw performance and gaming."
+msgstr "Saf CachyOS C++23 Doğal Kabuğu. Ham performans ve oyunlar için en iyisi."
+
+msgid "Caelestia"
+msgstr "Caelestia"
+
+msgid "Pure Quickshell QML interface. Elegant, modern, and highly customizable."
+msgstr "Saf Quickshell QML arayüzü. Zarif, modern ve son derece özelleştirilebilir."
+
+msgid "Hybrid (Recommended)"
+msgstr "Hibrit (Önerilen)"
+
+msgid "Noctalia top bar & widgets + Caelestia dashboard & launcher."
+msgstr "Noctalia üst çubuğu ve bileşenleri + Caelestia kontrol paneli ve başlatıcısı."
+
+msgid "SolarUI Taskbar"
+msgstr "SolarUI Görev Çubuğu"
+
+msgid "Enable KDE-style Taskbar"
+msgstr "KDE Tarzı Görev Çubuğunu Etkinleştir"
+
+msgid "Shows active window icons at the bottom of the screen."
+msgstr "Ekranın alt kısmında etkin pencere simgelerini gösterir."
+
+msgid "Noctalia Settings"
+msgstr "Noctalia Ayarları"
+
+msgid "Noctalia motoru şu an kapalı! Ayarları değiştirebilmek için 'SolarUI Engine' sekmesinden Noctalia veya Hibrit moduna geçmelisiniz."
+msgstr "Noctalia motoru şu an kapalı! Ayarları değiştirebilmek için 'SolarUI Engine' sekmesinden Noctalia veya Hibrit moduna geçmelisiniz."
+
+msgid "Animations & Visuals"
+msgstr "Animasyonlar ve Görseller"
+
+msgid "Animation Speed"
+msgstr "Animasyon Hızı"
+
+msgid "Current multiplier: "
+msgstr "Mevcut çarpan: "
+
+msgid "Corner Radius Scale"
+msgstr "Köşe Yuvarlama Ölçeği"
+
+msgid "Scale: "
+msgstr "Ölçek: "
+
+msgid "Panel Transparency Mode"
+msgstr "Panel Saydamlık Modu"
+
+msgid "Mode: "
+msgstr "Mod: "
+
+msgid "Accessibility"
+msgstr "Erişilebilirlik"
+
+msgid "UI Scale"
+msgstr "Arayüz Ölçeği"
+
+msgid "Global scaling factor: "
+msgstr "Genel ölçekleme faktörü: "
+
+msgid "Widgets & Features"
+msgstr "Bileşenler ve Özellikler"
+
+msgid "Screen Time Tracking"
+msgstr "Ekran Süresi Takibi"
+
+msgid "Enabled: "
+msgstr "Etkin: "
+
+msgid "Desktop Grid Widgets"
+msgstr "Masaüstü Izgara Bileşenleri"
+
+msgid "Visible: "
+msgstr "Görünür: "
+
+msgid "Advanced Config"
+msgstr "Gelişmiş Yapılandırma"
+
+msgid "Open Native Noctalia Settings"
+msgstr "Doğal Noctalia Ayarlarını Aç"
+
+msgid "Launch the full C++ native configuration app for complex layouts."
+msgstr "Karmaşık düzenler için tam C++ doğal yapılandırma uygulamasını başlatın."
+
+msgid "24-hour"
+msgstr "24 saat"
+
+msgid "12-hour"
+msgstr "12 saat"
+
+msgid "Language & region"
+msgstr "Dil ve Bölge"
+
+msgid "Language"
+msgstr "Dil"
+
+msgid "System language"
+msgstr "Sistem dili"
+
+msgid "Follows your system locale (%1)"
+msgstr "Sistem dilinizi takip eder (%1)"
+
+msgid "Location picker coming soon"
+msgstr "Konum seçici yakında eklenecek"
+
+msgid "Choose your weather location on a map in a future update"
+msgstr "Gelecek güncellemede hava durumu konumunuzu haritadan seçebileceksiniz"
+
+msgid "Units"
+msgstr "Birimler"
+
+msgid "Temperature"
+msgstr "Sıcaklık"
+
+msgid "Units for weather temperatures"
+msgstr "Hava durumu sıcaklık birimi"
+
+msgid "System temperatures"
+msgstr "Sistem sıcaklıkları"
+
+msgid "Units for CPU and GPU temperatures"
+msgstr "İşlemci ve ekran kartı sıcaklık birimi"
+
+msgid "Time & date"
+msgstr "Saat ve Tarih"
+
+msgid "Clock format"
+msgstr "Saat biçimi"
+
+msgid "How times are shown across the shell"
+msgstr "Saatin kabuk genelinde nasıl gösterileceği"
+
+msgid "On"
+msgstr "Açık"
+
+msgid "Off"
+msgstr "Kapalı"
+
+msgid "Important"
+msgstr "Önemli"
+
+msgid "Notifications"
+msgstr "Bildirimler"
+
+msgid "Show in fullscreen"
+msgstr "Tam ekranda göster"
+
+msgid "Whether notifications appear over fullscreen apps"
+msgstr "Bildirimlerin tam ekran uygulamaların üzerinde gösterilip gösterilmeyeceği"
+
+msgid "Expire automatically"
+msgstr "Otomatik zaman aşımına uğra"
+
+msgid "Dismiss notifications after their timeout"
+msgstr "Zaman aşımı sonrası bildirimleri otomatik kapat"
+
+msgid "Open expanded"
+msgstr "Genişletilmiş aç"
+
+msgid "Show notifications expanded by default"
+msgstr "Bildirimleri varsayılan olarak genişletilmiş göster"
+
+msgid "Default timeout"
+msgstr "Varsayılan zaman aşımı"
+
+msgid "Time before a notification dismisses (ms)"
+msgstr "Bildirimin kapanması için gereken süre (ms)"
+
+msgid "Group preview count"
+msgstr "Grup önizleme sayısı"
+
+msgid "Notifications shown per group before collapsing"
+msgstr "Daraltılmadan önce grup başına gösterilen bildirim sayısı"
+
+msgid "Toasts"
+msgstr "Bildirim Baloncukları"
+
+msgid "Whether toasts appear over fullscreen apps"
+msgstr "Baloncukların tam ekran uygulamaların üzerinde gösterilip gösterilmeyeceği"
+
+msgid "Visible toasts"
+msgstr "Görünür baloncuklar"
+
+msgid "Maximum number of toasts shown at once"
+msgstr "Aynı anda gösterilen maksimum baloncuk sayısı"
+
+msgid "Toast events"
+msgstr "Baloncuk olayları"
+
+msgid "Charging changes"
+msgstr "Şarj durumu değişiklikleri"
+
+msgid "Game mode changes"
+msgstr "Oyun modu değişiklikleri"
+
+msgid "Do not disturb changes"
+msgstr "Rahatsız etmeyin değişiklikleri"
+
+msgid "Audio output changes"
+msgstr "Ses çıkışı değişiklikleri"
+
+msgid "Audio input changes"
+msgstr "Ses girişi değişiklikleri"
+
+msgid "Caps lock changes"
+msgstr "Caps lock değişiklikleri"
+
+msgid "Num lock changes"
+msgstr "Num lock değişiklikleri"
+
+msgid "Keyboard layout changes"
+msgstr "Klavye düzeni değişiklikleri"
+
+msgid "VPN changes"
+msgstr "VPN değişiklikleri"
+
+msgid "Now playing"
+msgstr "Şu an çalıyor"
+
+msgid "Panels"
+msgstr "Paneller"
+
+msgid "Disabled"
+msgstr "Devre Dışı"
+
+msgid "Always visible"
+msgstr "Her zaman görünür"
+
+msgid "Reveal on hover"
+msgstr "Üzerine gelindiğinde göster"
+
+msgid "Reveal on drag"
+msgstr "Sürüklendiğinde göster"
+
+msgid "Connected devices"
+msgstr "Bağlı Cihazlar"
+
+msgid "No saved devices"
+msgstr "Kayıtlı cihaz yok"
+
+msgid "Bluetooth disabled"
+msgstr "Bluetooth devre dışı"
+
+msgid "Connected%1"
+msgstr "Bağlandı%1"
+
+msgid "Pair new device"
+msgstr "Yeni cihaz eşle"
+
+msgid "Discoverable"
+msgstr "Keşfedilebilir"
+
+msgid "Allow nearby devices to find this one"
+msgstr "Yakındaki cihazların bu cihazı bulmasına izin ver"
+
+msgid "Pairable"
+msgstr "Eşlenebilir"
+
+msgid "Allow nearby devices to pair with this one"
+msgstr "Yakındaki cihazların bu cihazla eşleşmesine izin ver"
+
+msgid "Paired"
+msgstr "Eşlendi"
+
+msgid "Not paired"
+msgstr "Eşlenmedi"
+
+msgid "Trusted"
+msgstr "Güvenilir"
+
+msgid "Allow this device to connect automatically"
+msgstr "Bu cihazın otomatik bağlanmasına izin ver"
+
+msgid "Blocked"
+msgstr "Engellendi"
+
+msgid "Prevent this device from connecting"
+msgstr "Bu cihazın bağlanmasını engelle"
+
+msgid "Wake allowed"
+msgstr "Uyanmaya izin verildi"
+
+msgid "Allow this device to wake the system"
+msgstr "Bu cihazın sistemi uyandırmasına izin ver"
+
+msgid "Unavailable"
+msgstr "Kullanılamıyor"
+
+msgid "Address"
+msgstr "Adres"
+
+msgid "Available devices"
+msgstr "Kullanılabilir cihazlar"
+
+msgid "Searching for devices…"
+msgstr "Cihazlar aranıyor…"
+
+msgid "Unknown device"
+msgstr "Bilinmeyen cihaz"
+
+msgid "Pairing..."
+msgstr "Eşleniyor..."
+
+msgid "Auto"
+msgstr "Otomatik"
+
+msgid "Generic"
+msgstr "Genel"
+
+msgid "None"
+msgstr "Yok"
+
+msgid "Services"
+msgstr "Servisler"
+
+msgid "Notifications, toasts, timeouts"
+msgstr "Bildirimler, baloncuklar, zaman aşımları"
+
+msgid "Polling"
+msgstr "Yoklama"
+
+msgid "Media refresh"
+msgstr "Medya yenileme"
+
+msgid "How often the media position updates (ms)"
+msgstr "Medya konumunun ne sıklıkla güncellendiği (ms)"
+
+msgid "System stats refresh"
+msgstr "Sistem istatistikleri yenileme"
+
+msgid "CPU, memory and GPU update interval (seconds)"
+msgstr "CPU, bellek ve GPU güncelleme aralığı (saniye)"
+
+msgid "Wi-Fi rescan"
+msgstr "Wi-Fi yeniden tarama"
+
+msgid "How often available networks are rescanned (seconds)"
+msgstr "Kullanılabilir ağların ne sıklıkla yeniden tarandığı (saniye)"
+
+msgid "Media & lyrics"
+msgstr "Medya ve şarkı sözleri"
+
+msgid "Lyrics backend"
+msgstr "Şarkı sözü sağlayıcısı"
+
+msgid "Source used to fetch synced lyrics"
+msgstr "Eşzamanlı şarkı sözlerini almak için kullanılan kaynak"
+
+msgid "Default player"
+msgstr "Varsayılan oynatıcı"
+
+msgid "Preferred media player when several are open"
+msgstr "Birden fazla açıkken tercih edilen medya oynatıcı"
+
+msgid "Input increments"
+msgstr "Giriş artışları"
+
+msgid "Volume step"
+msgstr "Ses adımı"
+
+msgid "Amount the volume changes per scroll (%)"
+msgstr "Kaydırma başına değişen ses miktarı (%)"
+
+msgid "Brightness step"
+msgstr "Parlaklık adımı"
+
+msgid "Amount the brightness changes per scroll (%)"
+msgstr "Kaydırma başına değişen parlaklık miktarı (%)"
+
+msgid "Max volume"
+msgstr "Maksimum ses"
+
+msgid "Upper limit for output volume (%)"
+msgstr "Çıkış sesi için üst sınır (%)"
+
+msgid "Service tuning"
+msgstr "Servis ince ayarları"
+
+msgid "Visualiser bars"
+msgstr "Görselleştirici çubukları"
+
+msgid "Number of bars in the audio visualisers"
+msgstr "Ses görselleştiricilerindeki çubuk sayısı"
+
+msgid "Smart colour scheme"
+msgstr "Akıllı renk şeması"
+
+msgid "Derive theme mode and variant from the wallpaper"
+msgstr "Tema modunu ve varyantını duvar kağıdından türet"
+
+msgid "Monitoring: %1"
+msgstr "İzleniyor: %1"
+
+msgid "Override for GPU type"
+msgstr "GPU türü için geçersiz kılma"
+
+msgid "Data usage: %1"
+msgstr "Veri kullanımı: %1"
+
+msgid "Wired connection"
+msgstr "Kablolu bağlantı"
+
+msgid "Not connected • %1"
+msgstr "Bağlı değil • %1"
+
+msgid "Local IP Address"
+msgstr "Yerel IP Adresi"
+
+msgid "Primary DNS"
+msgstr "Birincil DNS"
+
+msgid "No networks found"
+msgstr "Ağ bulunamadı"
+
+msgid "Wi-Fi disabled"
+msgstr "Wi-Fi devre dışı"
+
+msgid "Security: %1%2"
+msgstr "Güvenlik: %1%2"
+
+msgid " • Connected"
+msgstr " • Bağlandı"
+
+msgid " • Saved"
+msgstr " • Kayıtlı"
+
+msgid "Wallpaper, fonts, colours"
+msgstr "Duvar kağıdı, yazı tipleri, renkler"
+
+msgid "Wi-Fi, ethernet, VPN"
+msgstr "Wi-Fi, kablolu ağ, VPN"
+
+msgid "Bluetooth, pairing"
+msgstr "Bluetooth, eşleme"
+
+msgid "App volumes, sound devices"
+msgstr "Uygulama sesleri, ses aygıtları"
+
+msgid "Updates"
+msgstr "Güncellemeler"
+
+msgid "System updates"
+msgstr "Sistem güncellemeleri"
+
+msgid "Switch between Noctalia, Caelestia & Hybrid modes"
+msgstr "Noctalia, Caelestia ve Hibrit modları arasında geçiş yapın"
+
+msgid "Advanced Noctalia Shell Configuration"
+msgstr "Gelişmiş Noctalia Kabuk Yapılandırması"
+
+msgid "Manage plugins"
+msgstr "Eklentileri yönet"
+
+msgid "Dashboard, taskbar, launcher, sidebar"
+msgstr "Kontrol paneli, görev çubuğu, başlatıcı, kenar çubuğu"
+
+msgid "Default apps, favourites, hidden apps"
+msgstr "Varsayılan uygulamalar, favoriler, gizli uygulamalar"
+
+msgid "Poll intervals, lyrics backend"
+msgstr "Yoklama aralıkları, şarkı sözü servisi"
+
+msgid "UI language, weather location, display units"
+msgstr "Arayüz dili, hava durumu konumu, görüntüleme birimleri"
+
+msgid "System information, credits"
+msgstr "Sistem bilgisi, katkıda bulunanlar"
+
+msgid "Search settings"
+msgstr "Ayarlarda ara"
+
+msgid "Keep Awake"
+msgstr "Uyanık Tut"
+
+msgid "Preventing sleep mode"
+msgstr "Uyku modu engelleniyor"
+
+msgid "Normal power management"
+msgstr "Normal güç yönetimi"
+
+msgid "Active since %1"
+msgstr "%1 tarihinden beri aktif"
+
+msgid "Screen Recorder"
+msgstr "Ekran Kaydedici"
+
+msgid "Paused"
+msgstr "Duraklatıldı"
+
+msgid "Running..."
+msgstr "Çalışıyor..."
+
+msgid "Ready"
+msgstr "Hazır"
+
+msgid "Record fullscreen"
+msgstr "Tam ekranı kaydet"
+
+msgid "Fullscreen"
+msgstr "Tam Ekran"
+
+msgid "Record region"
+msgstr "Bölgeyi kaydet"
+
+msgid "Region"
+msgstr "Bölge"
+
+msgid "Record fullscreen with sound"
+msgstr "Sesli tam ekran kaydet"
+
+msgid "Record region with sound"
+msgstr "Sesli bölge kaydet"
+
+msgid "Recording for %1"
+msgstr "%1 süredir kaydediliyor"
+
+msgid "Recordings"
+msgstr "Kayıtlar"
+
+msgid "Recording at %1"
+msgstr "%1 konumuna kaydediliyor"
+
+msgid "No recordings found"
+msgstr "Kayıt bulunamadı"
+
+msgid "Quick Toggles"
+msgstr "Hızlı Anahtarlar"
+
+msgid "Delete recording?"
+msgstr "Kayıt silinsin mi?"
+
+msgid "Recording '%1' will be permanently deleted."
+msgstr "'%1' kaydı kalıcı olarak silinecektir."
+
+msgid "%1 notification%2"
+msgstr "%1 bildirim"
+
+msgid "Unlock for Notifications"
+msgstr "Bildirimler için Kilidi Açın"
+
+msgid "No Notifications"
+msgstr "Bildirim Yok"
+
+msgid "Loading..."
+msgstr "Yükleniyor..."
+
+msgid "Scanning face..."
+msgstr "Yüz taranıyor..."
+
+msgid "Max tries reached"
+msgstr "Maksimum deneme sayısına ulaşıldı"
+
+msgid "Enter your password"
+msgstr "Şifrenizi girin"
+
+msgid "FP ERROR: %1"
+msgstr "PARMAK İZİ HATASI: %1"
+
+msgid "FACE ERROR: %1"
+msgstr "YÜZ TANIMA HATASI: %1"
+
+msgid "PW ERROR: %1"
+msgstr "ŞİFRE HATASI: %1"
+
+msgid "Fingerprint not recognized (%1/%2). Please try again or use password."
+msgstr "Parmak izi tanınmadı (%1/%2). Lütfen tekrar deneyin veya şifre kullanın."
+
+msgid "Face not recognized (%1/%2). Please try again or use password."
+msgstr "Yüz tanınmadı (%1/%2). Lütfen tekrar deneyin veya şifre kullanın."
+
+msgid "Fingerprint not recognized (%1/%2). Please try again."
+msgstr "Parmak izi tanınmadı (%1/%2). Lütfen tekrar deneyin."
+
+msgid "Face not recognized (%1/%2). Please try again."
+msgstr "Yüz tanınmadı (%1/%2). Lütfen tekrar deneyin."
+
+msgid "Incorrect password. Please try again or use fingerprint."
+msgstr "Yanlış şifre. Lütfen tekrar deneyin veya parmak izi kullanın."
+
+msgid "Incorrect password. Please try again or use face."
+msgstr "Yanlış şifre. Lütfen tekrar deneyin veya yüz tanıma kullanın."
+
+msgid "Incorrect password. Please try again."
+msgstr "Yanlış şifre. Lütfen tekrar deneyin."
+
+msgid "Maximum password attempts reached. Please use fingerprint."
+msgstr "Maksimum şifre denemesine ulaşıldı. Lütfen parmak izi kullanın."
+
+msgid "Maximum password attempts reached. Please use face."
+msgstr "Maksimum şifre denemesine ulaşıldı. Lütfen yüz tanıma kullanın."
+
+msgid "Maximum attempts for all authentication methods reached."
+msgstr "Tüm kimlik doğrulama yöntemleri için maksimum denemeye ulaşıldı."
+
+msgid "Maximum password attempts reached."
+msgstr "Maksimum şifre denemesine ulaşıldı."
+
+msgid "Maximum fingerprint attempts reached. Please use password."
+msgstr "Maksimum parmak izi denemesine ulaşıldı. Lütfen şifre kullanın."
+
+msgid "Maximum face attempts reached. Please use password."
+msgstr "Maksimum yüz tanıma denemesine ulaşıldı. Lütfen şifre kullanın."
+
+msgid "Caps lock and Num lock are ON.\nKeyboard layout: %1"
+msgstr "Caps lock ve Num lock AÇIK.\nKlavye düzeni: %1"
+
+msgid "Caps lock is ON. Kb layout: %1"
+msgstr "Caps lock AÇIK. Klavye düzeni: %1"
+
+msgid "Num lock is ON. Kb layout: %1"
+msgstr "Num lock AÇIK. Klavye düzeni: %1"
+
+msgid "Keyboard layout: %1"
+msgstr "Klavye düzeni: %1"
+
+msgid "Caps lock and Num lock are ON."
+msgstr "Caps lock ve Num lock AÇIK."
+
+msgid "Caps lock is ON."
+msgstr "Caps lock AÇIK."
+
+msgid "Num lock is ON."
+msgstr "Num lock AÇIK."
+
+msgid "Hourly forecast"
+msgstr "Saatlik hava durumu"
+
+msgid "Now"
+msgstr "Şimdi"
+
+msgid "Feels like %1"
+msgstr "Hissedilen %1"
+
+msgid "High %1 • Low %2"
+msgstr "En Yüksek %1 • En Düşük %2"
+
+msgid "Nothing playing"
+msgstr "Hiçbir şey çalmıyor"
+
+msgid "Unknown track"
+msgstr "Bilinmeyen parça"
+
+msgid "Try playing some music!"
+msgstr "Müzik çalmayı deneyin!"
+
+msgid "Unknown artist"
+msgstr "Bilinmeyen sanatçı"
+
+msgid "Calculating..."
+msgstr "Hesaplanıyor..."
+
+msgid "Type an expression to calculate"
+msgstr "Hesaplamak için bir ifade yazın"
+
+msgid "Open in calculator"
+msgstr "Hesap makinesinde aç"
+
+msgid "Type \"%1\" for commands"
+msgstr "Komutlar için \"%1\" yazın"
+
+msgid "Vibrant"
+msgstr "Canlı"
+
+msgid "A high chroma palette. The primary palette's chroma is at maximum."
+msgstr "Yüksek kromalı bir palet. Birincil paletin kroma değeri maksimumdadır."
+
+msgid "Tonal Spot"
+msgstr "Tonal Nokta"
+
+msgid "Default for Material theme colours. A pastel palette with a low chroma."
+msgstr "Material tema renkleri için varsayılan. Düşük kromalı pastel bir palet."
+
+msgid "Expressive"
+msgstr "Dışavurumcu"
+
+msgid "A medium chroma palette. The primary palette's hue is different from the seed colour, for variety."
+msgstr "Orta kromalı bir palet. Çeşitlilik için birincil paletin tonu tohum renginden farklıdır."
+
+msgid "Fidelity"
+msgstr "Doğruluk"
+
+msgid "Matches the seed colour, even if the seed colour is very bright (high chroma)."
+msgstr "Tohum rengi çok parlak olsa bile tohum rengiyle eşleşir."
+
+msgid "Content"
+msgstr "İçerik"
+
+msgid "Almost identical to fidelity."
+msgstr "Doğruluk şeması ile neredeyse aynıdır."
+
+msgid "Fruit Salad"
+msgstr "Meyve Salatası"
+
+msgid "A playful theme - the seed colour's hue does not appear in the theme."
+msgstr "Neşeli bir tema - tohum renginin tonu temada yer almaz."
+
+msgid "Rainbow"
+msgstr "Gökkuşağı"
+
+msgid "Neutral"
+msgstr "Nötr"
+
+msgid "Close to grayscale, a hint of chroma."
+msgstr "Gri tonlamaya yakın, hafif kroma içeren bir palet."
+
+msgid "Monochrome"
+msgstr "Monokrom"
+
+msgid "All colours are grayscale, no chroma."
+msgstr "Tüm renkler gri tonlamalıdır, kroma içermez."
+
+msgid "Unnamed"
+msgstr "İsimsiz"
+
+msgid "No description"
+msgstr "Açıklama yok"
+
+msgid "No wallpapers found"
+msgstr "Duvar kağıdı bulunamadı"
+
+msgid "No results"
+msgstr "Sonuç yok"
+
+msgid "Try putting some wallpapers in %1"
+msgstr "%1 konumuna duvar kağıtları eklemeyi deneyin"
+
+msgid "Try searching for something else"
+msgstr "Başka bir şey aramayı deneyin"
+
+msgid "Wallpaper missing?"
+msgstr "Duvar kağıdı bulunamadı mı?"
+
+msgid "Select a wallpaper"
+msgstr "Bir duvar kağıdı seçin"
+
+msgid "Set it now!"
+msgstr "Şimdi ayarla!"
+
+msgid "Move to workspace"
+msgstr "Çalışma alanına taşı"
+
+msgid "Tile"
+msgstr "Döşe"
+
+msgid "Float"
+msgstr "Yüzdür"
+
+msgid "Unpin"
+msgstr "Sabitlemeyi Kaldır"
+
+msgid "Pin"
+msgstr "Sabitle"
+
+msgid "Kill"
+msgstr "Sonlandır"
+
+msgid "No active client"
+msgstr "Etkin istemci yok"
+
+msgid "Address: %1"
+msgstr "Adres: %1"
+
+msgid "Position: %1, %2"
+msgstr "Konum: %1, %2"
+
+msgid "Size: %1 x %2"
+msgstr "Boyut: %1 x %2"
+
+msgid "Workspace: %1 (%2)"
+msgstr "Çalışma Alanı: %1 (%2)"
+
+msgid "Monitor: %1 (%2) at %3, %4"
+msgstr "Monitör: %1 (%2), %3, %4 konumunda"
+
+msgid "Monitor: unknown"
+msgstr "Monitör: bilinmiyor"
+
+msgid "Initial title: %1"
+msgstr "İlk başlık: %1"
+
+msgid "Initial class: %1"
+msgstr "İlk sınıf: %1"
+
+msgid "Process id: %1"
+msgstr "İşlem kimliği (PID): %1"
+
+msgid "Floating: %1"
+msgstr "Yüzen pencere: %1"
+
+msgid "Xwayland: %1"
+msgstr "Xwayland: %1"
+
+msgid "Pinned: %1"
+msgstr "Sabitlenmiş: %1"
+
+msgid "Fullscreen state: %1"
+msgstr "Tam ekran durumu: %1"
+
+msgid "Fullscreen state: unknown"
+msgstr "Tam ekran durumu: bilinmiyor"
+
+msgid "Try switching to a window"
+msgstr "Bir pencereye geçmeyi deneyin"
+
+msgid "%1 on monitor %2 at %3, %4"
+msgstr "%1, monitör %2 üzerinde, %3, %4 konumunda"
+
+msgid "Keyboard layout limit"
+msgstr "Klavye düzeni sınırı"
+
+msgid "XKB supports only 4 layouts at a time"
+msgstr "XKB aynı anda en fazla 4 düzeni destekler"
+
+msgid "Keyboard Layouts"
+msgstr "Klavye Düzenleri"
+
+msgid "Capslock: %1"
+msgstr "Büyük Harf Kilidi: %1"
+
+msgid "Numlock: %1"
+msgstr "Rakam Kilidi: %1"
+
+msgid "Wireless"
+msgstr "Kablosuz Ağ"
+
+msgid "%1 networks available"
+msgstr "%1 ağ mevcut"
+
+msgid "Rescan networks"
+msgstr "Ağları yeniden tara"
+
+msgid "%1 devices available"
+msgstr "%1 cihaz mevcut"
+
+msgid "Output device"
+msgstr "Çıkış aygıtı"
+
+msgid "Input device"
+msgstr "Giriş aygıtı"
+
+msgid "Volume (%1)"
+msgstr "Ses Seviyesi (%1)"
+
+msgid "Open settings"
+msgstr "Ayarları aç"
+
+msgid "Discovering"
+msgstr "Aranıyor..."
+
+msgid "%1 device%2 available"
+msgstr "%1 cihaz mevcut"
+
+msgid " (%1 connected)"
+msgstr " (%1 bağlı)"
+
+msgid "Remaining: %1%"
+msgstr "Kalan: %%%1"
+
+msgid "No battery detected"
+msgstr "Pil algılanmadı"
+
+msgid "Time %1: %2"
+msgstr "Saat %1: %2"
+
+msgid "Power profile: %1"
+msgstr "Güç profili: %1"
+
+msgid "Performance Degraded"
+msgstr "Performans Düştü"
+
+msgid "Reason: %1"
+msgstr "Neden: %1"
+
+msgid "Back"
+msgstr "Geri"
+
+msgid "Enter password"
+msgstr "Şifre girin"
+
+msgid "Network: %1"
+msgstr "Ağ: %1"
+
+msgid "Network: Unknown"
+msgstr "Ağ: Bilinmiyor"
+
+msgid "Connection failed. Please check your password and try again."
+msgstr "Bağlantı başarısız oldu. Lütfen şifrenizi kontrol edip tekrar deneyin."
+
+msgid "Desktop"
+msgstr "Masaüstü"
+
+msgid "Battery warning"
+msgstr "Pil uyarısı"
+
+msgid "Battery level is low"
+msgstr "Pil seviyesi düşük"
+
+msgid "Hibernating in 5 seconds"
+msgstr "5 saniye içinde hazırda bekletilecek"
+
+msgid "Hibernating to prevent data loss"
+msgstr "Veri kaybını önlemek için hazırda bekletiliyor"
+
+msgid "Charger unplugged"
+msgstr "Şarj aleti çıkarıldı"
+
+msgid "Battery is discharging"
+msgstr "Pil boşalıyor"
+
+msgid "Charger plugged in"
+msgstr "Şarj aleti takıldı"
+
+msgid "Battery is charging"
+msgstr "Pil şarj ediliyor"
+
+msgid "No widgets enabled"
+msgstr "Etkinleştirilmiş bileşen yok"
+
+msgid "Enable widgets in the dashboard settings"
+msgstr "Kontrol paneli ayarlarından bileşenleri etkinleştirin"
+
+msgid "Backend: %1"
+msgstr "Sağlayıcı: %1"
+
+msgid "Selected candidate: %1 | %2 | %3"
+msgstr "Seçilen aday: %1 | %2 | %3"
+
+msgid "Offset: %1 ms"
+msgstr "Sapma: %1 ms"
+
+msgid "No lyrics found"
+msgstr "Şarkı sözü bulunamadı"
+
+msgid "Loading lyrics..."
+msgstr "Şarkı sözleri yükleniyor..."
+
+msgid "Unknown album"
+msgstr "Bilinmeyen albüm"
+
+msgid "Lyrics"
+msgstr "Şarkı Sözleri"
+
+msgid "No players"
+msgstr "Oynatıcı yok"
+
+msgid "No media"
+msgstr "Medya yok"
+
+msgid "Unknown title"
+msgstr "Bilinmeyen parça"
+
+msgid "Select a profile picture"
+msgstr "Bir profil resmi seçin"
+
+msgid "7-Day Forecast"
+msgstr "7 Günlük Hava Tahmini"
+
+msgid "Today"
+msgstr "Bugün"
+
+msgid "Collecting data..."
+msgstr "Veri toplanıyor..."
+
+msgid "Download"
+msgstr "İndirme"
+
+msgid "Upload"
+msgstr "Yükleme"
+
+msgid "Total"
+msgstr "Toplam"
+
+msgid "Usage"
+msgstr "Kullanım"
+
+msgid "Full"
+msgstr "Dolu"
+
+msgid "Charging"
+msgstr "Şarj Oluyor"
+
+msgid "..."
+msgstr "..."
+
+msgid "Used"
+msgstr "Kullanılan"
+
+msgid "No disks detected"
+msgstr "Disk algılanmadı"
+
+msgid "No disks"
+msgstr "Disk yok"
+
+msgid "Play something for it to show up here!"
+msgstr "Burada görünmesi için bir şeyler çalın!"
+
+msgid "notification%1"
+msgstr "bildirim"
+
+msgid "All up to date!"
+msgstr "Her şey güncel!"
+
+msgid "No body here! :/"
+msgstr "İçerik bulunamadı! :/"
+
+msgid "+%1"
+msgstr "+%1"
+
+msgid "Select a file"
+msgstr "Bir dosya seçin"
+
+msgid "Files"
+msgstr "Dosyalar"
+
+msgid "\"%1\" selected"
+msgstr "\"%1\" seçildi"
+
+msgid "This folder is empty"
+msgstr "Bu klasör boş"
+
+msgid "Filter:"
+msgstr "Filtre:"
+
+msgid "Select"
+msgstr "Seç"
+
+msgid "Nexus"
+msgstr "Nexus"
+
+msgid "Overview"
+msgstr "Genel Bakış"
+
+msgid "Shell and system information"
+msgstr "Kabuk ve sistem bilgisi"
+
+msgid "Output configuration"
+msgstr "Görüntü çıkış yapılandırması"
+
+msgid "Light theme"
+msgstr "Açık tema"
+
+msgid "Scheme"
+msgstr "Renk Şeması"
+
+msgid "Accent colour"
+msgstr "Vurgu rengi"
+
+msgid "Custom accent"
+msgstr "Özel vurgu"
+
+msgid "Variant"
+msgstr "Varyant"
+
+msgid "Style"
+msgstr "Stil"
+
+msgid "Fonts"
+msgstr "Yazı Tipleri"
+
+msgid "Interface font"
+msgstr "Arayüz yazı tipi"
+
+msgid "Monospace font"
+msgstr "Sabit genişlikli yazı tipi"
+
+msgid "Font size"
+msgstr "Yazı tipi boyutu"
+
+msgid "Screen Recording"
+msgstr "Ekran Kaydı"
+
+msgid "Screen Rec..."
+msgstr "Ekran Kaydı..."
+
+msgid "Recording"
+msgstr "Kaydediliyor"
+
+msgid "Mute"
+msgstr "Sessize Al"
+
+msgid "Game Mode"
+msgstr "Oyun Modu"
+
+msgid "Night Light"
+msgstr "Gece Işığı"
+
+msgid "Do Not Disturb"
+msgstr "Rahatsız Etmeyin"
+
+msgid "Idle Inhibitor"
+msgstr "Boşta Kalma Engelleyici"
+
+msgid "Recording area"
+msgstr "Kayıt alanı"
+
+msgid "Select region"
+msgstr "Bölge seç"
+
+msgid "Stop recording"
+msgstr "Kaydı durdur"
+
+msgid "Start recording"
+msgstr "Kaydı başlat"
+
+msgid "Copy"
+msgstr "Kopyala"
+
+msgid "Share"
+msgstr "Paylaş"
+
+msgid "Close"
+msgstr "Kapat"
+
+msgid "Clear all"
+msgstr "Tümünü Temizle"
+
+msgid "No notifications"
+msgstr "Bildirim yok"
+
+msgid "Notification sound"
+msgstr "Bildirim sesi"
+
+msgid "Lock"
+msgstr "Kilitle"
+
+msgid "Suspend"
+msgstr "Askıya Al"
+
+msgid "Restart"
+msgstr "Yeniden Başlat"
+
+msgid "Shut down"
+msgstr "Kapat"
+
+msgid "Log out"
+msgstr "Oturumu Kapat"
+
+msgid "Hibernate"
+msgstr "Hazırda Beklet"
+
+msgid "Reboot recommended!"
+msgstr "Yeniden başlatma önerilir!"
+
+msgid "Are you sure you want to shut down?"
+msgstr "Bilgisayarı kapatmak istediğinizden emin misiniz?"
+
+msgid "Are you sure you want to restart?"
+msgstr "Bilgisayarı yeniden başlatmak istediğinizden emin misiniz?"
+
+msgid "Are you sure you want to log out?"
+msgstr "Oturumu kapatmak istediğinizden emin misiniz?"
+
+msgid "Fully charged!"
+msgstr "Tam şarj oldu!"
+
+msgid "Low battery"
+msgstr "Düşük pil"
+
+msgid "Critical battery level"
+msgstr "Kritik pil seviyesi"
+
+msgid "PLUG THE CHARGER RIGHT NOW!!"
+msgstr "ŞARJ ALETİNİ HEMEN TAKIN!!"
+
+msgid "You might want to plug in a charger"
+msgstr "Şarj aletini takmak isteyebilirsiniz"
+
+msgid "You should probably plug in a charger <b>now</b>"
+msgstr "Şarj aletini <b>hemen</b> takmanız önerilir"
+
+msgid "Did you see the previous message?"
+msgstr "Önceki uyarıyı gördünüz mü?"
+
+msgid "Lyric backend"
+msgstr "Şarkı sözü sağlayıcısı"
+
+msgid "Synced lyrics"
+msgstr "Eşzamanlı şarkı sözleri"
+
+msgid "Media players"
+msgstr "Medya oynatıcılar"
+
+msgid "CPU usage"
+msgstr "İşlemci kullanımı"
+
+msgid "Memory usage"
+msgstr "Bellek kullanımı"
+
+msgid "Disk usage"
+msgstr "Disk kullanımı"
+
+msgid "Network usage"
+msgstr "Ağ kullanımı"
+
+msgid "GPU usage"
+msgstr "Ekran kartı kullanımı"
+
+msgid "Bar"
+msgstr "Panel"
+
+msgid "Position"
+msgstr "Konum"
+
+msgid "Top"
+msgstr "Üst"
+
+msgid "Bottom"
+msgstr "Alt"
+
+msgid "Left"
+msgstr "Sol"
+
+msgid "Right"
+msgstr "Sağ"
+
+msgid "Auto-hide"
+msgstr "Otomatik gizle"
+
+msgid "Widgets"
+msgstr "Bileşenler"
+
+msgid "Version"
+msgstr "Sürüm"
+
+msgid "Compositor"
+msgstr "Pencere Yöneticisi"
+
+msgid "Host"
+msgstr "Ana Makine"
+
+msgid "Uptime"
+msgstr "Çalışma Süresi"
+
+msgid "Distribution"
+msgstr "Dağıtım"
+

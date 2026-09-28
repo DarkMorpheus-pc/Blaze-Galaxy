@@ -1,0 +1,21 @@
+{
+    "appearance": {
+        "font": {
+            "icon": {
+                "family": "Material Symbols Rounded"
+            }
+        },
+        "transparency": {
+            "enabled": false
+        }
+    },
+    "general": {
+        "language": "tr",
+        "idle": {
+            "timeouts": []
+        }
+    },
+    "paths": {
+        "wallpaperDir": "/usr/share/backgrounds/blazeos"
+    }
+}

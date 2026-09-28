@@ -113,6 +113,7 @@ setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/libexe
 setfattr -n security.selinux -v "system_u:object_r:lib_t:s0" "$ROOTFS/usr/lib64/solarui/libsolar_brand.so" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:lib_t:s0" "$ROOTFS/usr/lib/solarui/libsolar_brand.so" 2>/dev/null || true
 find "$ROOTFS/usr/lib64/quickshell" -exec setfattr -n security.selinux -v "system_u:object_r:lib_t:s0" {} + 2>/dev/null || true
+find "$ROOTFS/usr/share/caelestia" -exec setfattr -n security.selinux -v "system_u:object_r:usr_t:s0" {} + 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:lib_t:s0" "$ROOTFS"/usr/lib64/libseat.so* 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:lib_t:s0" "$ROOTFS"/usr/lib64/libyyjson.so* 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:lib_t:s0" "$ROOTFS"/usr/lib64/libgtksourceview-3.0.so* 2>/dev/null || true

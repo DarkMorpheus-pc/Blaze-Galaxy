@@ -1,0 +1,10 @@
+module Caelestia.I18n
+linktarget caelestia-i18nplugin
+optional plugin caelestia-i18nplugin
+classname Caelestia_I18nPlugin
+typeinfo caelestia-i18n.qmltypes
+depends Caelestia.Config
+prefer :/qt/qml/Caelestia/I18n/
+singleton Tr 254.0 Tr.qml
+singleton Units 254.0 Units.qml
+

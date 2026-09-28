@@ -1,8 +1,6 @@
 set(po_files
-    # All .po files should go here
+    tr.po
 )
-
-set(trs_script "${CMAKE_SOURCE_DIR}/scripts/trs.fish")
 
 # Compile .po -> .mo and alias each one to <lang>.mo in the module's resources
 set(mo_files)
@@ -14,8 +12,8 @@ foreach(po IN LISTS po_files)
 
     add_custom_command(
         OUTPUT "${mo}"
-        COMMAND "${trs_script}" compile "${lang}" "${mo}"
-        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${po}" "${trs_script}"
+        COMMAND msgfmt -o "${mo}" "${CMAKE_CURRENT_SOURCE_DIR}/${po}"
+        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${po}"
         COMMENT "Compiling translations for ${lang}"
         VERBATIM
     )

@@ -39,6 +39,10 @@ public:
     Q_INVOKABLE [[nodiscard]] static QString markCtxN(
         const QString& text, const QString& plural, int n, const QString& context, const QStringList& args = {});
 
+    [[nodiscard]] QString translate(const QString& text, const QString& context) const;
+    [[nodiscard]] QString translatePlural(
+        const QString& text, const QString& plural, int n, const QString& context) const;
+
 signals:
     void languageChanged();
 
@@ -62,10 +66,6 @@ private:
     [[nodiscard]] static QString segment(QByteArrayView blob, quint32 index);
     [[nodiscard]] QByteArrayView lookupRaw(QByteArrayView key) const;
     [[nodiscard]] QString lookup(QByteArrayView key, quint32 index = 0) const;
-
-    [[nodiscard]] QString translate(const QString& text, const QString& context) const;
-    [[nodiscard]] QString translatePlural(
-        const QString& text, const QString& plural, int n, const QString& context) const;
 
     [[nodiscard]] QString langForLocale() const;
     [[nodiscard]] QString resolveLanguage(const QString& language) const;
