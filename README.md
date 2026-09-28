@@ -16,7 +16,7 @@
 
 **BlazeOS SolarEvolution 5** is a high-performance Linux operating system ecosystem built on Fedora Workstation, specifically optimized for gamers, developers, and content creators.
 
-The system brings together the innovative **SolarUI (Niri Wayland + Noctalia)** desktop shell, a choice of 9 different desktop environments, and dual bootloader management (GRUB2 & Limine) in a unified setup.
+The system brings together the innovative **SolarUI (Niri Wayland + Noctalia + Caelestia)** desktop shell, a choice of 9 different desktop environments, and dual bootloader management (GRUB2 & Limine) in a unified setup.
 
 ---
 
