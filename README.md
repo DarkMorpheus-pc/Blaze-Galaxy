@@ -4,7 +4,7 @@
   <img src="https://raw.githubusercontent.com/DarkMorpheus-pc/Blaze-Galaxy/main/blazeos_custom_apps/usr/share/icons/hicolor/256x256/apps/solarui.png" alt="BlazeOS Logo" width="140" />
 </p>
 
-<h3 align="center">Yeni Nesil, Hibrit Masaüstü Ekosistemi & Yüksek Performanslı Linux Dağıtımı</h3>
+<h3 align="center">Next-Generation Hybrid Desktop Ecosystem & High-Performance Linux Distribution</h3>
 
 <p align="center">
   <b>"From evolution to expansion — welcome to the galaxy."</b>
@@ -12,118 +12,120 @@
 
 ---
 
-## Hakkında (About)
+## About
 
-**BlazeOS SolarEvolution 5**, Fedora Workstation temeli üzerine inşa edilmiş; oyuncular, geliştiriciler ve içerik üreticileri için özel olarak optimize edilmiş yüksek performanslı bir Linux işletim sistemi ekosistemidir. 
+**BlazeOS SolarEvolution 5** is a high-performance Linux operating system ecosystem built on Fedora Workstation, specifically optimized for gamers, developers, and content creators.
 
-Sistem, yenilikçi **SolarUI (Niri Wayland + Noctalia)** masaüstü kabuğunu, 9 farklı masaüstü ortamı seçeneğini ve çift önyükleyici (GRUB2 & Limine) yönetimini tek bir yapıda birleştirir.
-
----
-
-## Öne Çıkan Özellikler (Key Features)
-
-- **SolarUI Desktop Ecosystem:** Niri Wayland pencere yöneticisi ve Noctalia hızlı kabuğu üzerine kurulu saf, akıcı ve cam efekti (glassmorphism) destekli masaüstü deneyimi.
-- **9 Farklı Masaüstü Ortamı Seçeneği:**
-  - **SolarUI:** Varsayılan akıcı Niri + Noctalia masaüstü (Çevrimdışı Hazır)
-  - **GNOME:** Modern ve kararlı GNOME 50 (Çevrimdışı Hazır)
-  - **Niri (Saf):** Sonsuz kaydırmalı saf pencere yöneticisi (Çevrimdışı Hazır)
-  - **KDE Plasma:** İleri düzey özelleştirilebilir Plasma 6 Wayland
-  - **COSMIC:** System76 Rust tabanlı bağımsız modern masaüstü
-  - **Hyprland:** Akıcı animasyonlu dinamik döşemeli Wayland ortamı
-  - **Cinnamon:** Klasik ve pratik masaüstü düzeni
-  - **XFCE:** Son derece hafif ve hızlı X11 ortamı
-  - **Sway:** i3 uyumlu klavye odaklı döşemeli ortam
-- **Limine & GRUB2 Önyükleyici Desteği:** Yıldırım hızında açılış sağlayan Limine önyükleyicisi ile Secure Boot destekli standart GRUB2 arasında tek komutla geçiş (`blaze-bootloader`).
-- **BlazeOS Control Center (`blazeos-control`):** GTK4 / Libadwaita standartlarında geliştirilmiş 5 sekmeli (Güncellemeler, Masaüstü, Performans, Araçlar, Bilgi) sistem kontrol merkezi.
-- **Düşük Gecikme & ZRAM İyileştirmeleri:** DNF5 hızlı indirme yapılandırmaları, ZRAM varsayılan optimizasyonları ve CachyOS kernel/animasyon tuning ayarları.
-- **Çevrim İçi & Çevrim Dışı ISO Mimarisi:** 3.5GB hafif Online ISO ve 10GB+ tam paketli Offline ISO derleme desteği.
+The system brings together the innovative **SolarUI (Niri Wayland + Noctalia)** desktop shell, a choice of 9 different desktop environments, and dual bootloader management (GRUB2 & Limine) in a unified setup.
 
 ---
 
-## Sistem Yapısı ve Bileşenler (Architecture)
+## Key Features
 
-```
+- **SolarUI Desktop Ecosystem:** A clean, fluid desktop experience with glassmorphism support, built on the Niri Wayland window manager and the fast Noctalia shell.
+- **9 Desktop Environment Options:**
+  - **SolarUI:** The default fluid Niri + Noctalia desktop (Available Offline)
+  - **GNOME:** Modern and stable GNOME 50 (Available Offline)
+  - **Niri (Standalone):** A standalone window manager with infinite scrolling (Available Offline)
+  - **KDE Plasma:** Highly customizable Plasma 6 on Wayland
+  - **COSMIC:** An independent, modern, Rust-based desktop by System76
+  - **Hyprland:** A dynamic tiling Wayland environment with fluid animations
+  - **Cinnamon:** A classic and practical desktop layout
+  - **XFCE:** An extremely lightweight and fast X11 environment
+  - **Sway:** An i3-compatible, keyboard-driven tiling environment
+- **Limine & GRUB2 Bootloader Support:** Switch between the Limine bootloader for lightning-fast startup and standard GRUB2 with Secure Boot support using a single command (`blaze-bootloader`).
+- **BlazeOS Control Center (`blazeos-control`):** A system control center built using GTK4 / Libadwaita, featuring 5 tabs: Updates, Desktop, Performance, Tools, and About.
+- **Low Latency & ZRAM Improvements:** DNF5 configurations for faster downloads, default ZRAM optimizations, and CachyOS kernel/animation tuning settings.
+- **Online & Offline ISO Architecture:** Build support for a lightweight 3.5 GB Online ISO and a fully bundled 10 GB+ Offline ISO.
+
+---
+
+## Architecture
+
+```text
 Blaze-Galaxy / BlazeOS SolarEvolution 5
-├── build_f45_final.sh          # 3.5GB Online ISO derleme betiği
-├── build_f45_offline.sh        # 10GB+ Offline ISO derleme betiği
-├── blazeos_custom_apps/        # Özel geliştirilmiş sistem araçları ve masaüstü yapılandırmaları
+├── build_f45_final.sh          # 3.5 GB Online ISO build script
+├── build_f45_offline.sh        # 10 GB+ Offline ISO build script
+├── blazeos_custom_apps/        # Custom-developed system tools and desktop configurations
 │   ├── usr/local/bin/
 │   │   ├── blazeos-control     # GTK4 Control Center
-│   │   ├── blazeos-welcome     # Karşılama ve ilk kurulum sihirbazı
-│   │   ├── blaze-bootloader    # Limine / GRUB2 geçiş aracı
-│   │   ├── blazeos-postinstall # Kurulum sonrası otomasyon servisi
-│   │   └── blaze-optimize      # ZRAM & kernel optimizasyonları
-│   └── usr/bin/firehub         # FireHub akıllı sarmalayıcı
-├── solarui/                    # SolarUI Rust bileşenleri ve kaynak kodları
-├── niri-src/                   # Niri Wayland compositor özelleştirmeleri
+│   │   ├── blazeos-welcome     # Welcome and initial setup wizard
+│   │   ├── blaze-bootloader    # Limine / GRUB2 switching tool
+│   │   ├── blazeos-postinstall # Post-installation automation service
+│   │   └── blaze-optimize      # ZRAM & kernel optimizations
+│   └── usr/bin/firehub         # FireHub smart wrapper
+├── solarui/                    # SolarUI Rust components and source code
+├── niri-src/                   # Niri Wayland compositor customizations
 └── README.md
 ```
 
 ---
 
-## 📦 Derleme Gereksinimleri (Build Requirements)
+## 📦 Build Requirements
 
-ISO imajını yerel ortamınızda derlemek için aşağıdaki paket ve araçların sisteminizde kurulu olması gereklidir:
+To build the ISO image locally, the following packages and tools must be installed on your system:
 
-- **İşletim Sistemi:** Fedora 40+, Arch Linux, CachyOS veya RHEL tabanlı 64-bit Linux
-- **Disk Alanı:** En az 30 GB boş tmpfs / disk alanı
-- **Gerekli Araçlar:**
+- **Operating System:** Fedora 40+, Arch Linux, CachyOS, or a RHEL-based 64-bit Linux distribution
+- **Disk Space:** At least 30 GB of free tmpfs / disk space
+- **Required Tools:**
   ```bash
-  # Fedora / RHEL üzerinde:
+  # On Fedora / RHEL:
   sudo dnf install -y xorriso isolinux squashfs-tools isomd5sum libattr-devel
   
-  # Arch Linux / CachyOS üzerinde:
+  # On Arch Linux / CachyOS:
   sudo pacman -S --needed xorriso squashfs-tools attr
   ```
 
 ---
 
-## ISO Derleme Adımları (How to Build)
+## How to Build
 
-### 1. Depoyu Klonlayın
+### 1. Clone the Repository
+
 ```bash
 git clone https://github.com/DarkMorpheus-pc/Blaze-Galaxy.git
 cd Blaze-Galaxy
 ```
 
-### 2. Taban ISO İmajını Hazırlayın
-Fedora Workstation 45 / 44 Live ISO imajını `f45_base/` klasörü altına yerleştirin.
+### 2. Prepare the Base ISO Image
 
-### 3. ISO Derleme Betiğini Çalıştırın
+Place the Fedora Workstation 45 / 44 Live ISO image in the `f45_base/` directory.
 
-- **Çevrim İçi (Online) ISO Derlemesi (3.5 GB):**
+### 3. Run the ISO Build Script
+
+- **Online ISO Build (3.5 GB):**
   ```bash
   chmod +x build_f45_final.sh
   sudo ./build_f45_final.sh
   ```
 
-- **Tam Çevrim Dışı (Offline) ISO Derlemesi (10 GB+):**
+- **Full Offline ISO Build (10 GB+):**
   ```bash
   chmod +x build_f45_offline.sh
   sudo ./build_f45_offline.sh
   ```
 
-Derleme tamamlandığında ISO imajınız kök dizinde (`Blaze-SolarEvolution-5-x86_64.iso`) hazır olacak ve MD5 doğrulama kontrolünden (`checkisomd5 PASS`) geçecektir.
+Once the build is complete, your ISO image will be available in the repository root directory (`Blaze-SolarEvolution-5-x86_64.iso`) and will pass the MD5 verification check (`checkisomd5 PASS`).
 
 ---
 
-## ⌨️ Kısayol Tuşları (SolarUI Keyboard Shortcuts)
+## ⌨️ SolarUI Keyboard Shortcuts
 
-| Kısayol | İşlev |
+| Shortcut | Action |
 | :--- | :--- |
-| `Mod + Return` | Terminal (Alacritty / Ptyxis) Aç |
-| `Mod + Space` | Uygulama Başlatıcı (Launcher) |
-| `Mod + S` | SolarUI Kontrol Merkezi |
-| `Mod + I` | Masaüstü Ayarları |
-| `Mod + Alt + R` | Masaüstü Kabuğunu Yeniden Başlat (Supervisor) |
-| `Mod + Alt + S` | QuickShell / SolarUI Hızlı Ayarlar |
-| `Mod + Q` / `Alt + F4` | Aktif Pencereyi Kapat |
-| `Mod + Shift + E` | Oturumu Kapat / Çıkış Menüsü |
+| `Mod + Return` | Open Terminal (Alacritty / Ptyxis) |
+| `Mod + Space` | Open Application Launcher |
+| `Mod + S` | Open SolarUI Control Center |
+| `Mod + I` | Open Desktop Settings |
+| `Mod + Alt + R` | Restart Desktop Shell (Supervisor) |
+| `Mod + Alt + S` | Open QuickShell / SolarUI Quick Settings |
+| `Mod + Q` / `Alt + F4` | Close Active Window |
+| `Mod + Shift + E` | Log Out / Open Exit Menu |
 
 ---
 
-## 📄 Lisans ve Katkı (License & Contributing)
+## 📄 License & Contributing
 
-Bu proje **GPL-3.0** lisansı altında sunulmaktadır. Katkıda bulunmak için pull request açabilir veya sorun bildiriminde (issue) bulunabilirsiniz.
+This project is released under the **GPL-3.0** license. You can contribute by opening a pull request or reporting an issue.
 
 Designed & Crafted for **BlazeOS & CachyOS** by **DarkMorpheus**.
