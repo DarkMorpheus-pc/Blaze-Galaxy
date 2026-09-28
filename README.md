@@ -12,7 +12,7 @@
 
 ---
 
-## 🌟 Hakkında (About)
+## Hakkında (About)
 
 **BlazeOS SolarEvolution 5**, Fedora Workstation temeli üzerine inşa edilmiş; oyuncular, geliştiriciler ve içerik üreticileri için özel olarak optimize edilmiş yüksek performanslı bir Linux işletim sistemi ekosistemidir. 
 
@@ -20,10 +20,10 @@ Sistem, yenilikçi **SolarUI (Niri Wayland + Noctalia)** masaüstü kabuğunu, 9
 
 ---
 
-## 🔥 Öne Çıkan Özellikler (Key Features)
+## Öne Çıkan Özellikler (Key Features)
 
-- 🚀 **SolarUI Desktop Ecosystem:** Niri Wayland pencere yöneticisi ve Noctalia hızlı kabuğu üzerine kurulu saf, akıcı ve cam efekti (glassmorphism) destekli masaüstü deneyimi.
-- 🎨 **9 Farklı Masaüstü Ortamı Seçeneği:**
+- **SolarUI Desktop Ecosystem:** Niri Wayland pencere yöneticisi ve Noctalia hızlı kabuğu üzerine kurulu saf, akıcı ve cam efekti (glassmorphism) destekli masaüstü deneyimi.
+- **9 Farklı Masaüstü Ortamı Seçeneği:**
   - **SolarUI:** Varsayılan akıcı Niri + Noctalia masaüstü (Çevrimdışı Hazır)
   - **GNOME:** Modern ve kararlı GNOME 50 (Çevrimdışı Hazır)
   - **Niri (Saf):** Sonsuz kaydırmalı saf pencere yöneticisi (Çevrimdışı Hazır)
@@ -33,14 +33,14 @@ Sistem, yenilikçi **SolarUI (Niri Wayland + Noctalia)** masaüstü kabuğunu, 9
   - **Cinnamon:** Klasik ve pratik masaüstü düzeni
   - **XFCE:** Son derece hafif ve hızlı X11 ortamı
   - **Sway:** i3 uyumlu klavye odaklı döşemeli ortam
-- ⚡ **Limine & GRUB2 Önyükleyici Desteği:** Yıldırım hızında açılış sağlayan Limine önyükleyicisi ile Secure Boot destekli standart GRUB2 arasında tek komutla geçiş (`blaze-bootloader`).
-- 🛠️ **BlazeOS Control Center (`blazeos-control`):** GTK4 / Libadwaita standartlarında geliştirilmiş 5 sekmeli (Güncellemeler, Masaüstü, Performans, Araçlar, Bilgi) sistem kontrol merkezi.
-- ⚡ **Düşük Gecikme & ZRAM İyileştirmeleri:** DNF5 hızlı indirme yapılandırmaları, ZRAM varsayılan optimizasyonları ve CachyOS kernel/animasyon tuning ayarları.
-- 🌐 **Çevrim İçi & Çevrim Dışı ISO Mimarisi:** 3.5GB hafif Online ISO ve 10GB+ tam paketli Offline ISO derleme desteği.
+- **Limine & GRUB2 Önyükleyici Desteği:** Yıldırım hızında açılış sağlayan Limine önyükleyicisi ile Secure Boot destekli standart GRUB2 arasında tek komutla geçiş (`blaze-bootloader`).
+- **BlazeOS Control Center (`blazeos-control`):** GTK4 / Libadwaita standartlarında geliştirilmiş 5 sekmeli (Güncellemeler, Masaüstü, Performans, Araçlar, Bilgi) sistem kontrol merkezi.
+- **Düşük Gecikme & ZRAM İyileştirmeleri:** DNF5 hızlı indirme yapılandırmaları, ZRAM varsayılan optimizasyonları ve CachyOS kernel/animasyon tuning ayarları.
+- **Çevrim İçi & Çevrim Dışı ISO Mimarisi:** 3.5GB hafif Online ISO ve 10GB+ tam paketli Offline ISO derleme desteği.
 
 ---
 
-## 🛠️ Sistem Yapısı ve Bileşenler (Architecture)
+## Sistem Yapısı ve Bileşenler (Architecture)
 
 ```
 Blaze-Galaxy / BlazeOS SolarEvolution 5
@@ -78,7 +78,7 @@ ISO imajını yerel ortamınızda derlemek için aşağıdaki paket ve araçlar�
 
 ---
 
-## 🏗️ ISO Derleme Adımları (How to Build)
+## ISO Derleme Adımları (How to Build)
 
 ### 1. Depoyu Klonlayın
 ```bash
