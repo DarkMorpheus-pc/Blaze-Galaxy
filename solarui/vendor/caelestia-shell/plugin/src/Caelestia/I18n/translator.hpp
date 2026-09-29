@@ -23,7 +23,7 @@ public:
 
     [[nodiscard]] QStringList supportedLanguages() const;
     [[nodiscard]] QString language() const;
-    static void setLanguageQml(const QString& language);
+    Q_INVOKABLE static void setLanguageQml(const QString& language);
 
     // NOLINTBEGIN(readability-identifier-naming)
     Q_INVOKABLE [[nodiscard]] QString _tr(const QString& text, const QString& context, bool markedOnly) const;
@@ -38,6 +38,11 @@ public:
         const QString& text, const QString& plural, int n, const QStringList& args = {});
     Q_INVOKABLE [[nodiscard]] static QString markCtxN(
         const QString& text, const QString& plural, int n, const QString& context, const QStringList& args = {});
+
+    [[nodiscard]] quint32 catalogCount() const { return m_count; }
+    [[nodiscard]] QString lookupSingle(const QString& text, const QString& context, bool* found = nullptr) const;
+    [[nodiscard]] QString lookupPlural(
+        const QString& text, const QString& plural, int n, const QString& context, bool* found = nullptr) const;
 
     [[nodiscard]] QString translate(const QString& text, const QString& context) const;
     [[nodiscard]] QString translatePlural(

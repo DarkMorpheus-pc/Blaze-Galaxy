@@ -64,7 +64,10 @@ layout {
     }
 
     struts {
-        bottom 48 // Reserved space for KDE taskbar
+        top 10
+        left 10
+        right 10
+        bottom 52 // Reserved space for KDE taskbar + safety margin
     }
 }
 
@@ -116,6 +119,16 @@ window-rule {
     }
 }
 
+// Installer & Dialog window rules: Center Anaconda and prevent full-screen corner trapping
+window-rule {
+    match app-id=r#"^(liveinst|anaconda|org\.fedoraproject\.Anaconda.*|Anaconda)$"#
+    open-floating true
+    default-column-width { proportion 0.88; }
+    default-window-height { proportion 0.88; }
+    geometry-corner-radius 12
+    clip-to-geometry true
+}
+
 // Default primary workspace and dedicated background workspace for parked/minimized windows
 workspace "1"
 workspace "background"
@@ -131,6 +144,16 @@ window-rule {
     clip-to-geometry true
 }
 
+// Live Installer Window Rule (Floating Centered, 82% screen proportion)
+window-rule {
+    match app-id="^(liveinst|firefox)$"
+    open-floating true
+    default-column-width { proportion 0.82; }
+    default-window-height { proportion 0.82; }
+    geometry-corner-radius 16
+    clip-to-geometry true
+}
+
 // Dialog & System Utility Windows Rule (Open Floating)
 window-rule {
     match is-floating=true
@@ -139,11 +162,18 @@ window-rule {
 }
 
 window-rule {
-    match app-id=r#"^org\.gnome\.FileRoller$"#
-    match app-id=r#"^org\.gnome\.NautilusPreviewer$"#
-    match app-id=r#"^polkit-gnome-authentication-agent-1$"#
-    match app-id=r#"^pavucontrol$"#
+    match app-id=r#"^(org\.gnome\.FileRoller|org\.gnome\.NautilusPreviewer|polkit-gnome-authentication-agent-1|pavucontrol)$"#
     open-floating true
+}
+
+// BlazeOS Control Center & Native Tools
+window-rule {
+    match app-id=r#"^(org\.blazeos\.control|FireHub|firehub|blazeos-welcome)$"#
+    open-floating true
+    default-column-width { proportion 0.75; }
+    default-window-height { proportion 0.80; }
+    geometry-corner-radius 16
+    clip-to-geometry true
 }
 
 // SolarUI KDE Taskbar Window Rule
@@ -177,6 +207,23 @@ window-rule {
     open-floating true
     default-column-width { fixed 660; }
     default-window-height { fixed 520; }
+}
+
+// SolarUI Omnibar (Raycast / Spotlight Command Hub)
+window-rule {
+    match app-id="^solar-omnibar$"
+    open-floating true
+    default-column-width { fixed 680; }
+    default-window-height { fixed 460; }
+    geometry-corner-radius 20
+    clip-to-geometry true
+}
+
+// Blaze GameZone Fullscreen Gaming Shell
+window-rule {
+    match app-id="^solar-gamezone$"
+    open-fullscreen true
+    geometry-corner-radius 0
 }
 
 // Steam & Dialog Window Rules
@@ -239,7 +286,9 @@ binds {
     Mod+D     { spawn "solar-shell" "route" "dashboard"; }
 
     // ── SolarUI Panels & Settings (Routed via SolarSurfaceRouter) ──
-    Mod+Space           { spawn "solar-shell" "route" "launcher"; }
+    Mod+Space           { spawn "solar-shell" "omnibar"; }
+    Mod+G               { spawn "solar-shell" "gamezone"; }
+    Mod+Alt+K           { spawn "solar-shell" "easter-egg" "konami"; }
     Mod+S               { spawn "solar-shell" "route" "control-center"; }
     Mod+I               { spawn "solar-shell" "route" "settings"; }
     Mod+Comma           { spawn "noctalia" "msg" "settings-toggle"; }

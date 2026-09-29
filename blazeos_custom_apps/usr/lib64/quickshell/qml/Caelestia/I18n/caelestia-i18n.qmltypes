@@ -41,7 +41,12 @@ Module {
             index: 2
             lineNumber: 17
         }
-        Signal { name: "languageChanged"; lineNumber: 47 }
+        Signal { name: "languageChanged"; lineNumber: 52 }
+        Method {
+            name: "setLanguageQml"
+            lineNumber: 26
+            Parameter { name: "language"; type: "QString" }
+        }
         Method {
             name: "_tr"
             type: "QString"

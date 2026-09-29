@@ -1,0 +1,11 @@
+[Unit]
+Description=Blaze Boot Success & Recovery Reset
+After=graphical.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/blaze-recovery --clear-trigger
+RemainAfterExit=yes
+
+[Install]
+WantedBy=graphical.target

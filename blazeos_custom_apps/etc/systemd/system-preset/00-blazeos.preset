@@ -1,0 +1,23 @@
+# BlazeOS Optimization & Telemetry Reduction Preset
+enable sddm.service
+enable blaze-sentinel.service
+enable blaze-boot-success.service
+enable blaze-recovery.service
+enable blazeos-postinstall.service
+disable gdm.service
+disable systemd-report-basic.socket
+disable systemd-report-cgroup.socket
+disable systemd-report-basic@.service
+disable systemd-report-cgroup@.service
+disable sssd.service
+disable sssd-kcm.socket
+disable stratisd.service
+disable auditd.service
+disable audit-rules.service
+disable systemd-journald-audit.socket
+disable mcelog.service
+disable rsyslog.service
+disable ModemManager.service
+disable dnf-makecache.timer
+disable virt*.socket
+disable virt*.service

@@ -29,6 +29,9 @@ cp -a "'"$ROOTFS_SRC"'" "$ROOTFS"
 echo "  -> Ensuring root:root ownership..."
 chown -R 0:0 "$ROOTFS"
 
+echo "  -> Applying tracked BlazeOS overlay..."
+cp -a --no-preserve=ownership "'"${BLAZEOS_ROOT:-$(pwd)}"'/blazeos_custom_apps/." "$ROOTFS/"
+
 echo "  -> Restoring SUID/SGID permissions stripped by chown..."
 chmod 4755 "$ROOTFS/usr/bin/sudo" 2>/dev/null || true
 chmod 4755 "$ROOTFS/usr/bin/su" 2>/dev/null || true
@@ -41,7 +44,6 @@ chmod 4755 "$ROOTFS/usr/bin/chsh" 2>/dev/null || true
 chmod 4755 "$ROOTFS/usr/bin/chfn" 2>/dev/null || true
 chmod 4755 "$ROOTFS/usr/bin/newgrp" 2>/dev/null || true
 chmod 4755 "$ROOTFS/usr/bin/userhelper" 2>/dev/null || true
-chmod 4755 "$ROOTFS/usr/bin/chvt" 2>/dev/null || true
 chmod 4755 "$ROOTFS/usr/lib/polkit-1/polkit-agent-helper-1" 2>/dev/null || true
 chmod 4755 "$ROOTFS/usr/libexec/dbus-1/dbus-daemon-launch-helper" 2>/dev/null || true
 chmod 4755 "$ROOTFS/opt/FireHub/chrome-sandbox" 2>/dev/null || true
@@ -61,15 +63,36 @@ fi
 
 chmod 755 "$ROOTFS/usr/bin/firehub" 2>/dev/null || true
 chmod 755 "$ROOTFS/usr/bin/blaze-house" 2>/dev/null || true
+chmod 755 "$ROOTFS/usr/bin/blaze-recovery" 2>/dev/null || true
+chmod 755 "$ROOTFS/usr/bin/blaze-sentinel" 2>/dev/null || true
 chmod 755 "$ROOTFS/usr/bin/solar-shell" 2>/dev/null || true
+chmod 755 "$ROOTFS/usr/bin/blaze-gamezone" 2>/dev/null || true
+chmod 755 "$ROOTFS/usr/bin/solar-omnibar" 2>/dev/null || true
+chmod 755 "$ROOTFS/usr/bin/protonup-qt" 2>/dev/null || true
 chmod 755 "$ROOTFS/usr/bin/solar-session" 2>/dev/null || true
 chmod 755 "$ROOTFS/usr/bin/kitty" 2>/dev/null || true
 chmod 755 "$ROOTFS/usr/bin/kitten" 2>/dev/null || true
 chmod -R 755 "$ROOTFS/usr/lib/kitty" 2>/dev/null || true
 chmod 755 "$ROOTFS/usr/local/bin/blazeos-control" 2>/dev/null || true
+chmod 755 "$ROOTFS/usr/bin/caelestia" 2>/dev/null || true
+chmod 755 "$ROOTFS/usr/bin/quickshell" 2>/dev/null || true
+chmod 755 "$ROOTFS/usr/bin/quickshell.bin" 2>/dev/null || true
+chmod 755 "$ROOTFS/usr/bin/qs" 2>/dev/null || true
+chmod 755 "$ROOTFS/usr/bin/sddm" 2>/dev/null || true
+chmod 755 "$ROOTFS/usr/bin/sddm-greeter-qt6" 2>/dev/null || true
+chmod 755 "$ROOTFS/usr/bin/weston" 2>/dev/null || true
+
+echo "  -> Ensuring SDDM default display manager and masking GDM..."
+mkdir -p "$ROOTFS/etc/systemd/system"
+ln -sf /usr/lib/systemd/system/sddm.service "$ROOTFS/etc/systemd/system/display-manager.service"
+ln -sf /dev/null "$ROOTFS/etc/systemd/system/gdm.service"
+
+echo "  -> Updating dynamic linker cache (ldconfig)..."
+rm -f "$ROOTFS/etc/ld.so.conf.d/quickshell.conf"
+chroot "$ROOTFS" ldconfig 2>/dev/null || ldconfig -r "$ROOTFS" -f "$ROOTFS/etc/ld.so.conf" -C "/etc/ld.so.cache" 2>/dev/null || true
 
 echo "  -> Setting SELinux contexts with setfiles..."
-LD_LIBRARY_PATH="$ROOTFS/usr/lib64" "$ROOTFS/usr/sbin/setfiles" -r "$ROOTFS" "$ROOTFS/etc/selinux/targeted/contexts/files/file_contexts" "$ROOTFS" 2>&1 | tail -10 || true
+LD_LIBRARY_PATH="$ROOTFS/usr/lib64" "$ROOTFS/usr/sbin/setfiles" -r "$ROOTFS" "$ROOTFS/etc/selinux/targeted/contexts/files/file_contexts" "$ROOTFS" 2>&1 | tail -10
 
 echo "  -> Explicitly ensuring systemd and custom apps have correct labels..."
 setfattr -n security.selinux -v "system_u:object_r:init_exec_t:s0" "$ROOTFS/usr/lib/systemd/systemd"
@@ -97,7 +120,16 @@ setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/bl
 setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/opt/FireHub/firehub" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:systemd_unit_file_t:s0" "$ROOTFS/etc/systemd/system/blazeos-nvidia-firstboot.service" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/solar-core" 2>/dev/null || true
+setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/blaze-recovery" 2>/dev/null || true
+setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/blaze-sentinel" 2>/dev/null || true
+setfattr -n security.selinux -v "system_u:object_r:systemd_unit_file_t:s0" "$ROOTFS/etc/systemd/system/blaze-recovery.target" 2>/dev/null || true
+setfattr -n security.selinux -v "system_u:object_r:systemd_unit_file_t:s0" "$ROOTFS/etc/systemd/system/blaze-recovery.service" 2>/dev/null || true
+setfattr -n security.selinux -v "system_u:object_r:systemd_unit_file_t:s0" "$ROOTFS/etc/systemd/system/blaze-sentinel.service" 2>/dev/null || true
+setfattr -n security.selinux -v "system_u:object_r:systemd_unit_file_t:s0" "$ROOTFS/etc/systemd/system/blaze-boot-success.service" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/solar-shell" 2>/dev/null || true
+setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/blaze-gamezone" 2>/dev/null || true
+setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/solar-omnibar" 2>/dev/null || true
+setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/protonup-qt" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/solar-session" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/solar-session-wrapper" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/niri" 2>/dev/null || true
@@ -110,6 +142,9 @@ setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/qs
 setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/caelestia" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/liveinst" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/libexec/livesys/sessions.d/livesys-solarui" 2>/dev/null || true
+setfattr -n security.selinux -v "system_u:object_r:xdm_exec_t:s0" "$ROOTFS/usr/bin/sddm" 2>/dev/null || true
+setfattr -n security.selinux -v "system_u:object_r:xdm_exec_t:s0" "$ROOTFS/usr/bin/sddm-greeter-qt6" 2>/dev/null || true
+setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/weston" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:lib_t:s0" "$ROOTFS/usr/lib64/solarui/libsolar_brand.so" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:lib_t:s0" "$ROOTFS/usr/lib/solarui/libsolar_brand.so" 2>/dev/null || true
 find "$ROOTFS/usr/lib64/quickshell" -exec setfattr -n security.selinux -v "system_u:object_r:lib_t:s0" {} + 2>/dev/null || true

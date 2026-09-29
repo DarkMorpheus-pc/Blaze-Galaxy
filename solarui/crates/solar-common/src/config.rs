@@ -16,6 +16,8 @@ pub struct SolarConfig {
     pub branding: BrandingConfig,
     #[serde(default)]
     pub display: DisplayConfig,
+    #[serde(default)]
+    pub omnibar: OmnibarConfig,
 }
 
 impl Default for SolarConfig {
@@ -27,6 +29,7 @@ impl Default for SolarConfig {
             shortcuts_hud: ShortcutsHudConfig::default(),
             branding: BrandingConfig::default(),
             display: DisplayConfig::default(),
+            omnibar: OmnibarConfig::default(),
         }
     }
 }
@@ -445,6 +448,30 @@ impl Default for PerformanceConfig {
             blur: true,
             animations: true,
             shadows: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct OmnibarConfig {
+    #[serde(default = "default_true")]
+    pub enable_web_search: bool,
+    #[serde(default = "default_search_engine")]
+    pub search_engine: String,
+    #[serde(default)]
+    pub ai_api_key: String,
+}
+
+fn default_search_engine() -> String {
+    "DuckDuckGo".to_string()
+}
+
+impl Default for OmnibarConfig {
+    fn default() -> Self {
+        Self {
+            enable_web_search: true,
+            search_engine: default_search_engine(),
+            ai_api_key: String::new(),
         }
     }
 }

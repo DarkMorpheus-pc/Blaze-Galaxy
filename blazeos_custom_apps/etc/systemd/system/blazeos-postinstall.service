@@ -1,0 +1,14 @@
+[Unit]
+Description=BlazeOS Post-Installation Setup
+Before=display-manager.service gdm.service sddm.service
+ConditionKernelCommandLine=!rd.live.image
+ConditionPathExists=!/run/initramfs/live
+ConditionPathExists=/usr/local/bin/blazeos-postinstall
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/blazeos-postinstall
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

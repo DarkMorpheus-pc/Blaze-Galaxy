@@ -1,9 +1,14 @@
 message(STATUS "QML install dir: ${CMAKE_INSTALL_PREFIX}/${INSTALL_QMLDIR}")
 
 function(qml_module arg_TARGET)
-    cmake_parse_arguments(PARSE_ARGV 1 arg "" "URI;INCLUDE_PREFIX" "SOURCES;QML_FILES;QML_SINGLETONS;RESOURCES;DEPENDENCIES;IMPORTS;OPTIONAL_IMPORTS;DEFAULT_IMPORTS;LIBRARIES")
+    cmake_parse_arguments(PARSE_ARGV 1 arg "NO_CACHEGEN" "URI;INCLUDE_PREFIX" "SOURCES;QML_FILES;QML_SINGLETONS;RESOURCES;DEPENDENCIES;IMPORTS;OPTIONAL_IMPORTS;DEFAULT_IMPORTS;LIBRARIES")
 
     set_source_files_properties(${arg_QML_SINGLETONS} PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+
+    set(cache_options)
+    if(arg_NO_CACHEGEN)
+        list(APPEND cache_options NO_CACHEGEN)
+    endif()
 
     qt_add_qml_module(${arg_TARGET}
         URI ${arg_URI}
@@ -14,6 +19,7 @@ function(qml_module arg_TARGET)
         IMPORTS ${arg_IMPORTS}
         OPTIONAL_IMPORTS ${arg_OPTIONAL_IMPORTS}
         DEFAULT_IMPORTS ${arg_DEFAULT_IMPORTS}
+        ${cache_options}
     )
 
     qt_query_qml_module(${arg_TARGET}

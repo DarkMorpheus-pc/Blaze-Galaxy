@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Read-only, local diagnostics. No automatic upload; review before sharing.
+set -u
+section() { printf '\n### %s\n' "$1"; }
+section 'Boot / GPU'
+cat /proc/cmdline
+lspci -nnk 2>/dev/null | grep -A3 -E 'VGA|3D|Display' || true
+command -v mokutil >/dev/null && mokutil --sb-state 2>/dev/null
+section 'Desktop environment'
+printf 'XDG_CURRENT_DESKTOP=%s\nXDG_SESSION_TYPE=%s\n' "${XDG_CURRENT_DESKTOP:-}" "${XDG_SESSION_TYPE:-}"
+loginctl show-session "${XDG_SESSION_ID:-self}" -p Type -p Desktop -p State 2>/dev/null || true
+section 'Display manager and live setup'
+cat /etc/gdm/custom.conf /etc/sysconfig/livesys 2>/dev/null || true
+systemctl --no-pager --full status gdm.service livesys.service blazeos-postinstall.service 2>/dev/null || true
+section 'Recent boot errors'
+journalctl -b --no-pager -p err -n 100 2>/dev/null || true
+section 'SolarUI user services'
+systemctl --user --no-pager --full status solar-core.service solar-shell.service solarui-session.target 2>/dev/null || true
+section 'SolarUI session log (last 120 lines)'
+tail -n 120 "${HOME}/.local/share/solarui/session.log" 2>/dev/null || true
+section 'Memory pressure'
+cat /proc/pressure/memory /proc/swaps 2>/dev/null || true

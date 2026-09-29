@@ -1,0 +1,7 @@
+module Caelestia.Settings
+linktarget caelestia-settingsplugin
+optional plugin caelestia-settingsplugin
+classname Caelestia_SettingsPlugin
+typeinfo caelestia-settings.qmltypes
+prefer :/qt/qml/Caelestia/Settings/
+

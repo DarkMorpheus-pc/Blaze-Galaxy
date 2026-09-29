@@ -8,6 +8,7 @@
 #include <qlocale.h>
 #include <qloggingcategory.h>
 #include <qtranslator.h>
+#include <qqmlengine.h>
 
 #include <cstring>
 
@@ -68,19 +69,47 @@ class CaelestiaQTranslator : public QTranslator {
 public:
     explicit CaelestiaQTranslator(Translator* t) : QTranslator(t), m_translator(t) {}
 
+    // The catalog is gettext-backed, not QTranslator's internal .qm data.
+    bool isEmpty() const override { return false; }
+
     QString translate(const char* context, const char* sourceText,
                       const char* disambiguation = nullptr, int n = -1) const override {
         Q_UNUSED(disambiguation);
         if (!m_translator || !sourceText || !*sourceText)
             return QString();
 
+        // 1. If English is selected, ALWAYS return sourceText directly!
+        // This locks the English translation and prevents Qt from falling back to
+        // any system locale / Qt translation that might turn it back to Turkish.
+        if (m_translator->language() == u"en"_s)
+            return QString::fromUtf8(sourceText);
+
+        if (m_translator->catalogCount() == 0)
+            return QString();
+
         const QString text = QString::fromUtf8(sourceText);
         const QString ctx = context ? QString::fromUtf8(context) : QString();
-        const QString res = (n >= 0) ? m_translator->translatePlural(text, QString(), n, ctx)
-                                     : m_translator->translate(text, ctx);
-        if (!res.isEmpty() && res != text) {
+
+        bool found = false;
+        QString res;
+
+        // 2. Catalogs are gettext-based and mostly context-free.
+        // First check with context if provided:
+        if (!ctx.isEmpty()) {
+            res = (n >= 0) ? m_translator->lookupPlural(text, text, n, ctx, &found)
+                           : m_translator->lookupSingle(text, ctx, &found);
+        }
+
+        // If not found with context, query without context (primary for gettext catalogues):
+        if (!found) {
+            res = (n >= 0) ? m_translator->lookupPlural(text, text, n, {}, &found)
+                           : m_translator->lookupSingle(text, {}, &found);
+        }
+
+        if (found) {
             return res;
         }
+
         return QString();
     }
 private:
@@ -176,7 +205,7 @@ QString Translator::markCtxN(
 }
 
 QStringList Translator::findSupportedLangs() {
-    QStringList langs;
+    QStringList langs { u"en"_s };
     const QDirListing listing(resourceDir(), { u"*.mo"_s }, QDirListing::IteratorFlag::FilesOnly);
     for (const auto& f : listing)
         langs << f.completeBaseName();
@@ -187,9 +216,6 @@ QStringList Translator::findSupportedLangs() {
         if (!langs.contains(base))
             langs << base;
     }
-    if (!langs.contains(u"tr"_s)) {
-        langs << u"tr"_s;
-    }
     return langs;
 }
 
@@ -197,7 +223,7 @@ void Translator::loadTranslations() {
     m_catalog.clear();
     m_count = 0;
 
-    if (m_language.isEmpty())
+    if (m_language.isEmpty() || m_language == u"en"_s)
         return;
 
     QFile file(resourceDir() + m_language + u".mo"_s);
@@ -318,25 +344,46 @@ QString Translator::lookup(QByteArrayView key, quint32 index) const {
     return blob.isNull() ? QString() : segment(blob, index);
 }
 
-QString Translator::translate(const QString& text, const QString& context) const {
-    if (m_count == 0)
+QString Translator::lookupSingle(const QString& text, const QString& context, bool* found) const {
+    if (found)
+        *found = false;
+    if (m_count == 0 || text.isEmpty())
         return text;
 
-    const auto translated = lookup(catalogKey(text, context));
-    return translated.isNull() ? text : translated;
+    const auto blob = lookupRaw(catalogKey(text, context));
+    if (!blob.isNull()) {
+        if (found)
+            *found = true;
+        return segment(blob, 0);
+    }
+    return text;
 }
 
-QString Translator::translatePlural(const QString& text, const QString& plural, int n, const QString& context) const {
-    auto result = n == 1 ? text : plural; // Default English plural rule
+QString Translator::lookupPlural(
+    const QString& text, const QString& plural, int n, const QString& context, bool* found) const {
+    if (found)
+        *found = false;
+    auto result = n == 1 ? text : plural;
 
-    if (m_count > 0) {
-        const auto translated = lookup(catalogKey(text, context), m_plurals.evaluate(n));
-        if (!translated.isNull())
-            result = translated;
+    if (m_count > 0 && !text.isEmpty()) {
+        const auto blob = lookupRaw(catalogKey(text, context));
+        if (!blob.isNull()) {
+            if (found)
+                *found = true;
+            result = segment(blob, m_plurals.evaluate(n));
+        }
     }
 
     substitutePercentN(result, n);
     return result;
+}
+
+QString Translator::translate(const QString& text, const QString& context) const {
+    return lookupSingle(text, context);
+}
+
+QString Translator::translatePlural(const QString& text, const QString& plural, int n, const QString& context) const {
+    return lookupPlural(text, plural, n, context);
 }
 
 QString Translator::langForLocale() const {
@@ -360,6 +407,16 @@ QString Translator::resolveLanguage(const QString& language) const {
     if (language.isEmpty())
         return langForLocale();
 
+    if (language == u"en"_s)
+        return u"en"_s;
+
+    const auto normalised = QString(language).replace(u'-', u'_');
+    if (m_supportedLanguages.contains(normalised))
+        return normalised;
+    const auto base = normalised.section(u'_', 0, 0);
+    if (m_supportedLanguages.contains(base))
+        return base;
+
     if (!m_supportedLanguages.contains(language)) {
         qCWarning(lcI18n) << "Unsupported language" << language << "- falling back to the system locale";
         return langForLocale();
@@ -375,6 +432,9 @@ void Translator::setLanguage(const QString& language) {
     m_language = language;
     loadTranslations(); // Load before emitting cause trsChangedFlag reuses the signal
     emit languageChanged();
+    // LanguageChange alone is not sufficient for every QQmlEngine host.
+    if (auto* engine = qmlEngine(this))
+        engine->retranslate();
 
     if (auto* app = QCoreApplication::instance()) {
         QCoreApplication::postEvent(app, new QEvent(QEvent::LanguageChange));

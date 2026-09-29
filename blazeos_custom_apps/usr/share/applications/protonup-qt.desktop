@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=ProtonUp-Qt
+GenericName=Wine/Proton Compatibility Tool Manager
+Comment=Install and manage GE-Proton, Wine-GE, and custom tools for Steam, Lutris, and Heroic
+Exec=protonup-qt %u
+Icon=protonup-qt
+Terminal=false
+Categories=Game;Utility;
+Keywords=steam;proton;wine;lutris;heroic;gaming;

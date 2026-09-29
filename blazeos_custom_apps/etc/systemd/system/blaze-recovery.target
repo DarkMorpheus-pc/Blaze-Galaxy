@@ -1,0 +1,7 @@
+[Unit]
+Description=Blaze Emergency Recovery Protocol (BERP) Target
+Requires=basic.target
+Wants=blaze-recovery.service
+Conflicts=rescue.service rescue.target graphical.target multi-user.target
+After=basic.target blaze-recovery.service
+AllowIsolate=yes

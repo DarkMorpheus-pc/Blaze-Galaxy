@@ -2028,3 +2028,126 @@ msgstr "Çalışma Süresi"
 msgid "Distribution"
 msgstr "Dağıtım"
 
+
+msgid "Sunrise"
+msgstr "Gün Doğumu"
+
+msgid "Sunset"
+msgstr "Gün Batımı"
+
+msgid "Humidity"
+msgstr "Nem"
+
+msgid "Feels Like"
+msgstr "Hissedilen"
+
+msgid "Wind"
+msgstr "Rüzgar"
+
+msgid "No weather"
+msgstr "Hava durumu yok"
+
+msgid "Clear"
+msgstr "Açık"
+
+msgid "Partly cloudy"
+msgstr "Parçalı bulutlu"
+
+msgid "Overcast"
+msgstr "Kapalı"
+
+msgid "Fog"
+msgstr "Sisli"
+
+msgid "Drizzle"
+msgstr "Çiseleyen yağmur"
+
+msgid "Freezing drizzle"
+msgstr "Dondurucu çisenti"
+
+msgid "Light rain"
+msgstr "Hafif yağmurlu"
+
+msgid "Rain"
+msgstr "Yağmurlu"
+
+msgid "Heavy rain"
+msgstr "Kuvvetli yağmurlu"
+
+msgid "Light snow"
+msgstr "Hafif kar yağışlı"
+
+msgid "Snow"
+msgstr "Kar yağışlı"
+
+msgid "Heavy snow"
+msgstr "Yoğun kar yağışlı"
+
+msgid "Light snow showers"
+msgstr "Hafif kar sağanağı"
+
+msgid "Heavy snow showers"
+msgstr "Yoğun kar sağanağı"
+
+msgid "Thunderstorm"
+msgstr "Gök gürültülü fırtına"
+
+msgid "Thunderstorm with hail"
+msgstr "Dolu ile gök gürültülü fırtına"
+
+msgid "%1 / %2"
+msgstr "%1 / %2"
+
+msgid "%1 B"
+msgstr "%1 B"
+
+msgid "%1 KB"
+msgstr "%1 KB"
+
+msgid "%1 MB"
+msgstr "%1 MB"
+
+msgid "%1 GB"
+msgstr "%1 GB"
+
+msgid "%1 TB"
+msgstr "%1 TB"
+
+msgid "%1 KiB"
+msgstr "%1 KiB"
+
+msgid "%1 MiB"
+msgstr "%1 MiB"
+
+msgid "%1 GiB"
+msgstr "%1 GiB"
+
+msgid "%1 TiB"
+msgstr "%1 TiB"
+
+msgid "%1 B/s"
+msgstr "%1 B/s"
+
+msgid "%1 KB/s"
+msgstr "%1 KB/s"
+
+msgid "%1 MB/s"
+msgstr "%1 MB/s"
+
+msgid "%1 GB/s"
+msgstr "%1 GB/s"
+
+msgid "%1 TB/s"
+msgstr "%1 TB/s"
+
+msgid "%1 KiB/s"
+msgstr "%1 KiB/s"
+
+msgid "%1 MiB/s"
+msgstr "%1 MiB/s"
+
+msgid "%1 GiB/s"
+msgstr "%1 GiB/s"
+
+msgid "%1 TiB/s"
+msgstr "%1 TiB/s"

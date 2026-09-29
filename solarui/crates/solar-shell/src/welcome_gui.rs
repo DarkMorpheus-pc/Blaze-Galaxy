@@ -155,6 +155,20 @@ fn build_welcome_ui(main_loop: glib::MainLoop) {
         glib::Propagation::Proceed
     });
 
+    let key_controller = gtk4::EventControllerKey::new();
+    let win_weak_key = window.downgrade();
+    key_controller.connect_key_pressed(move |_, key, _, _| {
+        if key == gdk::Key::Escape {
+            if let Some(win) = win_weak_key.upgrade() {
+                win.close();
+            }
+            glib::Propagation::Stop
+        } else {
+            glib::Propagation::Proceed
+        }
+    });
+    window.add_controller(key_controller);
+
     let root_box = GtkBox::new(Orientation::Vertical, 0);
     root_box.add_css_class("welcome-card");
 
@@ -180,7 +194,9 @@ fn build_welcome_ui(main_loop: glib::MainLoop) {
     grid.set_row_spacing(10);
 
     let shortcuts = [
-        ("Mod + Space", "SolarUI Uygulama Menüsü"),
+        ("Mod + Space", "Solar Omnibar (Raycast / Spotlight Arama & Komut)"),
+        ("Mod + G", "Blaze GameZone (Steam Deck & Xbox UI Oyun Kabuğu)"),
+        ("Mod + Alt + K", "Konami Kodu Retro Modu (↑↑↓↓←→←→ B A)"),
         ("Mod + T / F", "KDE Serbest Kayan Pencere (Floating Window)"),
         ("Mod + Sol Tık Sürükle", "Pencereyi Ekranda İstediğin Yere Taşı"),
         ("Mod + Sağ Tık Sürükle", "Pencereyi İstenilen Boyuta Getir"),
@@ -228,7 +244,7 @@ fn build_welcome_ui(main_loop: glib::MainLoop) {
         || std::path::Path::new("/dev/mapper/live-base").exists();
 
     if is_live_installer {
-        let install_btn = Button::with_label("💿 Sabit Diske Kur (Anaconda)");
+        let install_btn = Button::with_label("Sabit Diske Kur (Anaconda)");
         install_btn.add_css_class("install-btn");
         let win_weak_inst = window.downgrade();
         let loop_inst = main_loop.clone();

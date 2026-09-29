@@ -1,0 +1,16 @@
+#!/usr/bin/sh -e
+# Blaze Emergency Recovery Protocol (BERP) Early Shift & Watchdog Hook
+
+cat << 'BERPEOF'
+# === Blaze Emergency Recovery Protocol (BERP) Early Shift Detection ===
+insmod keystatus
+if keystatus --shift; then
+  set default="Blaze Emergency Recovery Protocol (BERP)"
+  set timeout=0
+fi
+
+if [ "${blaze_recovery}" = "alert" ]; then
+  set default="Blaze Emergency Recovery Protocol (BERP)"
+  set timeout=0
+fi
+BERPEOF

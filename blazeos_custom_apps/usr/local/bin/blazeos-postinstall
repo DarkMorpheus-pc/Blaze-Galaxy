@@ -5,19 +5,66 @@
 # ==============================================================================
 set -e
 
+# Live ISO detection: exit immediately before modifying anything
+if grep -qE 'rd\.live\.image|root=live:' /proc/cmdline 2>/dev/null || [ -d /run/initramfs/live ] || [ -f /run/liveuser ]; then
+    echo "Live environment detected; installed-system setup skipped."
+    exit 0
+fi
+
 LOG="/var/log/blazeos-postinstall.log"
 exec >> "$LOG" 2>&1
 echo "=== Starting BlazeOS Post-Install at $(date) ==="
 
-# 1. Purge liveuser if still lingering
-if id -u liveuser &>/dev/null; then
-    echo "Purging lingering liveuser account..."
-    userdel -rf liveuser 2>/dev/null || true
-    rm -rf /home/liveuser /var/lib/AccountsService/users/liveuser /etc/sudoers.d/liveuser
+# 1. Resolve Primary Human User or migrate/create fallback
+FIRST_HUMAN_USER=$(awk -F: '$3 >= 1000 && $3 < 65534 && $1 != "liveuser" {print $1; exit}' /etc/passwd)
+
+if [ -z "$FIRST_HUMAN_USER" ]; then
+    echo "No custom human user found from installer. Setting up primary user 'blaze'..."
+    if id -u liveuser &>/dev/null; then
+        # Migrate liveuser to blaze preserving home configuration
+        usermod -l blaze -d /home/blaze -m liveuser 2>/dev/null || true
+        groupmod -n blaze liveuser 2>/dev/null || true
+        FIRST_HUMAN_USER="blaze"
+    else
+        useradd -m -s /bin/bash -U blaze 2>/dev/null || true
+        FIRST_HUMAN_USER="blaze"
+    fi
+    echo "blaze:blaze" | chpasswd 2>/dev/null || true
+    echo "blaze ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/blaze
+    chmod 0440 /etc/sudoers.d/blaze
+else
+    # Custom human user exists, purge lingering liveuser
+    if id -u liveuser &>/dev/null; then
+        echo "Purging lingering liveuser account..."
+        userdel -rf liveuser 2>/dev/null || true
+        rm -rf /home/liveuser /var/lib/AccountsService/users/liveuser /etc/sudoers.d/liveuser
+    fi
 fi
 
-# 2. Configure GDM custom.conf
-echo "Ensuring GDM configuration..."
+# 2. Configure SDDM & GDM for Primary Human User
+echo "Ensuring SDDM and display manager configuration for $FIRST_HUMAN_USER..."
+mkdir -p /etc/sddm.conf.d
+cat > /etc/sddm.conf.d/autologin.conf << SDDMEOF
+[Autologin]
+User=${FIRST_HUMAN_USER}
+Session=solarui.desktop
+Relogin=false
+
+[General]
+DisplayServer=wayland
+GreeterEnvironment=QT_WAYLAND_SHELL_INTEGRATION=layer-shell
+
+[Wayland]
+CompositorCommand=weston --shell=kiosk
+SessionDir=/usr/share/wayland-sessions
+SessionCommand=/usr/share/sddm/scripts/wayland-session
+SDDMEOF
+
+mkdir -p /etc/systemd/system
+ln -sf /usr/lib/systemd/system/sddm.service /etc/systemd/system/display-manager.service 2>/dev/null || true
+systemctl set-default graphical.target 2>/dev/null || true
+systemctl enable sddm.service 2>/dev/null || true
+
 mkdir -p /etc/gdm
 cat > /etc/gdm/custom.conf << 'GDMEOF'
 # GDM configuration storage
@@ -57,6 +104,14 @@ ASCEOF
             fi
             if [ ! -f "$home/.config/solarui/niri.kdl" ] && [ -f /etc/solarui/niri.kdl ]; then
                 cp -f /etc/solarui/niri.kdl "$home/.config/solarui/"
+            fi
+            # Caelestia shell config (fixes grey screen / crash on first login)
+            if [ ! -d "$home/.config/caelestia" ] && [ -d /etc/skel/.config/caelestia ]; then
+                cp -a /etc/skel/.config/caelestia "$home/.config/caelestia"
+            fi
+            # Quickshell / Caelestia QML config (critical for shell rendering)
+            if [ ! -d "$home/.config/quickshell" ] && [ -d /etc/skel/.config/quickshell ]; then
+                cp -a /etc/skel/.config/quickshell "$home/.config/quickshell"
             fi
             chown -R "$user:$user" "$home/.config" 2>/dev/null || true
         fi
@@ -168,6 +223,30 @@ if [ -f /etc/blazeos-desktop-choice ]; then
     esac
 fi
 
+# Synchronize GDM and AccountsService user session definitions
+DEFAULT_SESSION_DESKTOP=$(grep -E '^DefaultSession=' /etc/gdm/custom.conf 2>/dev/null | cut -d= -f2 | tr -d ' \r\n')
+if [ -n "$DEFAULT_SESSION_DESKTOP" ]; then
+    SESSION_NAME="${DEFAULT_SESSION_DESKTOP%.desktop}"
+    SESSION_TYPE="wayland"
+    if [ -f "/usr/share/wayland-sessions/${DEFAULT_SESSION_DESKTOP}" ] || [ -f "/usr/share/wayland-sessions/${SESSION_NAME}.desktop" ]; then
+        SESSION_TYPE="wayland"
+    elif [ -f "/usr/share/xsessions/${DEFAULT_SESSION_DESKTOP}" ] || [ -f "/usr/share/xsessions/${SESSION_NAME}.desktop" ]; then
+        SESSION_TYPE="x11"
+    fi
+
+    while IFS=: read -r user pass uid gid gecos home shell; do
+        if [ "$uid" -ge 1000 ] && [ "$uid" -lt 65534 ] && [ "$user" != "liveuser" ]; then
+            ACCOUNT="/var/lib/AccountsService/users/$user"
+            if [ -f "$ACCOUNT" ]; then
+                sed -i "s/^Session=.*/Session=${SESSION_NAME}/" "$ACCOUNT"
+                sed -i "s/^XSession=.*/XSession=${SESSION_NAME}/" "$ACCOUNT"
+                sed -i "s/^SessionType=.*/SessionType=${SESSION_TYPE}/" "$ACCOUNT"
+                restorecon -F "$ACCOUNT" 2>/dev/null || true
+            fi
+        fi
+    done < /etc/passwd
+fi
+
 # 5. Check bootloader choice
 if [ -f /etc/blazeos-bootloader-choice ]; then
     BOOT_CHOICE=$(cat /etc/blazeos-bootloader-choice | tr -d ' \n\r')
@@ -180,8 +259,18 @@ if [ -f /etc/blazeos-bootloader-choice ]; then
     fi
 fi
 
-# 6. Self disable this service so it never runs again
+# 6. Ensure GRUB has BERP and Shift detection on installed system
+echo "Ensuring GRUB is up-to-date with BERP and Shift hooks..."
+if [ -d /boot/efi/EFI/fedora ]; then
+    grub2-mkconfig -o /boot/efi/EFI/fedora/grub.cfg 2>/dev/null || true
+fi
+if [ -f /boot/grub2/grub.cfg ]; then
+    grub2-mkconfig -o /boot/grub2/grub.cfg 2>/dev/null || true
+fi
+
+# 7. Self disable this service so it never runs again
 echo "Disabling blazeos-postinstall.service..."
 systemctl disable blazeos-postinstall.service 2>/dev/null || true
 echo "=== BlazeOS Post-Install Complete at $(date) ==="
 exit 0
+

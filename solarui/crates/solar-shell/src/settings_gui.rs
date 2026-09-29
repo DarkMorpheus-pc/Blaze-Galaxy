@@ -3,7 +3,7 @@ use gtk4::gdk;
 use gtk4::glib;
 use gtk4::prelude::*;
 use gtk4::{
-    Box as GtkBox, Button, CheckButton, CssProvider, DropDown, Image, Label,
+    Box as GtkBox, Button, CheckButton, CssProvider, DropDown, Entry, Image, Label,
     Notebook, Orientation, Separator, StringList, Window,
 };
 use solar_common::{
@@ -341,6 +341,10 @@ fn build_settings_ui(main_loop: glib::MainLoop) {
     noctalia_tab.append(&n_sec);
 
     notebook.append_page(&noctalia_tab, Some(&Label::new(Some("Noctalia Bar"))));
+
+    // ── TAB: OMNIBAR & AKILLI ARAMA AYARLARI ─────────────────────────────────
+    let omnibar_tab = build_omnibar_tab();
+    notebook.append_page(&omnibar_tab, Some(&Label::new(Some("Omnibar & Arama"))));
 
     // ── TAB 3: KISAYOLLAR & KARŞILAMA HUD ─────────────────────────────────────
     let hud_tab = GtkBox::new(Orientation::Vertical, 12);
@@ -1729,6 +1733,103 @@ pub fn apply_display_scale_dynamically(scale: f64) {
     cfg.display.text_scale = scale;
     let _ = cfg.save();
 }
+
+fn build_omnibar_tab() -> GtkBox {
+    let tab = GtkBox::new(Orientation::Vertical, 16);
+    tab.set_margin_top(14);
+    tab.set_margin_bottom(14);
+    tab.set_margin_start(16);
+    tab.set_margin_end(16);
+
+    let sec = GtkBox::new(Orientation::Vertical, 14);
+    sec.add_css_class("section-box");
+
+    let title = Label::new(Some("SolarUI Omnibar ve Akıllı Arama"));
+    title.add_css_class("section-title");
+    title.set_halign(gtk4::Align::Start);
+    sec.append(&title);
+
+    let desc = Label::new(Some(
+        "Super + Boşluk kısayolu ile açılan Omnibar; sistem komutları, anlık matematik hesaplamaları, birim ve kur çevirileri, uygulama başlatıcı ve isteğe bağlı web/yapay zeka arama motorudur.",
+    ));
+    desc.add_css_class("setting-subtext");
+    desc.set_wrap(true);
+    desc.set_halign(gtk4::Align::Start);
+    sec.append(&desc);
+
+    let sep1 = Separator::new(Orientation::Horizontal);
+    sec.append(&sep1);
+
+    // 1. Web Arama Geçişi
+    let cfg = SolarConfig::load();
+    let chk_web = CheckButton::with_label("Çevrimiçi Web Arama Sonuçlarını Göster");
+    chk_web.set_active(cfg.omnibar.enable_web_search);
+    chk_web.connect_toggled(|cb| {
+        let mut c = SolarConfig::load();
+        c.omnibar.enable_web_search = cb.is_active();
+        let _ = c.save();
+    });
+    sec.append(&chk_web);
+
+    // 2. Arama Motoru Seçimi
+    let engine_box = GtkBox::new(Orientation::Horizontal, 12);
+    let engine_lbl = Label::new(Some("Varsayılan Arama Motoru:"));
+    engine_lbl.add_css_class("setting-label");
+    engine_lbl.set_halign(gtk4::Align::Start);
+    engine_box.append(&engine_lbl);
+
+    let engines = ["DuckDuckGo", "Google", "Brave", "Bing"];
+    let str_list = StringList::new(&engines);
+    let dropdown = DropDown::new(Some(str_list), None::<gtk4::Expression>);
+
+    let current_pos = engines.iter().position(|e| *e == cfg.omnibar.search_engine).unwrap_or(0);
+    dropdown.set_selected(current_pos as u32);
+
+    dropdown.connect_selected_notify(move |dd| {
+        let sel = dd.selected() as usize;
+        if let Some(engine) = engines.get(sel) {
+            let mut c = SolarConfig::load();
+            c.omnibar.search_engine = engine.to_string();
+            let _ = c.save();
+        }
+    });
+    engine_box.append(&dropdown);
+    sec.append(&engine_box);
+
+    // 3. Yapay Zeka / Arama API Anahtarı
+    let api_box = GtkBox::new(Orientation::Vertical, 6);
+    let api_lbl = Label::new(Some("Yapay Zeka API Anahtarı (Opsiyonel):"));
+    api_lbl.add_css_class("setting-label");
+    api_lbl.set_halign(gtk4::Align::Start);
+    api_box.append(&api_lbl);
+
+    let api_entry = Entry::new();
+    api_entry.set_placeholder_text(Some("Gemini / OpenAI API Anahtarı..."));
+    api_entry.set_text(&cfg.omnibar.ai_api_key);
+    api_entry.connect_changed(|e| {
+        let text = e.text().to_string();
+        let mut c = SolarConfig::load();
+        c.omnibar.ai_api_key = text;
+        let _ = c.save();
+    });
+    api_box.append(&api_entry);
+    sec.append(&api_box);
+
+    let sep2 = Separator::new(Orientation::Horizontal);
+    sec.append(&sep2);
+
+    // Test Butonu
+    let btn_test = Button::with_label("Omnibar'ı Şimdi Test Et (Super + Boşluk)");
+    btn_test.add_css_class("action-btn");
+    btn_test.connect_clicked(|_| {
+        let _ = Command::new("solar-shell").arg("omnibar").spawn();
+    });
+    sec.append(&btn_test);
+
+    tab.append(&sec);
+    tab
+}
+
 
 
 

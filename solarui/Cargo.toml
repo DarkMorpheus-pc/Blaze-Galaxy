@@ -7,6 +7,7 @@ members = [
     "crates/solar-core",
     "crates/solar-shell",
     "crates/solar-session",
+    "crates/blaze-recovery",
 ]
 
 [workspace.package]
@@ -15,7 +16,7 @@ edition = "2021"
 rust-version = "1.89"
 authors = ["BlazeOS Team <contact@blazeos.org>"]
 license = "GPL-3.0-or-later"
-repository = "https://github.com/projectblaze/solarui"
+repository = "https://github.com/DarkMorpheus-pc/SolarUI"
 
 [workspace.dependencies]
 tokio = { version = "1.43", features = ["full"] }

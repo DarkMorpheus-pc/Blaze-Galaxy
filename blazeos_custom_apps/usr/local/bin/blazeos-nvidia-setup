@@ -2,6 +2,7 @@
 # BlazeOS NVIDIA İlk Başlatma Sürücü Kurulumu
 # Yalnızca NVIDIA GPU tespit edildiğinde çalışır, bir kez çalışıp biter.
 set -euo pipefail
+export LC_ALL=C.UTF-8
 
 DONE_FLAG="/var/lib/blazeos/nvidia-setup-done"
 LOG="/var/log/blazeos-nvidia-setup.log"
@@ -49,13 +50,28 @@ dnf install -y akmod-nvidia xorg-x11-drv-nvidia-cuda 2>>"$LOG" || {
 log "NVIDIA sürücüleri kuruldu. Kernel modülü derleniyor (bu birkaç dakika alabilir)..."
 
 # akmods tamamlanana kadar bekle (en fazla 5 dakika)
-for i in $(seq 1 60); do
+for _ in $(seq 1 60); do
     if modinfo -F version nvidia &>/dev/null; then
         log "NVIDIA modülü hazır."
         break
     fi
     sleep 5
 done
+
+# Never retire the working driver or mark success if module construction failed.
+if ! modinfo -F version nvidia >/dev/null 2>&1; then
+    log "HATA: NVIDIA modülü hazır değil; nouveau devre dışı bırakılmadı."
+    exit 1
+fi
+
+# A signed file alone does not prove that this machine trusts its key.
+# Keep the existing boot configuration until the driver has actually loaded.
+if command -v mokutil >/dev/null 2>&1 && mokutil --sb-state 2>/dev/null | grep -qi 'SecureBoot enabled'; then
+    if [ ! -d /sys/module/nvidia ]; then
+        log "HATA: Secure Boot açık; NVIDIA anahtar kaydı ve modül yüklemesi doğrulanmalı."
+        exit 1
+    fi
+fi
 
 # DRM modeset — Wayland için zorunlu
 grubby --update-kernel=ALL \

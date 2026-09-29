@@ -8,9 +8,11 @@ if grep -qE 'rd\.live\.image|root=live:' /proc/cmdline 2>/dev/null || [ -d /run/
 fi
 
 # 1. If Noctalia is active, use Noctalia native lockscreen
-if pgrep -x noctalia >/dev/null 2>&1; then
-    noctalia msg session lock
-    exit 0
+if pgrep -u "$(id -u)" -x noctalia >/dev/null 2>&1; then
+    if timeout 5s noctalia msg session lock; then
+        exit 0
+    fi
+    echo "Noctalia lock request failed; trying standalone locker." >&2
 fi
 
 # 2. If swaylock / gtklock / waylock is installed, use that

@@ -11,6 +11,9 @@ import sys
 import subprocess
 import threading
 import re
+import queue
+import pwd
+import shlex
 import gi
 
 gi.require_version("Gtk", "4.0")
@@ -130,6 +133,9 @@ class BlazeControlWindow(Adw.PreferencesWindow):
         self.set_title("BlazeOS Merkezi" if self.is_tr else "BlazeOS Control")
         self.set_default_size(920, 680)
 
+        self.task_running = False
+        self.log_timer = None
+        self.log_queue = queue.Queue(maxsize=256)
         self.build_updates_page()
         self.build_desktop_page()
         self.build_performance_page()
@@ -497,6 +503,11 @@ class BlazeControlWindow(Adw.PreferencesWindow):
     # HELPERS & LOGIC
     # --------------------------------------------------------------------------
     def run_task(self, name, command):
+        if self.task_running:
+            self.show_toast("Bir işlem zaten çalışıyor." if self.is_tr else "An operation is already running.")
+            return
+        self.task_running = True
+        self.log_timer = GLib.timeout_add(100, self.drain_logs)
         self.set_visible_page_name("updates")
         self.expander.set_expanded(True)
         cmd_str = " ".join(command)
@@ -505,26 +516,51 @@ class BlazeControlWindow(Adw.PreferencesWindow):
         def task_thread():
             try:
                 p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
-                for line in p.stdout:
-                    GLib.idle_add(self.append_log, line)
+                while True:
+                    chunk = p.stdout.readline(4096)
+                    if not chunk:
+                        break
+                    self.log_queue.put(chunk)
                 p.wait()
-                GLib.idle_add(self.append_log, f"\n=== {name} Tamamlandı (Çıkış Kodu: {p.returncode}) ===\n")
+                self.log_queue.put(f"\n=== {name} Tamamlandı (Çıkış Kodu: {p.returncode}) ===\n")
                 if p.returncode == 0:
                     GLib.idle_add(self.show_toast, f"{name} başarıyla tamamlandı.")
                 else:
                     GLib.idle_add(self.show_toast, f"{name} hata ile sonuçlandı (Kod: {p.returncode}).")
             except Exception as ex:
-                GLib.idle_add(self.append_log, f"\nHATA: {ex}\n")
+                self.log_queue.put(f"\nHATA: {ex}\n")
                 GLib.idle_add(self.show_toast, f"Hata: {ex}")
+            finally:
+                GLib.idle_add(self.finish_task)
 
         threading.Thread(target=task_thread, daemon=True).start()
 
+    def finish_task(self):
+        while not self.log_queue.empty():
+            self.drain_logs()
+        self.task_running = False
+        if self.log_timer is not None:
+            GLib.source_remove(self.log_timer)
+            self.log_timer = None
+        return False
+
+    def drain_logs(self):
+        for _ in range(64):
+            try:
+                self.append_log(self.log_queue.get_nowait())
+            except queue.Empty:
+                break
+        return self.task_running or not self.log_queue.empty()
+
     def append_log(self, text):
-        end_iter = self.log_buffer.get_end_iter()
-        self.log_buffer.insert(end_iter, text)
+        self.log_buffer.insert(self.log_buffer.get_end_iter(), text)
+        excess = self.log_buffer.get_char_count() - 200_000
+        if excess > 0:
+            self.log_buffer.delete(self.log_buffer.get_start_iter(),
+                                   self.log_buffer.get_iter_at_offset(excess))
 
     def get_current_session(self):
-        user = os.environ.get("USER", "liveuser")
+        user = pwd.getpwuid(os.getuid()).pw_name
         acc_file = f"/var/lib/AccountsService/users/{user}"
         if os.path.exists(acc_file):
             try:
@@ -537,13 +573,15 @@ class BlazeControlWindow(Adw.PreferencesWindow):
         return "solarui"
 
     def set_desktop_session(self, de):
-        user = os.environ.get("USER", "liveuser")
+        user = pwd.getpwuid(os.getuid()).pw_name
         session_name = de["session"]
         session_desktop = de["session_desktop"]
         session_type = de["session_type"]
         acc_file = f"/var/lib/AccountsService/users/{user}"
         content = f"[User]\nSession={session_name}\nSessionType={session_type}\nXSession={session_name}\nIcon=/usr/share/icons/hicolor/256x256/apps/solarui.png\n"
 
+        # Quote the path before constructing the privileged shell command.
+        acc_file = shlex.quote(acc_file)
         hide_gnome = "true" if session_name == "solarui" else "false"
 
         def do_write():

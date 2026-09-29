@@ -12,7 +12,7 @@ foreach(po IN LISTS po_files)
 
     add_custom_command(
         OUTPUT "${mo}"
-        COMMAND msgfmt -o "${mo}" "${CMAKE_CURRENT_SOURCE_DIR}/${po}"
+        COMMAND msgfmt --check --check-format -o "${mo}" "${CMAKE_CURRENT_SOURCE_DIR}/${po}"
         DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${po}"
         COMMENT "Compiling translations for ${lang}"
         VERBATIM
@@ -40,12 +40,13 @@ endif()
 qml_module(caelestia-i18n
     URI Caelestia.I18n
     INCLUDE_PREFIX i18n
-    SOURCES
-        translator.cpp
-        pluralrules.cpp
+    NO_CACHEGEN
     QML_SINGLETONS
         Tr.qml
         Units.qml
+    SOURCES
+        translator.cpp
+        pluralrules.cpp
     RESOURCES
         ${mo_files}
     LIBRARIES

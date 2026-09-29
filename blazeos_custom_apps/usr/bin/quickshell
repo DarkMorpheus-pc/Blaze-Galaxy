@@ -1,0 +1,12 @@
+#!/bin/sh
+export LD_LIBRARY_PATH="/usr/lib64/quickshell:/usr/lib64/quickshell/qml/Caelestia/lib:${LD_LIBRARY_PATH:-/usr/lib64}"
+export QT_PLUGIN_PATH="/usr/lib64/quickshell/plugins:/usr/lib64/qt6/plugins:${QT_PLUGIN_PATH}"
+export QT_QPA_PLATFORM_PLUGIN_PATH="/usr/lib64/quickshell/plugins/platforms"
+export QML2_IMPORT_PATH="/usr/lib64/quickshell/qml:/usr/lib64/qt6/qml:${QML2_IMPORT_PATH}"
+export QML_IMPORT_PATH="/usr/lib64/quickshell/qml:/usr/lib64/qt6/qml:${QML_IMPORT_PATH}"
+export QT_QPA_PLATFORM="wayland;xcb"
+export QS_NO_RELOAD_POPUP=1
+export QS_DROP_EXPENSIVE_FONTS=1
+export QSG_RENDER_LOOP=threaded
+export QT_QUICK_FLICKABLE_WHEEL_DECELERATION=10000
+exec /usr/bin/quickshell.bin "$@"

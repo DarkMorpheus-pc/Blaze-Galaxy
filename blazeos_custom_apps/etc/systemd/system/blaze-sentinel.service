@@ -1,0 +1,13 @@
+[Unit]
+Description=Blaze Sentinel Threat & Integrity Watchdog
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/blaze-sentinel
+Restart=always
+RestartSec=10
+Nice=-5
+
+[Install]
+WantedBy=multi-user.target

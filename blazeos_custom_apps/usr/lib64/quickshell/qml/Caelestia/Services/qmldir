@@ -1,0 +1,9 @@
+module Caelestia.Services
+linktarget caelestia-servicesplugin
+optional plugin caelestia-servicesplugin
+classname Caelestia_ServicesPlugin
+typeinfo caelestia-services.qmltypes
+depends Caelestia
+depends Caelestia.Config
+prefer :/qt/qml/Caelestia/Services/
+

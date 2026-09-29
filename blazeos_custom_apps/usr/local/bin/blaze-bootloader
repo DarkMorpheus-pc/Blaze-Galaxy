@@ -189,6 +189,12 @@ interface_branding_colour: 6
     module_path: boot():/blazeos/initramfs.img
     cmdline: root=UUID=${root_uuid} ro quiet rhgb splash
 
+/Blaze Emergency Recovery Protocol (BERP)
+    protocol: linux
+    kernel_path: boot():/blazeos/vmlinuz
+    module_path: boot():/blazeos/initramfs.img
+    cmdline: root=UUID=${root_uuid} ro systemd.unit=blaze-recovery.target single
+
 /Blaze SolarEvolution (Kurtarma Modu)
     protocol: linux
     kernel_path: boot():/blazeos/vmlinuz

@@ -42,13 +42,18 @@ CustomMouseArea {
     }
 
     function inTopPanel(panel: Item, x: real, y: real): bool {
-        const panelHeight = panel.height * (1 - (panel.offsetScale ?? 0)); // qmllint disable missing-property
-        return y < Math.max(Config.border.minThickness, Config.border.thickness + panelHeight) && withinPanelWidth(panel, x, y);
+        const offset = panel.offsetScale ?? 0;
+        const panelHeight = panel.height * (1 - offset); // qmllint disable missing-property
+        const threshold = offset < 1 ? Math.max(Config.border.minThickness, Config.border.thickness + panelHeight) : Math.min(4, Config.border.minThickness);
+        return y < threshold && withinPanelWidth(panel, x, y);
     }
 
     function inBottomPanel(panel: Item, x: real, y: real, isCorner = false): bool {
-        const panelHeight = panel.height * (1 - (panel.offsetScale ?? 0)); // qmllint disable missing-property
-        return y > height - Math.max(Config.border.minThickness, Config.border.thickness + panelHeight) - (isCorner ? Config.border.rounding : 0) && withinPanelWidth(panel, x, y);
+        const offset = panel.offsetScale ?? 0;
+        const panelHeight = panel.height * (1 - offset); // qmllint disable missing-property
+        const cornerPad = isCorner && offset < 1 ? Config.border.rounding : 0;
+        const threshold = offset < 1 ? Math.max(Config.border.minThickness, Config.border.thickness + panelHeight) : Math.min(4, Config.border.minThickness);
+        return y > height - threshold - cornerPad && withinPanelWidth(panel, x, y);
     }
 
     function onWheel(event: WheelEvent): void {

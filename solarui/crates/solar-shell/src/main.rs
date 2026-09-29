@@ -14,6 +14,9 @@ pub mod snap_gui;
 pub mod supervisor;
 pub mod switcher;
 pub mod welcome_gui;
+pub mod delight;
+pub mod omnibar;
+pub mod gamezone_gui;
 
 use anyhow::Result;
 use apps::scan_desktop_applications;
@@ -73,6 +76,10 @@ async fn main() -> Result<()> {
     let bin_name = args.get(0).map(|s| s.as_str()).unwrap_or("");
     let default_cmd = if bin_name.ends_with("solar-settings") {
         "settings"
+    } else if bin_name.ends_with("blaze-gamezone") || bin_name.ends_with("gamezone") {
+        "gamezone"
+    } else if bin_name.ends_with("solar-omnibar") || bin_name.ends_with("omnibar") {
+        "omnibar"
     } else {
         "run"
     };
@@ -222,6 +229,20 @@ async fn main() -> Result<()> {
             info!("Launching SolarUI Welcome & Shortcuts HUD...");
             tokio::task::block_in_place(|| {
                 welcome_gui::launch_welcome_window();
+            });
+            Ok(())
+        }
+        "omnibar" | "spotlight" | "launcher" => {
+            info!("Launching SolarUI Omnibar Command Hub...");
+            tokio::task::block_in_place(|| {
+                omnibar::launch_omnibar_window();
+            });
+            Ok(())
+        }
+        "gamezone" | "gaming" | "deck" => {
+            info!("Launching Blaze GameZone Fullscreen Shell...");
+            tokio::task::block_in_place(|| {
+                gamezone_gui::launch_gamezone_window();
             });
             Ok(())
         }
@@ -384,8 +405,27 @@ async fn main() -> Result<()> {
             sync_noctalia_settings().await?;
             Ok(())
         }
+        "easter-egg" | "konami" => {
+            let egg = args.get(2).map(|s| s.as_str()).unwrap_or("konami");
+            delight::trigger_easter_egg(egg)?;
+            Ok(())
+        }
+        "sound" => {
+            let snd = args.get(2).map(|s| s.as_str()).unwrap_or("click");
+            delight::play_acoustic_feedback(snd)?;
+            Ok(())
+        }
+        "atmosphere" | "season" => {
+            let (name, color) = delight::get_seasonal_atmosphere();
+            println!("Aktif Mevsimsel Atmosfer: {} (Vurgu Rengi: {})", name, color);
+            Ok(())
+        }
+        "recovery" => {
+            let _ = std::process::Command::new("blaze-recovery").status();
+            Ok(())
+        }
         other => {
-            eprintln!("Unknown command: '{}'. Valid: route, switch, sync-noctalia, supervisor, run, autostart, settings, welcome, snap, minimize, restore, toggle-taskbar, apps, status, bar", other);
+            eprintln!("Unknown command: '{}'. Valid: omnibar, gamezone, route, switch, sync-noctalia, supervisor, run, autostart, settings, welcome, snap, minimize, restore, toggle-taskbar, apps, status, bar, easter-egg, sound, atmosphere, recovery", other);
             Ok(())
         }
     }

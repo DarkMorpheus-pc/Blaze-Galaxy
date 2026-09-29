@@ -43,6 +43,13 @@ Singleton {
         return junk.includes(t.toLowerCase()) ? "" : t;
     }
 
+    function sanitiseFirmware(s: string): string {
+        let t = sanitiseDmi(s);
+        t = t.replace(/Arch Linux/gi, "UEFI / BIOS");
+        t = t.replace(/\barch\b/gi, "UEFI");
+        return t.trim() || "UEFI / BIOS";
+    }
+
     FileView {
         id: osRelease
 
@@ -104,7 +111,7 @@ Singleton {
     FileView {
         path: "/sys/class/dmi/id/bios_version"
         printErrors: false
-        onLoaded: root.firmware = root.sanitiseDmi(text())
+        onLoaded: root.firmware = root.sanitiseFirmware(text())
     }
 
     Timer {
