@@ -43,6 +43,33 @@ Bu sürüm (`5.03`), masaüstü deneyimini, dil desteğini, sistem entegrasyonun
 - Mevcut terminalin yanına bağımsız, yüksek performanslı **Kitty** terminali eklendi.
 - Fastfetch çıktıları SolarUI / BlazeOS logosu ve özel donanım/yazılım metrikleriyle optimize edildi.
 
+### ⚡ 6. Caelestia Shell Geçiş & Dinamik Bağlayıcı Onarımı
+- **Geçiş Çökmesi ve Geri Düşme (Rollback) Çözüldü:** `solar-shell switch caelestia` komutunda Caelestia'nın başlatılamayıp 6 saniye sonra otomatik olarak Noctalia'ya geri dönmesine yol açan runtime yükleme hatası tespit edildi.
+- **Kritik Sembol Hatası Giderildi (`TemperatureUnit::staticMetaObject`):** Caelestia'nın `Units.qml` dosyasının ihtiyaç duyduğu `caelestia::config::TemperatureUnit` sembolünün, eski `libcaelestia-config.so` sürümünde tanımlı olmaması nedeniyle Quickshell plugin yüklemesi başarısız oluyordu. Caelestia'nın tüm 9 C++/QML eklenti modülü (`core`, `config`, `settings`, `components`, `models`, `services`, `blobs`, `images`, `i18n`) aynı araç zinciriyle baştan derlendi ve hem kök dizine hem de `blazeos_custom_apps` katmanına işlendi.
+- **Qt6 Özel Sembol (Qt_6_PRIVATE_API) İzolasyonu:** `caelestia-i18n` modülündeki AOT (Ahead-of-Time) derlemesi saf çalışma zamanı QML yorumlamasına dönüştürülerek ABI uyuşmazlığı giderildi.
+- **Sistem Dinamik Bağlayıcı İzolasyonu (`ldconfig`):** Caelestia'nın özel Quickshell kütüphaneleri sistem genelindeki dinamik bağlayıcı (`ld.so.conf`) yerine `/usr/bin/quickshell` sarmalayıcısı ve `solar-shell` sürecine özel `LD_LIBRARY_PATH` ile izole edildi. Bu sayede Fedora'nın yerel Qt6 kütüphaneleriyle SDDM arasındaki ELF sembol çakışmaları (`GNU_PROPERTY_1_NEEDED_INDIRECT_EXTERN_ACCESS`) kökten engellendi.
+
+### 🛡️ 7. Arka Plan Servisleri, Telemetri ve Bloat Arındırma
+- **NetworkManager Telemetri Engelleme:** Fedora'nın varsayılan olarak her 300 saniyede bir `hotspot.txt` pingi atarak ağ gecikmesi oluşturan ve telemetri toplayan captive portal sorgusu `/etc/NetworkManager/conf.d/99-disable-telemetry.conf` ile kapatıldı.
+- **Gereksiz Arka Plan Servisleri Devre Dışı:** Masaüstü performansını ve disk G/Ç yanıt hızını düşüren `auditd` (güvenlik denetim izleme), `sssd` (kurumsal LDAP), `stratisd` (depolama yöneticisi), `mcelog`, `rsyslog` (çift günlükleme), `ModemManager` (seri port tarama) ve 27 adet `virt*.socket` servisi kapatıldı.
+- **DNF Otomatik Önbellek Zamanlayıcısı:** `dnf-makecache.timer` devreden çıkarılarak oyun veya çalışma esnasında beklenmedik disk/CPU kilitlenmeleri önlendi.
+- **Live ISO Otomatik Giriş Koruması:** `blazeos-postinstall.service` servisinin Live ISO oturumu sırasında çalışıp `liveuser` hesabını silmesi ve GDM autologin'i bozması engellendi.
+
+### 🖥️ 8. SDDM Varsayılan Giriş Yöneticisi & GNOME Bileşenlerinden Arındırma
+- **SDDM Varsayılan Olarak Etkinleştirildi:** GDM3 ve ağır GNOME arka plan servisleri devreden çıkarıldı. SDDM 0.21 (Qt6) hafif oturum yöneticisi sisteme entegre edildi (`/etc/systemd/system/display-manager.service -> sddm.service`). Sistem açılışında doğrudan ~350-400 MB RAM tasarrufu sağlandı.
+- **GNOME Ayarlar ve Çakışmalar Kaldırıldı:** Sistemde açılmayan, çöken ve arayüzü kalabalıklaştıran `gnome-control-center`, `gnome-shell`, `gnome-tour`, `gnome-initial-setup` ve GNOME kabuk eklentileri paket seviyesinde temizlendi. Uygulama menüsündeki tüm ayar talepleri doğrudan yerel **SolarUI Ayarları** (`solar-settings`) aracına yönlendirildi.
+- **SDDM Canlı Açılış ve Weston Kiosk Entegrasyonu:** SDDM'in Wayland modunda ihtiyaç duyduğu `CompositorCommand=weston --shell=kiosk` yapılandırması tanımlandı; `sddm.service.d/10-livesys.conf` ile oturum başlangıcı `livesys.service` arkasına güvenle sıralandı. Ağ bağlantı sorguları asenkron arka plana alınarak açılış kilitlenmeleri giderildi ve sistem GRUB sonrası ~18 saniyede doğrudan SolarUI masaüstüne ulaştı.
+- **Deklaratif SDDM Otomatik Giriş:** `/etc/sddm.conf.d/autologin.conf` üzerinden Live ISO ve kurulu sistem için `liveuser` otomatik oturumu `solarui.desktop` Wayland oturumuyla birebir kilitlendi.
+
+### 🎯 9. Performans GiB Gösterimi, Bellenim, Çeviriler ve Ekran Köşeleri Sınırlandırması
+- **Performans Çekmecesi GiB Gösterimi:** `MemoryCard.qml` ve `StorageCard.qml` içindeki tanımsız fonksiyon referansı giderilerek `Units.formatKibUsage(...)` bağlandı. Bellek ve disk kartlarında yüzdelik bilginin altında dinamik `14.4 / 62.4 GiB` ve `675 / 937.9 GiB` değerlerinin kusursuz görüntülenmesi sağlandı.
+- **Bellenim (Firmware) Düzeltmesi:** Sanal makine ve SeaBIOS kaynaklı `Arch Linux 1.17.0-2-2` dizesi `SysInfo.qml` içinde arındırılarak temiz ve standart `UEFI / BIOS` bilgisine dönüştürüldü.
+- **Hava Durumu Tam Türkçe Desteği:** Hava durumu çekmecesindeki "Sunrise", "Sunset", "Humidity", "Feels Like", "Wind", "No weather", 7 günlük tahmin ve 26 farklı hava durumu durum kodu Türkçe gettext kataloğuna eklendi, `tr.mo` olarak derlenip tüm sistem katmanlarına dağıtıldı.
+- **Ekran Köşeleri & Kör Nokta Sınırlandırması:**
+  - **Niri Güvenli Kenar Sınırları (`layout.struts`):** `top 10`, `left 10`, `right 10`, `bottom 52` marjları tanımlandı. Google Chrome sekmeleri ve pencere başlıkları ekranın en tepesindeki çekmece tetikleyicilerinden bağımsız, rahatça tıklanabilir konuma çekildi.
+  - **Anaconda Kurulum Sihirbazı Kuralı:** Kurulum penceresi ekranda tam ekran yayılmak yerine %88 genişlik/yükseklikte ortalanmış ve yüzen (`open-floating`) pencere olarak yapılandırıldı. Sağ-alt köşedeki "İleri" butonunun köşe tetikleyicileriyle çakışması kökten önlendi.
+  - **Caelestia Çekmece Maskesi Daraltması:** Çekmeceler kapalıyken ekran kenarında oluşan 10–35 piksellik gereksiz girdi maskesi maksimum 2–3 piksele sıkıştırıldı; pencerelerin kenar ve köşe tıklama alanları tamamen serbest bırakıldı.
+
 ---
 
 ## 🌟 About (Hakkında)

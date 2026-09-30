@@ -13,7 +13,7 @@ Region {
     required property var win
 
     readonly property real borderThickness: win.contentItem.Config.border.thickness
-    readonly property real edgeTrigger: 3
+    readonly property real edgeTrigger: Math.max(10, borderThickness)
 
     // 1. Sol Cubuk (Caelestia Bar): Yalnizca sol cubuk alani tiklama alir
     x: 0

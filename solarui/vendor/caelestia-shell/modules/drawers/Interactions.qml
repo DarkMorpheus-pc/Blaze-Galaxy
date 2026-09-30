@@ -44,7 +44,7 @@ CustomMouseArea {
     function inTopPanel(panel: Item, x: real, y: real): bool {
         const offset = panel.offsetScale ?? 0;
         const panelHeight = panel.height * (1 - offset); // qmllint disable missing-property
-        const threshold = offset < 1 ? Math.max(Config.border.minThickness, Config.border.thickness + panelHeight) : Math.min(4, Config.border.minThickness);
+        const threshold = offset < 1 ? Math.max(Config.border.minThickness, Config.border.thickness + panelHeight) : Math.max(10, Config.border.minThickness);
         return y < threshold && withinPanelWidth(panel, x, y);
     }
 
@@ -52,7 +52,7 @@ CustomMouseArea {
         const offset = panel.offsetScale ?? 0;
         const panelHeight = panel.height * (1 - offset); // qmllint disable missing-property
         const cornerPad = isCorner && offset < 1 ? Config.border.rounding : 0;
-        const threshold = offset < 1 ? Math.max(Config.border.minThickness, Config.border.thickness + panelHeight) : Math.min(4, Config.border.minThickness);
+        const threshold = offset < 1 ? Math.max(Config.border.minThickness, Config.border.thickness + panelHeight) : Math.max(10, Config.border.minThickness);
         return y > height - threshold - cornerPad && withinPanelWidth(panel, x, y);
     }
 

@@ -158,7 +158,7 @@ fn build_welcome_ui(main_loop: glib::MainLoop) {
     let key_controller = gtk4::EventControllerKey::new();
     let win_weak_key = window.downgrade();
     key_controller.connect_key_pressed(move |_, key, _, _| {
-        if key == gdk::Key::Escape {
+        if key == gdk::Key::Escape || key == gdk::Key::Return || key == gdk::Key::KP_Enter {
             if let Some(win) = win_weak_key.upgrade() {
                 win.close();
             }
@@ -275,5 +275,7 @@ fn build_welcome_ui(main_loop: glib::MainLoop) {
     root_box.append(&bottom_box);
 
     window.set_child(Some(&root_box));
+    start_btn.set_can_focus(true);
     window.present();
+    start_btn.grab_focus();
 }
