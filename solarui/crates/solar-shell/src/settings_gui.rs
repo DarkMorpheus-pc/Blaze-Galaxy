@@ -831,7 +831,7 @@ fn build_pixel_clock_tab() -> GtkBox {
     opts_sec.append(&row1);
 
     let row2 = GtkBox::new(Orientation::Horizontal, 20);
-    let bat_chk = CheckButton::with_label("Pil Kapsülünü Göster (Battery Pill ⚡ %41)");
+    let bat_chk = CheckButton::with_label("Pil Kapsülünü Göster (Battery Pill [PIL] %41)");
     bat_chk.set_active(clock_cfg.show_battery_pill);
     bat_chk.connect_toggled(|cb| {
         let mut cfg = PixelClockConfig::load();
@@ -1251,7 +1251,7 @@ fn build_shell_tab() -> GtkBox {
 
         let engine_str = target_engine.as_str();
         shell_status_clone.set_text(&format!(
-            "✓ Kabuk motoru ({}) seçildi ve uygulandı.",
+            "[OK] Kabuk motoru ({}) seçildi ve uygulandı.",
             engine_str
         ));
 
@@ -1269,7 +1269,7 @@ fn build_shell_tab() -> GtkBox {
     reconcile_btn.set_halign(gtk4::Align::Start);
     let shell_status_rec = shell_status_lbl.clone();
     reconcile_btn.connect_clicked(move |_| {
-        shell_status_rec.set_text("✓ Kabuk durumu denetleniyor ve doğrulanıyor...");
+        shell_status_rec.set_text("[OK] Kabuk durumu denetleniyor ve doğrulanıyor...");
         std::thread::spawn(|| {
             let _ = Command::new("solar-shell")
                 .args(["supervisor"])
@@ -1407,20 +1407,22 @@ fn build_caelestia_tab() -> GtkBox {
 }
 
 fn build_display_tab() -> GtkBox {
-    let tab = GtkBox::new(Orientation::Vertical, 12);
-    tab.set_margin_top(10);
-    tab.set_margin_bottom(10);
+    let tab = GtkBox::new(Orientation::Vertical, 16);
+    tab.set_margin_top(14);
+    tab.set_margin_bottom(14);
+    tab.set_margin_start(16);
+    tab.set_margin_end(16);
 
     let sec = GtkBox::new(Orientation::Vertical, 12);
     sec.add_css_class("section-box");
 
-    let title = Label::new(Some("Ekran Çözünürlüğü ve Arayüz Ölçeği"));
+    let title = Label::new(Some("Genel Masaüstü ve Arayüz Ölçeği"));
     title.add_css_class("section-title");
     title.set_halign(gtk4::Align::Start);
     sec.append(&title);
 
     let desc = Label::new(Some(
-        "Ekranınızdaki pencere ve simgelerin boyutunu donanımınıza ve ekran çözünürlüğünüze göre ayarlayın. Küçük veya sanal makine ekranlarında (1280x800 vb.) arayüzün çok büyük görünmesini engellemek için %85 veya %75 kompakt ölçek önerilir.",
+        "Ekranınızdaki pencere ve simgelerin genel boyutunu donanımınıza ve ekran çözünürlüğünüze göre ayarlayın. Küçük veya sanal makine ekranlarında (1280x800 vb.) %85 veya %75 kompakt ölçek önerilir. Çoklu monitör kurulumlarında her monitör için aşağıdan bağımsız ölçek atayabilirsiniz.",
     ));
     desc.add_css_class("setting-subtext");
     desc.set_wrap(true);
@@ -1431,7 +1433,7 @@ fn build_display_tab() -> GtkBox {
 
     // Row: Scale factor selection
     let row_scale = GtkBox::new(Orientation::Horizontal, 12);
-    let lbl_scale = Label::new(Some("Masaüstü & Pencere Ölçeği:"));
+    let lbl_scale = Label::new(Some("Genel Sistem Ölçeği:"));
     lbl_scale.add_css_class("setting-label");
     lbl_scale.set_hexpand(true);
     lbl_scale.set_halign(gtk4::Align::Start);
@@ -1473,7 +1475,7 @@ fn build_display_tab() -> GtkBox {
     let btn_box = GtkBox::new(Orientation::Horizontal, 10);
     btn_box.set_margin_top(8);
 
-    let apply_btn = Button::with_label("Ölçeği Uygula (Anında Geçerli)");
+    let apply_btn = Button::with_label("Tüm Ekranlara Uygula");
     apply_btn.add_css_class("action-btn");
 
     let scale_dd_clone = scale_dd.clone();
@@ -1498,7 +1500,7 @@ fn build_display_tab() -> GtkBox {
 
         // 3. Update status label
         status_clone.set_text(&format!(
-            "✓ Ölçek {:.2}x başarıyla uygulandı ve kaydedildi.",
+            "[OK] Genel ölçek {:.2}x başarıyla uygulandı ve kaydedildi.",
             chosen_scale
         ));
     });
@@ -1516,7 +1518,7 @@ fn build_display_tab() -> GtkBox {
         c.display.text_scale = 1.00;
         let _ = c.save();
         apply_display_scale_dynamically(1.00);
-        status_reset.set_text("✓ Ölçek varsayılan 1.00x değerine sıfırlandı.");
+        status_reset.set_text("[OK] Ölçek varsayılan 1.00x değerine sıfırlandı.");
     });
     btn_box.append(&reset_btn);
 
@@ -1524,6 +1526,92 @@ fn build_display_tab() -> GtkBox {
     sec.append(&status_lbl);
     tab.append(&sec);
 
+    // SECTION 2: Multi-Monitor Independent DPI Scaling
+    let sec_mon = GtkBox::new(Orientation::Vertical, 12);
+    sec_mon.add_css_class("section-box");
+
+    let title_mon = Label::new(Some("Bağlı Monitörler ve Bağımsız DPI Ölçekleme"));
+    title_mon.add_css_class("section-title");
+    title_mon.set_halign(gtk4::Align::Start);
+    sec_mon.append(&title_mon);
+
+    let desc_mon = Label::new(Some(
+        "Her bir monitörün donanımsal çözünürlüğüne ve panel boyutuna göre bağımsız ölçek belirleyin. Örneğin dizüstü dahili ekranınız %125 iken harici monitörünüz %100 veya %150 olarak çalışabilir.",
+    ));
+    desc_mon.add_css_class("setting-subtext");
+    desc_mon.set_wrap(true);
+    desc_mon.set_halign(gtk4::Align::Start);
+    sec_mon.append(&desc_mon);
+
+    let detected_outputs = get_detected_outputs();
+    for out in detected_outputs {
+        let mon_box = GtkBox::new(Orientation::Vertical, 8);
+        mon_box.set_margin_top(4);
+        mon_box.set_margin_bottom(6);
+
+        let mon_header = GtkBox::new(Orientation::Horizontal, 10);
+        let mon_icon = Image::from_icon_name("video-display");
+        mon_icon.set_pixel_size(24);
+        mon_header.append(&mon_icon);
+
+        let info_box = GtkBox::new(Orientation::Vertical, 2);
+        info_box.set_hexpand(true);
+
+        let name_lbl = Label::new(Some(&format!("{} — {}", out.name, out.description)));
+        name_lbl.add_css_class("setting-label");
+        name_lbl.set_halign(gtk4::Align::Start);
+        info_box.append(&name_lbl);
+
+        let res_lbl = Label::new(Some(&format!("Çözünürlük: {}", out.resolution)));
+        res_lbl.add_css_class("setting-subtext");
+        res_lbl.set_halign(gtk4::Align::Start);
+        info_box.append(&res_lbl);
+        mon_header.append(&info_box);
+
+        // DropDown for this monitor
+        let mon_dd = DropDown::new(Some(StringList::new(&scale_presets)), None::<gtk4::Expression>);
+        let mut mon_sel_idx = 2;
+        for (i, &val) in scale_values.iter().enumerate() {
+            if (out.scale - val).abs() < 0.04 {
+                mon_sel_idx = i as u32;
+                break;
+            }
+        }
+        mon_dd.set_selected(mon_sel_idx);
+        mon_header.append(&mon_dd);
+
+        // Apply button for this monitor
+        let mon_apply = Button::with_label("Uygula");
+        mon_apply.add_css_class("action-btn");
+
+        let out_name = out.name.clone();
+        let mon_dd_clone = mon_dd.clone();
+        let mon_status = Label::new(Some(""));
+        mon_status.add_css_class("setting-subtext");
+        mon_status.set_halign(gtk4::Align::Start);
+        let mon_status_clone = mon_status.clone();
+
+        mon_apply.connect_clicked(move |_| {
+            let idx = mon_dd_clone.selected() as usize;
+            let val = if idx < scale_values.len() {
+                scale_values[idx]
+            } else {
+                1.00
+            };
+            apply_per_output_scale_dynamically(&out_name, val);
+            mon_status_clone.set_text(&format!(
+                "[OK] {} ekranı için {:.2}x bağımsız ölçek uygulandı.",
+                out_name, val
+            ));
+        });
+        mon_header.append(&mon_apply);
+
+        mon_box.append(&mon_header);
+        mon_box.append(&mon_status);
+        sec_mon.append(&mon_box);
+    }
+
+    tab.append(&sec_mon);
     tab
 }
 
@@ -1655,6 +1743,120 @@ pub fn sync_caelestia_scale(_scale: f64) {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct OutputDetails {
+    pub name: String,
+    pub description: String,
+    pub resolution: String,
+    pub scale: f64,
+}
+
+pub fn get_detected_outputs() -> Vec<OutputDetails> {
+    let mut outputs = Vec::new();
+    let cfg = SolarConfig::load();
+
+    if let Ok(out) = Command::new("niri").args(["msg", "--json", "outputs"]).output() {
+        if out.status.success() {
+            if let Ok(val) = serde_json::from_slice::<serde_json::Value>(&out.stdout) {
+                if let Some(obj) = val.as_object() {
+                    for (name, data) in obj {
+                        let make = data.get("make").and_then(|v| v.as_str()).unwrap_or("");
+                        let model = data.get("model").and_then(|v| v.as_str()).unwrap_or("");
+                        let desc = if !make.is_empty() || !model.is_empty() {
+                            format!("{} {}", make, model).trim().to_string()
+                        } else {
+                            "Dahili / Harici Ekran".to_string()
+                        };
+
+                        let mut res_str = "1920x1080 @ 60Hz".to_string();
+                        if let Some(modes) = data.get("modes").and_then(|v| v.as_array()) {
+                            let cur_idx = data.get("current_mode").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+                            if let Some(m) = modes.get(cur_idx).or_else(|| modes.first()) {
+                                let w = m.get("width").and_then(|v| v.as_u64()).unwrap_or(1920);
+                                let h = m.get("height").and_then(|v| v.as_u64()).unwrap_or(1080);
+                                let rr = m.get("refresh_rate").and_then(|v| v.as_u64()).unwrap_or(60000) / 1000;
+                                res_str = format!("{}x{} @ {}Hz", w, h, rr);
+                            }
+                        }
+
+                        let saved_scale = cfg.display.outputs.iter().find(|o| o.name == *name).map(|o| o.scale);
+                        let logical_scale = data.get("logical").and_then(|l| l.get("scale")).and_then(|v| v.as_f64());
+                        let cur_scale = saved_scale.or(logical_scale).unwrap_or(cfg.display.scale);
+
+                        outputs.push(OutputDetails {
+                            name: name.clone(),
+                            description: desc,
+                            resolution: res_str,
+                            scale: cur_scale,
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    if outputs.is_empty() {
+        outputs.push(OutputDetails {
+            name: "Virtual-1".to_string(),
+            description: "Sanal / Varsayılan Ekran".to_string(),
+            resolution: "1920x1080 @ 60Hz".to_string(),
+            scale: cfg.display.scale,
+        });
+    }
+
+    outputs
+}
+
+pub fn apply_per_output_scale_dynamically(output_name: &str, scale: f64) {
+    let scale_str = format!("{:.2}", scale);
+
+    // 1. Run niri msg output <name> scale <scale_str>
+    let _ = Command::new("niri")
+        .args(["msg", "output", output_name, "scale", &scale_str])
+        .status();
+
+    // 2. Persist to ~/.config/solarui/niri.kdl
+    if let Ok(home) = std::env::var("HOME") {
+        let niri_kdl = PathBuf::from(home).join(".config/solarui/niri.kdl");
+        if let Ok(content) = std::fs::read_to_string(&niri_kdl) {
+            let mut new_lines = Vec::new();
+            let mut skip_this_output = false;
+            let target_header = format!("output \"{}\"", output_name);
+
+            for line in content.lines() {
+                if line.trim().starts_with(&target_header) {
+                    skip_this_output = true;
+                    continue;
+                }
+                if skip_this_output {
+                    if line.trim() == "}" {
+                        skip_this_output = false;
+                    }
+                    continue;
+                }
+                new_lines.push(line.to_string());
+            }
+
+            // Append output block with specific scale
+            new_lines.push(format!("\noutput \"{}\" {{\n    scale {}\n}}", output_name, scale_str));
+            let _ = std::fs::write(&niri_kdl, new_lines.join("\n"));
+        }
+    }
+
+    // 3. Update SolarConfig outputs list
+    let mut cfg = SolarConfig::load();
+    if let Some(pos) = cfg.display.outputs.iter().position(|o| o.name == output_name) {
+        cfg.display.outputs[pos].scale = scale;
+    } else {
+        cfg.display.outputs.push(solar_common::MonitorOutputConfig {
+            name: output_name.to_string(),
+            scale,
+            mode: None,
+        });
+    }
+    let _ = cfg.save();
+}
+
 pub fn apply_display_scale_dynamically(scale: f64) {
     let scale_str = format!("{:.2}", scale);
 
@@ -1731,6 +1933,17 @@ pub fn apply_display_scale_dynamically(scale: f64) {
     let mut cfg = SolarConfig::load();
     cfg.display.scale = scale;
     cfg.display.text_scale = scale;
+    for op in &outputs_found {
+        if let Some(pos) = cfg.display.outputs.iter().position(|o| o.name == *op) {
+            cfg.display.outputs[pos].scale = scale;
+        } else {
+            cfg.display.outputs.push(solar_common::MonitorOutputConfig {
+                name: op.clone(),
+                scale,
+                mode: None,
+            });
+        }
+    }
     let _ = cfg.save();
 }
 

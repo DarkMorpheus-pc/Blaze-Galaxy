@@ -15,6 +15,37 @@ LOG="/var/log/blazeos-postinstall.log"
 exec >> "$LOG" 2>&1
 echo "=== Starting BlazeOS Post-Install at $(date) ==="
 
+# 1. Check if Apple-Style OOBE has completed
+if [ ! -f /etc/blazeos-setup-completed ]; then
+    echo "BlazeOS first-boot OOBE pending. Ensuring SDDM 00-blaze-oobe.conf is active..."
+    rm -f /etc/sddm.conf.d/autologin.conf
+
+    # Ensure home directory and permissions for blaze-setup user
+    mkdir -p /var/lib/blaze-setup
+    chown -R 961:961 /var/lib/blaze-setup 2>/dev/null || true
+    chmod 755 /var/lib/blaze-setup 2>/dev/null || true
+    chmod 0440 /etc/sudoers.d/99-blaze-setup 2>/dev/null || true
+
+    mkdir -p /etc/systemd/system
+    mkdir -p /etc/systemd/system/graphical.target.wants
+    mkdir -p /etc/systemd/system/multi-user.target.wants
+    ln -sf /usr/lib/systemd/system/sddm.service /etc/systemd/system/display-manager.service 2>/dev/null || true
+    ln -sf /usr/lib/systemd/system/sddm.service /etc/systemd/system/graphical.target.wants/sddm.service 2>/dev/null || true
+    ln -sf /usr/lib/systemd/system/sddm.service /etc/systemd/system/multi-user.target.wants/display-manager.service 2>/dev/null || true
+    ln -sf /usr/lib/systemd/system/graphical.target /etc/systemd/system/default.target 2>/dev/null || true
+    systemctl set-default graphical.target 2>/dev/null || true
+    systemctl enable sddm.service 2>/dev/null || true
+
+    # If the system is currently in or headed to multi-user.target, switch to graphical.target immediately
+    if ! systemctl is-active --quiet graphical.target; then
+        echo "Activating graphical.target for OOBE..."
+        systemctl isolate --no-block graphical.target 2>/dev/null || systemctl start --no-block sddm.service 2>/dev/null || true
+    fi
+
+    echo "=== OOBE Firstboot Preparation Complete ==="
+    exit 0
+fi
+
 # 1. Resolve Primary Human User or migrate/create fallback
 FIRST_HUMAN_USER=$(awk -F: '$3 >= 1000 && $3 < 65534 && $1 != "liveuser" {print $1; exit}' /etc/passwd)
 
@@ -40,6 +71,19 @@ else
         rm -rf /home/liveuser /var/lib/AccountsService/users/liveuser /etc/sudoers.d/liveuser
     fi
 fi
+
+# Ensure valid hostname and /etc/hosts
+if [ ! -s /etc/hostname ] || grep -qiE '^(localhost|localhost\.localdomain)?$' /etc/hostname 2>/dev/null; then
+    echo "blazeos" > /etc/hostname
+    hostnamectl set-hostname blazeos 2>/dev/null || true
+fi
+if ! grep -q "blazeos" /etc/hosts 2>/dev/null; then
+    cat > /etc/hosts << 'HOSTSEOF'
+127.0.0.1   localhost localhost.localdomain blazeos
+::1         localhost localhost.localdomain blazeos
+HOSTSEOF
+# Ensure setuid permissions for rootless containers & Ptyxis/toolbox instant startup
+chmod 4755 /usr/bin/newuidmap /usr/bin/newgidmap /usr/sbin/newuidmap /usr/sbin/newgidmap 2>/dev/null || true
 
 # 2. Configure SDDM & GDM for Primary Human User
 echo "Ensuring SDDM and display manager configuration for $FIRST_HUMAN_USER..."

@@ -40,6 +40,7 @@ test_screen.ppm
 *.log
 *.tmp
 /tmp/
+audit/
 
 # ============================================================
 # SSH / GPG / credentials (just in case)
@@ -65,6 +66,7 @@ venv/
 # ============================================================
 # Rust / Cargo build artifacts
 # ============================================================
+**/target/
 target/
 Cargo.lock
 

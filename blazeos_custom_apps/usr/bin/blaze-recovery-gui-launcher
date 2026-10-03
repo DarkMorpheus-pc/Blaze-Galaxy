@@ -1,0 +1,75 @@
+#!/bin/bash
+# ==============================================================================
+# BlazeOS Recovery Environment (BERE) GUI Launcher
+# Root olarak DRM direct erişimi ile Niri compositor baslatilir.
+# seatd veya logind gerektirmez: LIBSEAT_BACKEND=direct yeterlidir.
+# Fallback: Weston kiosk. Her ikisi basarisiz olursa metin konsoluna duser.
+# ==============================================================================
+set -euo pipefail
+
+export HOME=/root
+export XDG_RUNTIME_DIR=/run/user/0
+export TERM=linux
+export XDG_SESSION_TYPE=wayland
+# Direct seat yonetimi: root olarak DRM aygitina dogrudan erisim
+export LIBSEAT_BACKEND=direct
+# WebKit sandbox ve dmabuf render: recovery ortaminda gereksiz
+export WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1
+export WEBKIT_DISABLE_DMABUF_RENDERER=1
+export MOZ_ENABLE_WAYLAND=1
+export GDK_BACKEND=wayland
+# Niri: seat grubu kontrolunu atla
+export NIRI_SKIP_SEAT_CHECK=1
+
+# XDG_RUNTIME_DIR hazirla
+mkdir -p /run/user/0
+chmod 0700 /run/user/0
+
+log() {
+    echo "[BERE-GUI] $*" >&2
+}
+
+# DRM aygit dugumunu bekle (maks 6 saniye)
+log "DRM aygiti bekleniyor..."
+for i in $(seq 1 60); do
+    if ls /dev/dri/card* >/dev/null 2>&1; then
+        log "DRM hazir: $(ls /dev/dri/card*)"
+        break
+    fi
+    sleep 0.1
+done
+
+if ! ls /dev/dri/card* >/dev/null 2>&1; then
+    log "UYARI: DRM aygiti bulunamadi, devam ediliyor..."
+fi
+
+# Niri ikilik kontrolu
+NIRI_BIN=""
+for path in /usr/bin/niri /usr/local/bin/niri; do
+    if [ -x "$path" ]; then
+        NIRI_BIN="$path"
+        break
+    fi
+done
+
+# 1. Asil girisim: Niri + LIBSEAT_BACKEND=direct
+if [ -n "$NIRI_BIN" ]; then
+    log "Niri baslatiliyor (LIBSEAT_BACKEND=direct)..."
+    if "$NIRI_BIN" --config /usr/share/berp-recovery/niri-recovery.kdl; then
+        exit 0
+    fi
+    log "Niri cikis kodu: $? -- fallback deneniyor..."
+fi
+
+# 2. Fallback: Weston kiosk modu
+if command -v weston >/dev/null 2>&1; then
+    log "Weston kiosk moduna geciliyor..."
+    if weston --backend=drm-backend.so --shell=kiosk.so --log=/tmp/weston-recovery.log -- /usr/bin/berp-recovery-gui; then
+        exit 0
+    fi
+    log "Weston da basarisiz oldu. Log: /tmp/weston-recovery.log"
+fi
+
+# 3. Hicbiri calismadi: metin konsoluna dus (OnFailure=blaze-recovery.service devreye girer)
+log "HATA: Tum GUI compositor girisimleri basarisiz. Metin konsoluna dusulüyor..."
+exit 1

@@ -1,0 +1,63 @@
+// BlazeOS BERP Recovery GUI - Dedicated Niri Kiosk Configuration
+// OrangeFox-inspired recovery compositor configuration
+
+spawn-at-startup "/usr/bin/berp-recovery-gui"
+
+hotkey-overlay {
+    skip-at-startup
+}
+
+input {
+    keyboard {
+        xkb {
+            layout "tr,us"
+            options "grp:alt_shift_toggle"
+        }
+    }
+    touchpad {
+        tap
+        dwt
+        natural-scroll
+        accel-speed 0.2
+    }
+    mouse {
+        accel-speed 0.0
+    }
+}
+
+output "eDP-1" {
+    scale 1.0
+}
+
+output "Virtual-1" {
+    scale 1.0
+}
+
+layout {
+    gaps 0
+    center-focused-column "always"
+    background-color "#141518"
+
+    default-column-width { proportion 1.0; }
+
+    focus-ring {
+        off
+    }
+    border {
+        off
+    }
+}
+
+window-rule {
+    match app-id=r#"(berp-recovery-gui|python3|firefox|WebKit.*)"#
+    open-maximized true
+    open-fullscreen true
+    geometry-corner-radius 0
+    clip-to-geometry false
+    border {
+        off
+    }
+    focus-ring {
+        off
+    }
+}

@@ -35,6 +35,14 @@ if [ -n "$XDG_SESSION_ID" ]; then
     loginctl activate "$XDG_SESSION_ID" 2>> "$LOG_FILE" || :
 fi
 
+
+# systemd user session ortamini guncelle (niri --session bayragi olmadan calisirken)
+if command -v systemctl >/dev/null 2>&1; then
+    systemctl --user import-environment         XDG_SESSION_TYPE XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP         XDG_RUNTIME_DIR MOZ_ENABLE_WAYLAND QT_QPA_PLATFORM         GDK_BACKEND SDL_VIDEODRIVER ELECTRON_OZONE_PLATFORM_HINT         2>>"$LOG_FILE" || :
+fi
+if command -v dbus-update-activation-environment >/dev/null 2>&1; then
+    dbus-update-activation-environment --all 2>>"$LOG_FILE" || :
+fi
 # Auto-launch Anaconda Welcome Screen / Installer on Live ISO session
 (
     if grep -qE 'rd\.live\.image|root=live:' /proc/cmdline 2>/dev/null || [ -d /run/initramfs/live ]; then

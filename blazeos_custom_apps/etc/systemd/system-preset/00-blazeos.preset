@@ -2,7 +2,6 @@
 enable sddm.service
 enable blaze-sentinel.service
 enable blaze-boot-success.service
-enable blaze-recovery.service
 enable blazeos-postinstall.service
 disable gdm.service
 disable systemd-report-basic.socket

@@ -76,11 +76,21 @@ class QmpClient:
         time.sleep(0.3)
 
     def send_key(self, qcode):
+        if qcode == 'return':
+            qcode = 'ret'
         self.send({
             "execute": "input-send-event",
             "arguments": {
                 "events": [
-                    {"type": "key", "data": {"key": {"type": "qcode", "data": qcode}, "down": True}},
+                    {"type": "key", "data": {"key": {"type": "qcode", "data": qcode}, "down": True}}
+                ]
+            }
+        })
+        time.sleep(0.04)
+        self.send({
+            "execute": "input-send-event",
+            "arguments": {
+                "events": [
                     {"type": "key", "data": {"key": {"type": "qcode", "data": qcode}, "down": False}}
                 ]
             }
@@ -95,6 +105,12 @@ class QmpClient:
                 self.send_key('ret')
             elif ch == '\t':
                 self.send_key('tab')
+            elif ch == '-':
+                self.send_key('minus')
+            elif ch == '.':
+                self.send_key('dot')
+            elif ch == '/':
+                self.send_key('slash')
             else:
                 self.send_key(ch.lower())
             time.sleep(0.08)
@@ -104,10 +120,58 @@ class QmpClient:
             "execute": "input-send-event",
             "arguments": {
                 "events": [
-                    {"type": "key", "data": {"key": {"type": "qcode", "data": mod}, "down": True}},
+                    {"type": "key", "data": {"key": {"type": "qcode", "data": mod}, "down": True}}
+                ]
+            }
+        })
+        time.sleep(0.05)
+        self.send({
+            "execute": "input-send-event",
+            "arguments": {
+                "events": [
                     {"type": "key", "data": {"key": {"type": "qcode", "data": key}, "down": True}},
-                    {"type": "key", "data": {"key": {"type": "qcode", "data": key}, "down": False}},
+                    {"type": "key", "data": {"key": {"type": "qcode", "data": key}, "down": False}}
+                ]
+            }
+        })
+        time.sleep(0.05)
+        self.send({
+            "execute": "input-send-event",
+            "arguments": {
+                "events": [
                     {"type": "key", "data": {"key": {"type": "qcode", "data": mod}, "down": False}}
+                ]
+            }
+        })
+        time.sleep(0.3)
+
+    def send_combo3(self, mod1, mod2, key):
+        self.send({
+            "execute": "input-send-event",
+            "arguments": {
+                "events": [
+                    {"type": "key", "data": {"key": {"type": "qcode", "data": mod1}, "down": True}},
+                    {"type": "key", "data": {"key": {"type": "qcode", "data": mod2}, "down": True}}
+                ]
+            }
+        })
+        time.sleep(0.05)
+        self.send({
+            "execute": "input-send-event",
+            "arguments": {
+                "events": [
+                    {"type": "key", "data": {"key": {"type": "qcode", "data": key}, "down": True}},
+                    {"type": "key", "data": {"key": {"type": "qcode", "data": key}, "down": False}}
+                ]
+            }
+        })
+        time.sleep(0.05)
+        self.send({
+            "execute": "input-send-event",
+            "arguments": {
+                "events": [
+                    {"type": "key", "data": {"key": {"type": "qcode", "data": mod2}, "down": False}},
+                    {"type": "key", "data": {"key": {"type": "qcode", "data": mod1}, "down": False}}
                 ]
             }
         })
@@ -160,6 +224,7 @@ def main():
         "-cpu", "host",
         "-vga", "virtio",
         "-device", "virtio-tablet-pci",
+        "-boot", "order=d",
         "-netdev", "user,id=net0",
         "-device", "virtio-net-pci,netdev=net0",
         "-drive", f"file={DISK_PATH},if=virtio,format=qcow2",
@@ -194,20 +259,35 @@ def main():
 
     # 2. Test Anaconda Installer 7 Steps
     print("\n--- 2. Testing Anaconda Installer Steps ---")
+    time.sleep(3)
+    client.screenshot("qmp_03_anaconda_screen1")
+
     # Step 1: Click Sonraki (412, 745)
-    print("Step 1 (Language/Welcome) -> Clicking Sonraki (412, 745)...")
+    print("Step 1 -> Clicking Sonraki (412, 745)...")
     client.click(412, 745)
     time.sleep(3)
-    client.screenshot("qmp_03_anaconda_step2_datetime")
+    client.screenshot("qmp_03b_anaconda_screen2")
 
     # Step 2: Click Sonraki (412, 745)
-    print("Step 2 (Date/Time) -> Clicking Sonraki (412, 745)...")
+    print("Step 2 -> Clicking Sonraki (412, 745)...")
     client.click(412, 745)
     time.sleep(3)
     client.screenshot("qmp_04_anaconda_step3_de_bootloader")
 
-    # Step 3: System Preferences (DE & Bootloader) -> Click Sonraki (412, 745)
-    print("Step 3 (DE & Bootloader) -> Clicking Sonraki (412, 745)...")
+    # Step 3: System Preferences (DE & Bootloader)
+    print("Step 3 (DE & Bootloader) -> Checking view & scrolling to bootloader cards...")
+    time.sleep(2)
+    client.screenshot("qmp_04_anaconda_step3_de_bootloader")
+    # Click inside the scrollable container and scroll down
+    client.click(550, 400)
+    time.sleep(0.5)
+    for _ in range(8):
+        client.send_key("down")
+        time.sleep(0.1)
+    time.sleep(1)
+    client.screenshot("qmp_04b_anaconda_step3_scroll_bootloader")
+
+    print("Step 3 -> Clicking Sonraki (412, 745)...")
     client.click(412, 745)
     time.sleep(3)
     client.screenshot("qmp_05_anaconda_step4_install_method")
@@ -289,36 +369,96 @@ def main():
     time.sleep(2)
     client.screenshot("qmp_14_gamezone_all_games")
 
-    # Close GameZone
-    client.send_key("esc")
-    time.sleep(2)
-
-    # 4. Test Omnibar (Mod + Space)
-    print("\n--- 4. Testing Solar Omnibar ---")
-    client.send_combo("meta_l", "spc")
-    time.sleep(2)
-    client.screenshot("qmp_15_omnibar_open")
+    # Close GameZone and any opened browser tab
     client.send_key("esc")
     time.sleep(1)
+    client.send_combo("meta_l", "q")
+    time.sleep(1)
 
-    # 5. Test Everyday Desktop Applications
-    # 5.1 Terminal (Mod + Return) & Network Verification
-    print("\n--- 5. Testing Terminal & Network Connectivity ---")
+    # 4. Test Everyday Desktop Applications
+    # 4.1 Terminal (Mod + Return), Network Verification & Clipboard population
+    print("\n--- 4. Testing Terminal & Network Connectivity ---")
     client.send_combo("meta_l", "ret")
     time.sleep(3)
     client.type_text("ip a\n")
     time.sleep(1)
     client.type_text("ping -c 3 1.1.1.1\n")
     time.sleep(4)
+    client.type_text("echo 'BlazeOS Amiral Gemisi Pano Testi' | wl-copy\n")
+    time.sleep(1)
     client.screenshot("qmp_18_terminal_network")
     client.send_combo("meta_l", "q")
     time.sleep(2)
 
-    # 5.2 Settings (Mod + I)
-    print("\n--- 6. Testing SolarUI Settings ---")
-    client.send_combo("meta_l", "i")
+    # 5. Test Omnibar (Mod + Space)
+    print("\n--- 5. Testing Solar Omnibar (Currency, Crypto, Clipboard, BERP) ---")
+    client.send_combo("meta_l", "spc")
+    time.sleep(2)
+    client.screenshot("qmp_15_omnibar_open")
+
+    # 5.1 Currency conversion test
+    print("Testing Omnibar currency conversion: 100 usd to try...")
+    client.type_text("100 usd to try")
+    time.sleep(1.5)
+    client.screenshot("qmp_15a_omnibar_currency")
+
+    # Clear entry
+    for _ in range(25):
+        client.send_key("backspace")
+        time.sleep(0.04)
+
+    # 5.2 Crypto conversion test
+    print("Testing Omnibar crypto conversion: 1 btc to usd...")
+    client.type_text("1 btc to usd")
+    time.sleep(1.5)
+    client.screenshot("qmp_15b_omnibar_crypto")
+
+    # Clear entry
+    for _ in range(25):
+        client.send_key("backspace")
+        time.sleep(0.04)
+
+    # 5.3 Clipboard history test
+    print("Testing Omnibar clipboard history: cb...")
+    client.type_text("cb")
+    time.sleep(1.5)
+    client.screenshot("qmp_15c_omnibar_clipboard")
+
+    # Clear entry
+    for _ in range(10):
+        client.send_key("backspace")
+        time.sleep(0.04)
+
+    # 5.4 BERP system command test
+    print("Testing Omnibar BERP command...")
+    client.type_text("berp")
+    time.sleep(1.5)
+    client.screenshot("qmp_15d_omnibar_berp")
+
+    # Launch BERP recovery console
+    print("Launching BERP via Omnibar (ret)...")
+    client.send_key("ret")
+    time.sleep(4)
+    client.screenshot("qmp_15e_berp_recovery_tui")
+
+    # Close recovery console
+    client.send_combo("meta_l", "q")
+    time.sleep(2)
+
+    # 6. Testing SolarUI Settings & Multi-Monitor Scaling (Mod + Alt + S)
+    print("\n--- 6. Testing SolarUI Settings & Multi-Monitor Scaling (Mod + Alt + S) ---")
+    client.send_combo3("meta_l", "alt", "s")
     time.sleep(3)
     client.screenshot("qmp_19_settings_open")
+
+    # Switch to Ekran & Ölçek tab (tab 2: Ctrl + Page_Down twice)
+    print("Switching to Ekran & Ölçek tab (Ctrl + Page_Down x2)...")
+    client.send_combo("ctrl", "pgdn")
+    time.sleep(1)
+    client.send_combo("ctrl", "pgdn")
+    time.sleep(2)
+    client.screenshot("qmp_19b_settings_display_multi_monitor")
+
     client.send_combo("meta_l", "q")
     time.sleep(2)
 
@@ -350,8 +490,55 @@ def main():
     time.sleep(2)
     client.screenshot("qmp_17_caelestia_right_hover")
 
-    client.move_abs(640, 400)
-    time.sleep(1)
+    # 10. Testing Apple-Style "Hello" Setup Assistant (OOBE)
+    print("\n--- 10. Testing Apple-Style 'Hello' Setup Assistant (OOBE) ---")
+    print("Opening Omnibar for OOBE setup...")
+    client.send_combo("meta_l", "spc")
+    time.sleep(2)
+    client.type_text("oobe")
+    time.sleep(1.5)
+    client.screenshot("qmp_22_omnibar_oobe")
+
+    print("Launching OOBE assistant via Omnibar (ret)...")
+    client.send_key("ret")
+    time.sleep(5)
+    client.screenshot("qmp_23_oobe_hello_animation")
+
+    print("Advancing to Setup Wizard on keypress & click...")
+    client.click(640, 400)
+    time.sleep(0.5)
+    client.send_key("spc")
+    time.sleep(3)
+    client.screenshot("qmp_24_oobe_wizard_step1_lang")
+
+    print("Step 1 -> Next: Region & Timezone...")
+    client.click(980, 700)
+    time.sleep(2)
+    client.screenshot("qmp_25_oobe_wizard_step2_tz")
+
+    print("Step 2 -> Next: User Account & Password...")
+    client.click(980, 700)
+    time.sleep(2)
+    client.screenshot("qmp_26_oobe_wizard_step3_account")
+
+    print("Step 3 -> Next: Desktop Engine & Theme Accents...")
+    client.click(980, 700)
+    time.sleep(2)
+    client.screenshot("qmp_27_oobe_wizard_step4_desktop")
+
+    print("Step 4 -> Next: Acoustic Sensory & Gaming...")
+    client.click(980, 700)
+    time.sleep(2)
+    client.screenshot("qmp_28_oobe_wizard_step5_acoustic")
+
+    print("Step 5 -> Next: Finalization Checklist...")
+    client.click(980, 700)
+    time.sleep(2)
+    client.screenshot("qmp_29_oobe_wizard_step6_checklist")
+
+    print("Closing OOBE assistant window (Mod + Q)...")
+    client.send_combo("meta_l", "q")
+    time.sleep(2)
 
     print("\nAll dogfooding tests complete! Terminating VM...")
     client.close()

@@ -58,7 +58,7 @@ PageBase {
                 icon: "speed"
                 trailingIcon: root.currentEngine === "noctalia" ? "check_circle" : ""
                 onClicked: {
-                    Quickshell.execDetached(["niri", "msg", "action", "spawn", "--", "solar-shell", "switch", "noctalia"]);
+                    Quickshell.execDetached(["solar-shell", "switch", "noctalia"]);
                     engineStatus.running = true;
                 }
             }
@@ -68,7 +68,7 @@ PageBase {
                 icon: "auto_awesome"
                 trailingIcon: root.currentEngine === "caelestia" ? "check_circle" : ""
                 onClicked: {
-                    Quickshell.execDetached(["niri", "msg", "action", "spawn", "--", "solar-shell", "switch", "caelestia"]);
+                    Quickshell.execDetached(["solar-shell", "switch", "caelestia"]);
                     engineStatus.running = true;
                 }
             }
@@ -78,7 +78,7 @@ PageBase {
                 icon: "join_inner"
                 trailingIcon: root.currentEngine === "hybrid" ? "check_circle" : ""
                 onClicked: {
-                    Quickshell.execDetached(["niri", "msg", "action", "spawn", "--", "solar-shell", "switch", "hybrid"]);
+                    Quickshell.execDetached(["solar-shell", "switch", "hybrid"]);
                     engineStatus.running = true;
                 }
             }

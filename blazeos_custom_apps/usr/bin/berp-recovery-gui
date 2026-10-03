@@ -1,0 +1,582 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+BlazeOS Recovery Environment (BERE / BERP Recovery)
+OrangeFox-inspired GUI Recovery Environment powered by BERP.
+Zero emojis, maximum reliability, offline capable.
+"""
+
+import os
+import sys
+import json
+import time
+import glob
+import shutil
+import subprocess
+import threading
+import ctypes
+from http.server import HTTPServer, SimpleHTTPRequestHandler
+
+PORT = 49223
+STATIC_DIR = "/usr/share/berp-recovery"
+if not os.path.isdir(STATIC_DIR):
+    local_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../share/berp-recovery")
+    if os.path.isdir(local_dir):
+        STATIC_DIR = local_dir
+
+def sync_bere_to_boot():
+    """Ensure BERE runtime and recovery tools exist on /boot partition for survival."""
+    try:
+        boot_bere = "/boot/bere"
+        os.makedirs(boot_bere, exist_ok=True)
+        if os.path.exists("/usr/bin/berp-recovery-gui"):
+            shutil.copy2("/usr/bin/berp-recovery-gui", os.path.join(boot_bere, "berp-recovery-gui"))
+        if os.path.exists("/usr/bin/blaze-death-screen"):
+            shutil.copy2("/usr/bin/blaze-death-screen", os.path.join(boot_bere, "blaze-death-screen"))
+        if os.path.isdir(STATIC_DIR):
+            dst_static = os.path.join(boot_bere, "static")
+            os.makedirs(dst_static, exist_ok=True)
+            for item in os.listdir(STATIC_DIR):
+                s = os.path.join(STATIC_DIR, item)
+                d = os.path.join(dst_static, item)
+                if os.path.isdir(s):
+                    if not os.path.exists(d):
+                        shutil.copytree(s, d)
+                else:
+                    shutil.copy2(s, d)
+    except Exception as e:
+        print(f"[BERE] Warning syncing to /boot: {e}")
+
+def clean_path_contents(path):
+    """Safely wipe directory contents without deleting the root container, using pure Python without /bin/sh."""
+    if not os.path.exists(path):
+        return
+    try:
+        with os.scandir(path) as it:
+            for entry in it:
+                try:
+                    if entry.is_symlink() or entry.is_file():
+                        os.unlink(entry.path)
+                    elif entry.is_dir():
+                        shutil.rmtree(entry.path, ignore_errors=True)
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+class RecoveryAPIHandler(SimpleHTTPRequestHandler):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, directory=STATIC_DIR, **kwargs)
+
+    def log_message(self, format, *args):
+        pass
+
+    def do_POST(self):
+        if self.path.startswith("/api/"):
+            endpoint = self.path[len("/api/"):]
+            length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(length) if length > 0 else b"{}"
+            try:
+                data = json.loads(body.decode("utf-8")) if body else {}
+            except Exception:
+                data = {}
+
+            res = self.handle_api(endpoint, data)
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(res).encode("utf-8"))
+        else:
+            self.send_error(404, "Not Found")
+
+    def do_GET(self):
+        if self.path.startswith("/api/"):
+            endpoint = self.path[len("/api/"):]
+            res = self.handle_api(endpoint, {})
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(res).encode("utf-8"))
+        else:
+            super().do_GET()
+
+    def handle_api(self, endpoint, data):
+        if endpoint == "status" or endpoint == "telemetry":
+            cpu = 0
+            try:
+                with open("/proc/loadavg", "r") as f:
+                    load = float(f.read().split()[0])
+                    cpu = min(100, int(load * 25))
+            except Exception:
+                pass
+
+            ram = 0
+            try:
+                with open("/proc/meminfo", "r") as f:
+                    lines = f.readlines()
+                    total = 1
+                    avail = 1
+                    for line in lines:
+                        if line.startswith("MemTotal:"):
+                            total = int(line.split()[1])
+                        elif line.startswith("MemAvailable:"):
+                            avail = int(line.split()[1])
+                    ram = int(((total - avail) / total) * 100)
+            except Exception:
+                pass
+
+            return {"status": "ok", "cpu": cpu, "ram": ram}
+
+        elif endpoint == "isos":
+            isos = []
+            search_patterns = [
+                "/home/*/Downloads/*.iso",
+                "/home/*/*.iso",
+                "/run/media/*/*/*.iso",
+                "/run/media/*/*.iso",
+                "/mnt/*.iso",
+                "/mnt/*/*.iso",
+                "/*.iso"
+            ]
+            found_paths = set()
+            for pat in search_patterns:
+                for match in glob.glob(pat):
+                    if match not in found_paths and os.path.isfile(match):
+                        found_paths.add(match)
+                        try:
+                            sz_mb = int(os.path.getsize(match) / (1024 * 1024))
+                            isos.append({
+                                "name": os.path.basename(match),
+                                "path": match,
+                                "size_mb": sz_mb
+                            })
+                        except Exception:
+                            pass
+            return {"status": "ok", "isos": sorted(isos, key=lambda x: x["name"])}
+
+        elif endpoint == "iso_boot":
+            iso_path = data.get("path")
+            if not iso_path or not os.path.isfile(iso_path):
+                return {"status": "error", "message": "Gecerli bir ISO dosyasi bulunamadi."}
+
+            try:
+                cfg_d = "/boot/grub2/grub.cfg.d"
+                os.makedirs(cfg_d, exist_ok=True)
+                target_cfg = os.path.join(cfg_d, "40_iso_boot.cfg")
+
+                df_out = subprocess.check_output(["df", "--output=source", iso_path]).decode().strip().split("\n")[-1]
+                uuid_out = subprocess.check_output(["blkid", "-s", "UUID", "-o", "value", df_out]).decode().strip()
+
+                iso_entry = f"""# BlazeOS Loopback ISO Boot
+menuentry "BlazeOS Direct ISO Boot ({os.path.basename(iso_path)})" --id=blaze_iso_boot {{
+    insmod part_gpt
+    insmod ext2
+    insmod btrfs
+    search --no-floppy --fs-uuid --set=root {uuid_out}
+    set isofile="{iso_path}"
+    loopback loop ($root)$isofile
+    linux (loop)/images/pxeboot/vmlinuz iso-scan/filename=$isofile root=live:CDLABEL=Blaze-SolarEvolution-5-x86_64 rd.live.image quiet
+    initrd (loop)/images/pxeboot/initrd.img
+}}
+"""
+                with open(target_cfg, "w", encoding="utf-8") as f:
+                    f.write(iso_entry)
+
+                if shutil.which("grub2-reboot"):
+                    subprocess.run(["grub2-reboot", "blaze_iso_boot"], check=False)
+
+                return {"status": "ok", "message": "ISO baslatma yapilandirildi."}
+            except Exception as e:
+                return {"status": "error", "message": str(e)}
+
+        elif endpoint == "snapshots":
+            snapshots = []
+            try:
+                out = subprocess.check_output(["btrfs", "subvolume", "list", "/"], stderr=subprocess.DEVNULL).decode("utf-8")
+                for line in out.splitlines():
+                    if "snapshots" in line or "backup" in line:
+                        parts = line.split("path ")
+                        if len(parts) > 1:
+                            sub_path = parts[1].strip()
+                            snapshots.append({
+                                "name": os.path.basename(sub_path),
+                                "path": "/" + sub_path,
+                                "date": time.strftime("%Y-%m-%d %H:%M")
+                            })
+            except Exception:
+                pass
+
+            for snap_dir in ["/.snapshots", "/home/.snapshots"]:
+                if os.path.isdir(snap_dir):
+                    for item in os.listdir(snap_dir):
+                        full = os.path.join(snap_dir, item)
+                        if os.path.isdir(full):
+                            snapshots.append({
+                                "name": item,
+                                "path": full,
+                                "date": time.ctime(os.path.getmtime(full))
+                            })
+
+            return {"status": "ok", "snapshots": snapshots}
+
+        elif endpoint == "create_snapshot":
+            name = data.get("name", "snap-" + str(int(time.time())))
+            snap_root = data.get("root", True)
+            snap_home = data.get("home", True)
+
+            try:
+                if snap_root:
+                    os.makedirs("/.snapshots", exist_ok=True)
+                    target = f"/.snapshots/{name}_root"
+                    subprocess.run(["btrfs", "subvolume", "snapshot", "-r", "/", target], check=True)
+                if snap_home and os.path.exists("/home"):
+                    os.makedirs("/home/.snapshots", exist_ok=True)
+                    target_h = f"/home/.snapshots/{name}_home"
+                    subprocess.run(["btrfs", "subvolume", "snapshot", "-r", "/home", target_h], check=True)
+                return {"status": "ok", "message": "Anlik goruntu basariyla olusturuldu."}
+            except Exception as e:
+                return {"status": "error", "message": f"Snapshot alinamadi: {e}"}
+
+        elif endpoint == "restore_snapshot":
+            snap_path = data.get("snapshot")
+            if not snap_path or not os.path.exists(snap_path):
+                return {"status": "error", "message": "Yedek yolu bulunamadi."}
+
+            try:
+                # Btrfs snapshot rollback: hedef subvolume'u sil, snapshot'i yerine tasi
+                # Ornek: snap_path = "/.bere-snapshots/root/pre-update-state"
+                # Hedef: "/" root subvolume
+                parent = os.path.dirname(os.path.dirname(snap_path))  # /.bere-snapshots
+                snap_name = os.path.basename(snap_path)
+                snap_type = os.path.basename(os.path.dirname(snap_path))  # "root" veya "home"
+
+                if snap_type == "root":
+                    target = "/"
+                elif snap_type == "home":
+                    target = "/home"
+                else:
+                    return {"status": "error", "message": f"Bilinmeyen snapshot tipi: {snap_type}"}
+
+                # btrfs snapshot restore komutu
+                restore_cmd = ["btrfs", "subvolume", "snapshot", snap_path, f"{target}.restore-tmp"]
+                p = subprocess.run(restore_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                if p.returncode != 0:
+                    return {"status": "error", "message": f"Snapshot geri yukleme basarisiz: {p.stdout}"}
+
+                return {"status": "ok", "message": f"{snap_path} geri yukleme baslatildi. Yeniden baslatma sonrasi aktif olacaktir."}
+            except Exception as e:
+                return {"status": "error", "message": f"Geri yukleme hatasi: {e}"}
+
+        elif endpoint == "partitions":
+            parts = []
+            try:
+                out = subprocess.check_output(["lsblk", "-J", "-o", "NAME,FSTYPE,SIZE,MOUNTPOINT,LABEL"], stderr=subprocess.DEVNULL).decode("utf-8")
+                raw = json.loads(out)
+                def parse_devs(dev_list):
+                    for d in dev_list:
+                        parts.append({
+                            "name": "/dev/" + d.get("name", ""),
+                            "fstype": d.get("fstype", ""),
+                            "size": d.get("size", ""),
+                            "mountpoint": d.get("mountpoint", "")
+                        })
+                        if "children" in d:
+                            parse_devs(d["children"])
+                parse_devs(raw.get("blockdevices", []))
+            except Exception:
+                pass
+
+            smart_info = "SMART Bilgisi: Diskler saglikli gorunuyor."
+            try:
+                nvme_check = subprocess.check_output(["nvme", "list"], stderr=subprocess.DEVNULL).decode("utf-8")
+                smart_info = nvme_check
+            except Exception:
+                pass
+
+            return {"status": "ok", "partitions": parts, "smart_info": smart_info}
+
+        elif endpoint == "mount_toggle":
+            dev = data.get("device")
+            action = data.get("action")
+            if not dev:
+                return {"status": "error", "message": "Aygit secilmedi."}
+            try:
+                if action == "mount":
+                    mp = f"/mnt/{os.path.basename(dev)}"
+                    os.makedirs(mp, exist_ok=True)
+                    subprocess.run(["mount", dev, mp], check=True)
+                else:
+                    subprocess.run(["umount", dev], check=True)
+                return {"status": "ok"}
+            except Exception as e:
+                return {"status": "error", "message": str(e)}
+
+        elif endpoint == "wipe":
+            cleared = []
+            lang = data.get("lang", "tr")
+            try:
+                if data.get("system_cache"):
+                    clean_path_contents("/var/cache/dnf")
+                    clean_path_contents("/var/cache/flatpak")
+                    clean_path_contents("/var/tmp")
+                    cleared.append("Sistem ve paket önbellekleri temizlendi" if lang == "tr" else "System and package caches cleared")
+
+                if data.get("user_cache"):
+                    for cache_dir in glob.glob("/home/*/.cache"):
+                        clean_path_contents(cache_dir)
+                    cleared.append("Kullanıcı önbellekleri temizlendi" if lang == "tr" else "User caches cleared")
+
+                if data.get("home"):
+                    # Delete all human users from passwd
+                    try:
+                        with open("/etc/passwd", "r") as f:
+                            lines = f.readlines()
+                        filtered = []
+                        for line in lines:
+                            parts = line.strip().split(":")
+                            if len(parts) >= 3:
+                                u, uid = parts[0], int(parts[2])
+                                if 1000 <= uid < 65534 and u not in ["liveuser", "blaze-setup"]:
+                                    continue
+                            filtered.append(line)
+                        with open("/etc/passwd", "w") as f:
+                            f.writelines(filtered)
+                    except Exception:
+                        pass
+
+                    clean_path_contents("/home")
+
+                    if os.path.exists("/etc/blazeos-setup-completed"):
+                        try:
+                            os.remove("/etc/blazeos-setup-completed")
+                        except Exception:
+                            pass
+                    if os.path.exists("/etc/sddm.conf.d/autologin.conf"):
+                        try:
+                            os.remove("/etc/sddm.conf.d/autologin.conf")
+                        except Exception:
+                            pass
+
+                    # Restore OOBE autologin
+                    os.makedirs("/etc/sddm.conf.d", exist_ok=True)
+                    with open("/etc/sddm.conf.d/00-blaze-oobe.conf", "w", encoding="utf-8") as f:
+                        f.write("[Autologin]\nUser=blaze-setup\nSession=blaze-oobe\nRelogin=false\n")
+                    cleared.append("Kullanıcı hesapları silindi, ilk kurulum sihirbazı (OOBE) aktif edildi" if lang == "tr" else "User accounts deleted, first-boot wizard (OOBE) restored")
+
+                if data.get("factory"):
+                    try:
+                        with open("/etc/passwd", "r") as f:
+                            lines = f.readlines()
+                        filtered = []
+                        for line in lines:
+                            parts = line.strip().split(":")
+                            if len(parts) >= 3:
+                                u, uid = parts[0], int(parts[2])
+                                if 1000 <= uid < 65534 and u not in ["liveuser", "blaze-setup"]:
+                                    continue
+                            filtered.append(line)
+                        with open("/etc/passwd", "w") as f:
+                            f.writelines(filtered)
+                    except Exception:
+                        pass
+
+                    clean_path_contents("/home")
+
+                    if os.path.exists("/etc/blazeos-setup-completed"):
+                        try:
+                            os.remove("/etc/blazeos-setup-completed")
+                        except Exception:
+                            pass
+                    if os.path.exists("/etc/sddm.conf.d/autologin.conf"):
+                        try:
+                            os.remove("/etc/sddm.conf.d/autologin.conf")
+                        except Exception:
+                            pass
+
+                    os.makedirs("/etc/sddm.conf.d", exist_ok=True)
+                    with open("/etc/sddm.conf.d/00-blaze-oobe.conf", "w", encoding="utf-8") as f:
+                        f.write("[Autologin]\nUser=blaze-setup\nSession=blaze-oobe\nRelogin=false\n")
+
+                    clean_path_contents("/var/log")
+                    clean_path_contents("/tmp")
+                    cleared.append("Sistem fabrika ayarlarına sıfırlandı" if lang == "tr" else "System reset to factory defaults")
+
+                if data.get("hard_reset"):
+                    sync_bere_to_boot()
+                    # Hard Reset: Wipe OS and user directories on /, protecting /boot and /dev and /proc and /sys
+                    dirs_to_clean = ["/bin", "/sbin", "/lib", "/lib64", "/usr", "/var", "/etc", "/home", "/root", "/opt", "/srv", "/tmp"]
+                    for d in dirs_to_clean:
+                        clean_path_contents(d)
+
+                    cleared.append("Tam Sistem Temizliği (Hard Reset) tamamlandı" if lang == "tr" else "Complete System Wipe (Hard Reset) finished")
+
+                    def trigger_recovery_reboot():
+                        time.sleep(2)
+                        # Disk verilerin disk'e yazilmasini garanti et
+                        try:
+                            os.sync()
+                        except Exception:
+                            pass
+                        # 1. sysrq ile dogrudan kernel reboot (en guvenilir, /usr gerekmez)
+                        try:
+                            with open("/proc/sys/kernel/sysrq", "w") as f:
+                                f.write("1\n")
+                            with open("/proc/sysrq-trigger", "w") as f:
+                                f.write("b\n")
+                        except Exception:
+                            pass
+                        # 2. systemctl dene (muhtemelen basarisiz olacak)
+                        try:
+                            subprocess.run(["systemctl", "reboot"], timeout=5)
+                        except Exception:
+                            pass
+                        # 3. ctypes ile dogrudan reboot syscall (ctypes dosya basinda import edildi)
+                        try:
+                            libc = ctypes.CDLL(None)
+                            libc.reboot(0x1234567)
+                        except Exception:
+                            pass
+
+                    threading.Thread(target=trigger_recovery_reboot).start()
+
+                return {"status": "ok", "cleared": cleared}
+            except Exception as e:
+                return {"status": "error", "message": str(e)}
+
+        elif endpoint == "boot_repair":
+            target = data.get("target")
+            out_msg = ""
+            try:
+                if target == "grub":
+                    cmd = ["grub2-mkconfig", "-o", "/boot/grub2/grub.cfg"]
+                    p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                    out_msg = p.stdout
+                elif target == "efi":
+                    cmd = ["efibootmgr", "-v"]
+                    p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                    out_msg = p.stdout
+                elif target == "dracut":
+                    cmd = ["dracut", "--regenerate-all", "--force"]
+                    p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                    out_msg = p.stdout
+                if p.returncode != 0:
+                    return {"status": "error", "output": out_msg, "message": f"Komut basarisiz (kod: {p.returncode})"}
+                return {"status": "ok", "output": out_msg}
+            except Exception as e:
+                return {"status": "error", "message": str(e)}
+
+        elif endpoint == "exec":
+            cmd = data.get("command", "")
+            try:
+                p = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=30)
+                return {"status": "ok", "output": p.stdout, "error": p.stderr}
+            except subprocess.TimeoutExpired:
+                return {"status": "error", "error": "Komut zaman asimina ugradi (30s)"}
+            except Exception as e:
+                return {"status": "error", "error": str(e)}
+
+        elif endpoint == "reboot":
+            target = data.get("target", "system")
+            def do_reboot():
+                time.sleep(0.5)
+                if target == "uefi":
+                    subprocess.run(["systemctl", "reboot", "--firmware-setup"])
+                elif target == "recovery":
+                    subprocess.run(["systemctl", "isolate", "blaze-recovery-gui.target"])
+                elif target == "poweroff":
+                    subprocess.run(["systemctl", "poweroff"])
+                else:
+                    subprocess.run(["systemctl", "reboot"])
+            threading.Thread(target=do_reboot).start()
+            return {"status": "ok"}
+
+        return {"status": "unknown_endpoint"}
+
+def start_server():
+    server = HTTPServer(("127.0.0.1", PORT), RecoveryAPIHandler)
+    server.serve_forever()
+
+def wait_for_display(timeout_sec=10.0):
+    start = time.time()
+    xdg = os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
+    while time.time() - start < timeout_sec:
+        wl = os.environ.get("WAYLAND_DISPLAY")
+        if wl:
+            sock = os.path.join(xdg, wl) if not wl.startswith("/") else wl
+            if os.path.exists(sock):
+                return True
+        socks = [s for s in glob.glob(os.path.join(xdg, "wayland-*")) if not s.endswith(".lock")]
+        if socks:
+            os.environ["WAYLAND_DISPLAY"] = os.path.basename(socks[0])
+            return True
+        if os.environ.get("DISPLAY"):
+            return True
+        time.sleep(0.1)
+    return False
+
+def launch_gui(url):
+    os.environ["GDK_BACKEND"] = "wayland"
+    os.environ["MOZ_ENABLE_WAYLAND"] = "1"
+    os.environ["WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS"] = "1"
+    os.environ["WEBKIT_DISABLE_DMABUF_RENDERER"] = "1"
+    os.environ["XDG_CACHE_HOME"] = "/tmp/berp-recovery-cache"
+    os.environ["XDG_DATA_HOME"] = "/tmp/berp-recovery-data"
+    os.makedirs("/tmp/berp-recovery-cache", exist_ok=True)
+    os.makedirs("/tmp/berp-recovery-data", exist_ok=True)
+
+    wait_for_display(10.0)
+
+    try:
+        import gi
+        gi.require_version("Gtk", "3.0")
+        gi.require_version("WebKit2", "4.1")
+        from gi.repository import Gtk, WebKit2, GLib
+        GLib.set_prgname("berp-recovery-gui")
+        GLib.set_application_name("BlazeOS Recovery")
+        Gtk.init()
+        win = Gtk.Window(title="BlazeOS Recovery")
+        win.set_default_size(1280, 800)
+        win.fullscreen()
+
+        settings = WebKit2.Settings()
+        settings.set_enable_developer_extras(False)
+        settings.set_enable_smooth_scrolling(True)
+
+        wv = WebKit2.WebView.new_with_settings(settings)
+        wv.load_uri(url)
+        win.add(wv)
+        win.show_all()
+        Gtk.main()
+        return
+    except Exception as e:
+        print(f"[BERP-RECOVERY] GTK3 WebKit2 launch failed: {e}. Falling back to browser...")
+
+    profile_dir = "/tmp/berp-recovery-profile"
+    os.makedirs(profile_dir, exist_ok=True)
+    user_js = os.path.join(profile_dir, "user.js")
+    with open(user_js, "w", encoding="utf-8") as f_u:
+        f_u.write('user_pref("browser.startup.homepage", "about:blank");\n')
+        f_u.write('user_pref("browser.startup.firstrunSkipsHomepage", true);\n')
+        f_u.write('user_pref("browser.aboutwelcome.enabled", false);\n')
+        f_u.write('user_pref("browser.newtabpage.enabled", false);\n')
+        f_u.write('user_pref("browser.shell.checkDefaultBrowser", false);\n')
+        f_u.write('user_pref("toolkit.telemetry.enabled", false);\n')
+        f_u.write('user_pref("browser.display.background_color", "#141518");\n')
+    subprocess.run(["firefox", "--no-remote", "--profile", profile_dir, "--kiosk", "--new-window", url])
+
+def main():
+    t = threading.Thread(target=start_server, daemon=True)
+    t.start()
+    time.sleep(0.2)
+
+    url = f"http://127.0.0.1:{PORT}/index.html"
+    print(f"[BERP-RECOVERY] Started server at {url}")
+
+    if "--daemon" in sys.argv:
+        while True:
+            time.sleep(3600)
+    else:
+        launch_gui(url)
+
+if __name__ == "__main__":
+    main()

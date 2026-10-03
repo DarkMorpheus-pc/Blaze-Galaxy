@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BlazeOS Recovery Environment</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="fox-theme">
+    <div class="recovery-app">
+        <!-- Status Bar -->
+        <header class="status-bar">
+            <div class="status-left">
+                <div class="brand-mark">
+                    <svg class="fox-flame" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2c1 3 4 5 4 9a6 6 0 1 1-12 0c0-4 3-6 4-9 1 3 2 4 4 4s1-2 0-4z" fill="#ff6a00" stroke="#ff8533"/>
+                    </svg>
+                    <span class="brand-title">BlazeOS Recovery</span>
+                    <span class="brand-badge">BERP v5</span>
+                </div>
+            </div>
+            <div class="status-center" id="header-status-msg" data-i18n="status_active">Kurtarma Modu Aktif</div>
+            <div class="status-right">
+                <button class="lang-switch-btn" id="btn-lang-toggle" title="Dil Değiştir / Change Language">
+                    <span id="lang-current">TR</span>
+                </button>
+                <div class="telemetry-pill" id="cpu-pill">CPU: <span id="cpu-val">--%</span></div>
+                <div class="telemetry-pill" id="ram-pill">RAM: <span id="ram-val">--%</span></div>
+                <div class="telemetry-pill" id="clock-pill"><span id="clock-val">00:00</span></div>
+            </div>
+        </header>
+
+        <!-- Main Workspace -->
+        <div class="recovery-body">
+            <!-- Sidebar Navigation -->
+            <nav class="nav-rail">
+                <button class="nav-item active" data-tab="tab-install">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    <span data-i18n="nav_install">Yükle (ISO)</span>
+                </button>
+                <button class="nav-item" data-tab="tab-backup">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                    <span data-i18n="nav_backup">Yedekle</span>
+                </button>
+                <button class="nav-item" data-tab="tab-restore">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+                    <span data-i18n="nav_restore">Geri Yükle</span>
+                </button>
+                <button class="nav-item" data-tab="tab-wipe">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                    <span data-i18n="nav_wipe">Sıfırla</span>
+                </button>
+                <button class="nav-item" data-tab="tab-partitions">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+                    <span data-i18n="nav_partitions">Diskler</span>
+                </button>
+                <button class="nav-item" data-tab="tab-boot">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                    <span data-i18n="nav_boot">Önyükleme</span>
+                </button>
+                <button class="nav-item" data-tab="tab-terminal">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                    <span data-i18n="nav_terminal">Terminal</span>
+                </button>
+                <button class="nav-item danger-nav" data-tab="tab-reboot">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+                    <span data-i18n="nav_reboot">Yeniden Başlat</span>
+                </button>
+            </nav>
+
+            <!-- Main Tab View Content -->
+            <main class="tab-content-container">
+                
+                <!-- TAB 1: INSTALL / FLASH ISO (USB-less direct boot) -->
+                <section class="tab-pane active" id="tab-install">
+                    <div class="section-header">
+                        <h2 data-i18n="install_title">USB Olmadan ISO ile Yeniden Kurulum / Güncelleme</h2>
+                        <p class="section-desc" data-i18n="install_desc">Sisteminizdeki veya takılı disklerdeki BlazeOS ISO dosyalarını doğrudan belleğe bağlayarak USB belleğe ihtiyaç duymadan kurulumu başlatabilirsiniz.</p>
+                    </div>
+
+                    <div class="card-grid">
+                        <div class="fox-card col-span-2">
+                            <div class="card-title-row">
+                                <h3 data-i18n="detected_isos">Tespit Edilen ISO Kalıpları</h3>
+                                <button class="fox-btn outline-btn" id="btn-refresh-isos" data-i18n="btn_rescan">Yeniden Tara</button>
+                            </div>
+                            <div class="iso-list-container" id="iso-list">
+                                <div class="empty-hint" data-i18n="scanning_isos">ISO kalıpları taranıyor...</div>
+                            </div>
+                        </div>
+
+                        <div class="fox-card col-span-2" id="iso-action-card" style="display:none;">
+                            <h3 data-i18n="selected_iso_action">Seçili Kalıp İşlemi</h3>
+                            <div class="iso-meta-info" id="selected-iso-meta"></div>
+                            <div class="slider-action-wrapper">
+                                <p class="slider-instruction" data-i18n="slider_iso_desc">Bu kalıbı bir sonraki açılışta doğrudan başlatmak için kaydırın:</p>
+                                <div class="orange-slider-track" id="slider-iso-boot" role="button" tabindex="0">
+                                    <div class="slider-fill"></div>
+                                    <div class="slider-thumb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="9 18 15 12 9 6"/></svg></div>
+                                    <span class="slider-label" data-i18n="slider_iso_label">Kaydırarak ISO ile Başlat</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- TAB 2: BACKUP (Btrfs Snapshots) -->
+                <section class="tab-pane" id="tab-backup">
+                    <div class="section-header">
+                        <h2 data-i18n="backup_title">Sistem ve Kullanıcı Durumu Yedekleme (Btrfs Snapshot)</h2>
+                        <p class="section-desc" data-i18n="backup_desc">Btrfs CoW teknolojisi ile diskinizde saniyeler içinde sıfır gecikmeli kurtarma noktası oluşturun.</p>
+                    </div>
+
+                    <div class="fox-card">
+                        <h3 data-i18n="create_snapshot_title">Yeni Anlık Görüntü (Snapshot) Oluştur</h3>
+                        <div class="input-group">
+                            <label for="backup-name" data-i18n="backup_name_label">Yedek Açıklaması / Adı:</label>
+                            <input type="text" id="backup-name" class="fox-input" placeholder="Orn: guncelleme-oncesi-durum">
+                        </div>
+                        <div class="checkbox-group">
+                            <label class="fox-check"><input type="checkbox" id="chk-backup-root" checked> <span data-i18n="backup_root_label">Sistem Kök Dizini (/)</span></label>
+                            <label class="fox-check"><input type="checkbox" id="chk-backup-home" checked> <span data-i18n="backup_home_label">Kullanıcı Verileri (/home)</span></label>
+                        </div>
+                        <div class="card-actions">
+                            <button class="fox-btn primary-btn" id="btn-create-snapshot" data-i18n="btn_create_snapshot">Anlık Görüntü Al</button>
+                        </div>
+                        <div class="op-status" id="backup-status-text"></div>
+                    </div>
+                </section>
+
+                <!-- TAB 3: RESTORE -->
+                <section class="tab-pane" id="tab-restore">
+                    <div class="section-header">
+                        <h2 data-i18n="restore_title">Sistem Geri Yükleme (Rollback)</h2>
+                        <p class="section-desc" data-i18n="restore_desc">Daha önce oluşturulmuş kurtarma noktalarından birine anında geri dönün.</p>
+                    </div>
+
+                    <div class="fox-card">
+                        <div class="card-title-row">
+                            <h3 data-i18n="restore_points_title">Mevcut Kurtarma Noktaları</h3>
+                            <button class="fox-btn outline-btn" id="btn-refresh-snapshots" data-i18n="btn_refresh_list">Listeyi Yenile</button>
+                        </div>
+                        <div class="snapshot-list-container" id="snapshot-list">
+                            <div class="empty-hint" data-i18n="scanning_snapshots">Yedek noktaları aranıyor...</div>
+                        </div>
+                        <div class="slider-action-wrapper" id="restore-slider-box" style="display:none;">
+                            <p class="slider-instruction" id="restore-target-label" data-i18n="slider_restore_desc">Seçili yedeğe geri dönmek için kaydırın:</p>
+                            <div class="orange-slider-track" id="slider-restore" role="button" tabindex="0">
+                                <div class="slider-fill"></div>
+                                <div class="slider-thumb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="9 18 15 12 9 6"/></svg></div>
+                                <span class="slider-label" data-i18n="slider_restore_label">Kaydırarak Geri Yükle</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- TAB 4: WIPE / FACTORY RESET -->
+                <section class="tab-pane" id="tab-wipe">
+                    <div class="section-header">
+                        <h2 data-i18n="wipe_title">Temizle ve Fabrika Ayarlarına Sıfırla (Wipe)</h2>
+                        <p class="section-desc" data-i18n="wipe_desc">OrangeFox güvenlik mimarisi: Yanlışlıkla silmeyi önleyen sürgü koruması ile önbellekleri temizleyin veya sistemi sıfırlayın.</p>
+                    </div>
+
+                    <div class="fox-card">
+                        <h3 data-i18n="wipe_select_title">Temizlenecek Alanları Seçin</h3>
+                        <div class="wipe-options-list">
+                            <label class="fox-check-card">
+                                <input type="checkbox" id="wipe-cache" checked>
+                                <div class="check-card-info">
+                                    <strong data-i18n="wipe_cache_title">Sistem ve Paket Önbellekleri (/var/cache)</strong>
+                                    <span data-i18n="wipe_cache_desc">DNF, Flatpak ve geçici sistem artıklarını temizler. Kullanıcı dosyalarına dokunmaz.</span>
+                                </div>
+                            </label>
+                            <label class="fox-check-card">
+                                <input type="checkbox" id="wipe-user-cache">
+                                <div class="check-card-info">
+                                    <strong data-i18n="wipe_user_cache_title">Kullanıcı Önbellekleri (~/.cache)</strong>
+                                    <span data-i18n="wipe_user_cache_desc">Tarayıcı ve masaüstü önbelleklerini sıfırlar. Belgeleri ve şifreleri korur.</span>
+                                </div>
+                            </label>
+                            <label class="fox-check-card danger-card">
+                                <input type="checkbox" id="wipe-home">
+                                <div class="check-card-info">
+                                    <strong data-i18n="wipe_home_title">Kullanıcı Hesaplarını ve Verilerini Sıfırla (/home)</strong>
+                                    <span data-i18n="wipe_home_desc">Tüm kullanıcı belgeleri silinir. Sistem ilk kurulum sihirbazına (OOBE) döner.</span>
+                                </div>
+                            </label>
+                            <label class="fox-check-card danger-card">
+                                <input type="checkbox" id="wipe-factory">
+                                <div class="check-card-info">
+                                    <strong data-i18n="wipe_factory_title">Tam Fabrika Sıfırlaması (Format Data / Root Subvolumes)</strong>
+                                    <span data-i18n="wipe_factory_desc">Sistem kökünü ve ayarları tamamen sıfırlar.</span>
+                                </div>
+                            </label>
+                            <label class="fox-check-card ultra-danger-card" id="card-wipe-hard-reset">
+                                <input type="checkbox" id="wipe-hard-reset">
+                                <div class="check-card-info">
+                                    <strong data-i18n="wipe_hard_reset_title">Tam Sistem Temizliği (Hard Reset / Wipe System Data - sudo rm -rf /*)</strong>
+                                    <span data-i18n="wipe_hard_reset_desc">Tüm kök dosya sistemini siler. BERE kurtarma çekirdeği /boot/bere altında korunur. Güvenlik için 'YES' ve parola onayı gerektirir.</span>
+                                </div>
+                            </label>
+                        </div>
+
+                        <div class="slider-action-wrapper danger-slider-wrap">
+                            <p class="slider-instruction danger-text" data-i18n="wipe_slider_warn">Dikkat: Seçilen alanlar kalıcı olarak temizlenecektir.</p>
+                            <div class="orange-slider-track danger-track" id="slider-wipe" role="button" tabindex="0">
+                                <div class="slider-fill danger-fill"></div>
+                                <div class="slider-thumb danger-thumb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="9 18 15 12 9 6"/></svg></div>
+                                <span class="slider-label" data-i18n="wipe_slider_label">Kaydırarak Temizlemeyi Başlat</span>
+                            </div>
+                        </div>
+                        <div class="op-status" id="wipe-status-text"></div>
+                    </div>
+                </section>
+
+                <!-- TAB 5: PARTITIONS & HEALTH -->
+                <section class="tab-pane" id="tab-partitions">
+                    <div class="section-header">
+                        <h2 data-i18n="part_title">Bölüm ve Disk Yönetimi</h2>
+                        <p class="section-desc" data-i18n="part_desc">Bağlama (Mount/Unmount), dosya sistemi onarımı (fsck/scrub) ve disk SMART sağlığı.</p>
+                    </div>
+
+                    <div class="card-grid">
+                        <div class="fox-card col-span-2">
+                            <div class="card-title-row">
+                                <h3 data-i18n="mounted_parts_title">Bağlı ve Algılanan Bölümler</h3>
+                                <button class="fox-btn outline-btn" id="btn-refresh-parts" data-i18n="btn_refresh_parts">Bölümleri Yenile</button>
+                            </div>
+                            <div class="table-wrapper">
+                                <table class="fox-table" id="parts-table">
+                                    <thead>
+                                        <tr>
+                                            <th data-i18n="th_device">Aygıt</th>
+                                            <th data-i18n="th_fs">Dosya Sistemi</th>
+                                            <th data-i18n="th_size">Boyut</th>
+                                            <th data-i18n="th_mount">Bağlama Noktası</th>
+                                            <th data-i18n="th_action">İşlem</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr><td colspan="5" class="text-center" data-i18n="fetching_parts">Disk bilgileri alınıyor...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="fox-card col-span-2">
+                            <h3 data-i18n="smart_title">Disk Sağlığı (SMART / NVMe Health)</h3>
+                            <div class="smart-summary-box" id="smart-summary">
+                                <div data-i18n="analyzing_smart">Disk sağlık verileri analiz ediliyor...</div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- TAB 6: BOOT REPAIR -->
+                <section class="tab-pane" id="tab-boot">
+                    <div class="section-header">
+                        <h2 data-i18n="boot_title">Önyükleme Onarımı (Boot Repair)</h2>
+                        <p class="section-desc" data-i18n="boot_desc">GRUB/Limine yapılandırmasını yeniden oluşturun, EFI girişlerini düzeltin ve çekirdek initramfs kalıbını onarın.</p>
+                    </div>
+
+                    <div class="card-grid">
+                        <div class="fox-card">
+                            <h3 data-i18n="grub_card_title">GRUB / Limine Yeniden Yapılandır</h3>
+                            <p class="card-help" data-i18n="grub_card_desc">/etc/grub.d yapılandırmasını okur, BERP ve normal sistem girişlerini yeniden bağlar.</p>
+                            <button class="fox-btn primary-btn" id="btn-repair-grub" data-i18n="btn_repair_grub">GRUB Yapılandırmasını Onar</button>
+                        </div>
+                        <div class="fox-card">
+                            <h3 data-i18n="efi_card_title">EFI Girişlerini Sıfırla / Onar</h3>
+                            <p class="card-help" data-i18n="efi_card_desc">Anakart UEFI NVRAM tablosuna BlazeOS ve Limine girişlerini yeniden yazar.</p>
+                            <button class="fox-btn primary-btn" id="btn-repair-efi" data-i18n="btn_repair_efi">EFI NVRAM Onarımı</button>
+                        </div>
+                        <div class="fox-card col-span-2">
+                            <h3 data-i18n="dracut_card_title">Dracut Initramfs Yeniden Derle</h3>
+                            <p class="card-help" data-i18n="dracut_card_desc">Tüm kurulu çekirdekler için donanım sürücülerini içeren initramfs imajlarını baştan üretir.</p>
+                            <button class="fox-btn outline-btn" id="btn-repair-dracut" data-i18n="btn_repair_dracut">Tüm Initramfs Kalıplarını Yenile (dracut)</button>
+                        </div>
+                        <div class="fox-card col-span-2" id="boot-repair-log-card">
+                            <h3 data-i18n="repair_log_title">Onarım Günlüğü</h3>
+                            <pre class="fox-console" id="boot-repair-console" data-i18n="waiting_op">İşlem bekleniyor...</pre>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- TAB 7: TERMINAL -->
+                <section class="tab-pane" id="tab-terminal">
+                    <div class="section-header">
+                        <h2 data-i18n="term_title">Root Acil Durum Terminali</h2>
+                        <p class="section-desc" data-i18n="term_desc">Doğrudan root ayrıcalıklarıyla sistem komutlarını çalıştırın.</p>
+                    </div>
+
+                    <div class="fox-card terminal-card">
+                        <div class="terminal-screen" id="term-output">BlazeOS Emergency Root Shell v5 ready.
+Type commands below.
+# </div>
+                        <form class="term-input-row" id="term-form">
+                            <span class="term-prompt">#</span>
+                            <input type="text" id="term-input" class="fox-input" autocomplete="off" spellcheck="false" placeholder="komut girin..." data-i18n-placeholder="term_placeholder">
+                            <button type="submit" class="fox-btn primary-btn" data-i18n="btn_send">Gönder</button>
+                        </form>
+                    </div>
+                </section>
+
+                <!-- TAB 8: REBOOT -->
+                <section class="tab-pane" id="tab-reboot">
+                    <div class="section-header">
+                        <h2 data-i18n="reboot_title">Yeniden Başlat ve Güç Seçenekleri</h2>
+                        <p class="section-desc" data-i18n="reboot_desc">Kurtarma ortamından güvenli çıkış yapın.</p>
+                    </div>
+
+                    <div class="reboot-grid">
+                        <button class="reboot-tile" id="btn-reboot-system">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                            <strong data-i18n="btn_reboot_sys_title">Sistemi Başlat</strong>
+                            <span data-i18n="btn_reboot_sys_desc">BlazeOS normal masaüstüne dön</span>
+                        </button>
+                        <button class="reboot-tile" id="btn-reboot-recovery">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2c1 3 4 5 4 9a6 6 0 1 1-12 0c0-4 3-6 4-9 1 3 2 4 4 4s1-2 0-4z"/></svg>
+                            <strong data-i18n="btn_reboot_rec_title">Kurtarmayı Yeniden Başlat</strong>
+                            <span data-i18n="btn_reboot_rec_desc">BERP Recovery oturumunu tazele</span>
+                        </button>
+                        <button class="reboot-tile" id="btn-reboot-uefi">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/></svg>
+                            <strong data-i18n="btn_reboot_uefi_title">UEFI / BIOS Ayarlarına Git</strong>
+                            <span data-i18n="btn_reboot_uefi_desc">Anakart donanım kurulum ekranına geç</span>
+                        </button>
+                        <button class="reboot-tile danger-tile" id="btn-poweroff">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+                            <strong data-i18n="btn_poweroff_title">Bilgisayarı Kapat</strong>
+                            <span data-i18n="btn_poweroff_desc">Güvenli şekilde sistemi durdur</span>
+                        </button>
+                    </div>
+                </section>
+
+            </main>
+        </div>
+    </div>
+
+    <!-- Hard Reset Safety Confirmation Modal -->
+    <div class="modal-backdrop" id="modal-hard-reset" style="display: none;">
+        <div class="modal-dialog danger-modal">
+            <div class="modal-header">
+                <div class="modal-title-wrap">
+                    <svg class="modal-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                        <line x1="12" y1="9" x2="12" y2="13"/>
+                        <line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                    <h3 data-i18n="modal_hard_reset_title">Kritik Güvenlik Doğrulaması</h3>
+                </div>
+                <button class="modal-close-btn" id="btn-modal-close" aria-label="Kapat">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-warning-text" data-i18n="modal_hard_reset_msg">
+                    Bu işlem geri alınamaz emin misiniz?
+                </p>
+                <p class="modal-subtext" data-i18n="modal_hard_reset_submsg">
+                    Sistem kök dizinindeki (rootfs) tüm dosyalar kalıcı olarak silinecektir. Devam etmek için aşağıdaki kutucuğa tam olarak <strong>YES</strong> yazın ve yetki şifrenizi girin:
+                </p>
+                <div class="modal-field">
+                    <label for="input-hard-reset-confirm" data-i18n="modal_confirm_label">Onaylamak için "YES" yazın:</label>
+                    <input type="text" id="input-hard-reset-confirm" class="fox-input code-input" placeholder="YES" autocomplete="off" spellcheck="false">
+                </div>
+                <div class="modal-field">
+                    <label for="input-hard-reset-pass" data-i18n="modal_pass_label">Yetkili Kullanıcı / Root Şifresi:</label>
+                    <input type="password" id="input-hard-reset-pass" class="fox-input" placeholder="Parola" autocomplete="off">
+                </div>
+                <div class="modal-error" id="modal-error-msg" style="display: none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="fox-btn outline-btn" id="btn-cancel-hard-reset" data-i18n="btn_cancel">İptal</button>
+                <button class="fox-btn danger-btn" id="btn-confirm-hard-reset" data-i18n="btn_confirm_wipe">Onayla ve Kilidi Aç</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

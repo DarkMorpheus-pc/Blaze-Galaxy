@@ -1,0 +1,7 @@
+[Unit]
+Description=BlazeOS Recovery Environment (BERP Recovery - GUI) Target
+Requires=basic.target dbus.service
+Wants=blaze-recovery-gui.service
+Conflicts=rescue.service rescue.target graphical.target
+After=basic.target dbus.service blaze-recovery-gui.service
+AllowIsolate=yes

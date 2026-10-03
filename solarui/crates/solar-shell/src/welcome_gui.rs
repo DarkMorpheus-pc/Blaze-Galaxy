@@ -239,9 +239,12 @@ fn build_welcome_ui(main_loop: glib::MainLoop) {
     });
     bottom_box.append(&check);
 
-    let is_live_installer = std::path::Path::new("/usr/bin/liveinst").exists()
-        || std::path::Path::new("/run/initramfs/live").exists()
-        || std::path::Path::new("/dev/mapper/live-base").exists();
+    let is_live_installer = (std::path::Path::new("/run/initramfs/live").exists()
+        || std::path::Path::new("/dev/mapper/live-base").exists()
+        || std::fs::read_to_string("/proc/cmdline")
+            .map(|c| c.contains("rd.live.image"))
+            .unwrap_or(false))
+        && std::path::Path::new("/usr/bin/liveinst").exists();
 
     if is_live_installer {
         let install_btn = Button::with_label("Sabit Diske Kur (Anaconda)");
@@ -252,9 +255,7 @@ fn build_welcome_ui(main_loop: glib::MainLoop) {
             if let Some(win) = win_weak_inst.upgrade() {
                 win.close();
             }
-            let _ = std::process::Command::new("niri")
-                .args(["msg", "action", "spawn", "--", "/usr/bin/liveinst"])
-                .spawn();
+            let _ = std::process::Command::new("/usr/bin/liveinst").spawn();
             loop_inst.quit();
         });
         bottom_box.append(&install_btn);

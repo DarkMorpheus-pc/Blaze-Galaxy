@@ -72,6 +72,29 @@ async fn main() -> Result<()> {
         )
         .init();
 
+    // Ensure WAYLAND_DISPLAY is resolved from XDG_RUNTIME_DIR if missing
+    if std::env::var("WAYLAND_DISPLAY").is_err() {
+        if let Ok(runtime_dir) = std::env::var("XDG_RUNTIME_DIR") {
+            if let Ok(entries) = std::fs::read_dir(&runtime_dir) {
+                let mut sockets: Vec<String> = entries
+                    .flatten()
+                    .filter_map(|e| {
+                        let name = e.file_name().to_string_lossy().to_string();
+                        if name.starts_with("wayland-") && !name.ends_with(".lock") {
+                            Some(name)
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                sockets.sort();
+                if let Some(last) = sockets.last() {
+                    std::env::set_var("WAYLAND_DISPLAY", last);
+                }
+            }
+        }
+    }
+
     let args: Vec<String> = std::env::args().collect();
     let bin_name = args.get(0).map(|s| s.as_str()).unwrap_or("");
     let default_cmd = if bin_name.ends_with("solar-settings") {
@@ -191,13 +214,22 @@ async fn main() -> Result<()> {
                 tracing::error!("Failed to reconcile shell engine on autostart: {}", e);
             }
 
+            // Start clipboard history daemon (cliphist + wl-paste)
+            std::thread::spawn(|| {
+                let _ = std::process::Command::new("wl-paste")
+                    .args(["--watch", "cliphist", "store"])
+                    .spawn();
+            });
+
             // Start ChromeOS Ash-level Watchdog daemon (auto-recovers shell engines within 3 seconds if crashed)
             let _watchdog_handle = supervisor.start_watchdog_loop();
 
             let cfg = SolarConfig::load();
             let is_live = std::path::Path::new("/run/initramfs/live").exists()
                 || std::path::Path::new("/dev/mapper/live-base").exists()
-                || std::path::Path::new("/usr/bin/liveinst").exists();
+                || std::fs::read_to_string("/proc/cmdline")
+                    .map(|c| c.contains("rd.live.image"))
+                    .unwrap_or(false);
             if cfg.shortcuts_hud.show_at_startup || is_live {
                 std::thread::spawn(|| {
                     std::thread::sleep(std::time::Duration::from_millis(2000));
@@ -421,11 +453,22 @@ async fn main() -> Result<()> {
             Ok(())
         }
         "recovery" => {
-            let _ = std::process::Command::new("blaze-recovery").status();
+            if std::io::IsTerminal::is_terminal(&std::io::stdout()) {
+                let _ = std::process::Command::new("blaze-recovery").status();
+            } else {
+                let _ = std::process::Command::new("ptyxis")
+                    .args(["--", "blaze-recovery"])
+                    .spawn();
+            }
+            Ok(())
+        }
+        "oobe" | "setup" => {
+            let _ = std::process::Command::new("/usr/bin/blaze-setup")
+                .spawn();
             Ok(())
         }
         other => {
-            eprintln!("Unknown command: '{}'. Valid: omnibar, gamezone, route, switch, sync-noctalia, supervisor, run, autostart, settings, welcome, snap, minimize, restore, toggle-taskbar, apps, status, bar, easter-egg, sound, atmosphere, recovery", other);
+            eprintln!("Unknown command: '{}'. Valid: omnibar, gamezone, route, switch, sync-noctalia, supervisor, run, autostart, settings, welcome, snap, minimize, restore, toggle-taskbar, apps, status, bar, easter-egg, sound, atmosphere, recovery, oobe", other);
             Ok(())
         }
     }

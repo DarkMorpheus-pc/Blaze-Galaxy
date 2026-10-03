@@ -2737,12 +2737,7 @@ fn launch_game_entry(game: &GameEntry) {
     let parts: Vec<&str> = game.exec.split_whitespace().collect();
     if let Some(cmd) = parts.get(0) {
         let args = &parts[1..];
-        let _ = Command::new("niri")
-            .arg("msg")
-            .arg("action")
-            .arg("spawn")
-            .arg("--")
-            .arg(cmd)
+        let _ = Command::new(cmd)
             .args(args)
             .spawn();
     }

@@ -75,6 +75,47 @@ impl NoctaliaProvider {
         }
         Vec::new()
     }
+
+    fn cmd(&self) -> tokio::process::Command {
+        let mut cmd = tokio::process::Command::new(&self.binary_path);
+        cmd.env("NOCTALIA_ASSETS_DIR", &self.assets_dir);
+
+        let wayland_disp = if let Ok(d) = std::env::var("WAYLAND_DISPLAY") {
+            Some(d)
+        } else if let Ok(runtime_dir) = std::env::var("XDG_RUNTIME_DIR") {
+            let mut found = None;
+            if let Ok(entries) = std::fs::read_dir(&runtime_dir) {
+                let mut sockets: Vec<String> = entries
+                    .flatten()
+                    .filter_map(|e| {
+                        let name = e.file_name().to_string_lossy().to_string();
+                        if name.starts_with("wayland-") && !name.ends_with(".lock") {
+                            Some(name)
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                sockets.sort();
+                if let Some(last) = sockets.last() {
+                    found = Some(last.clone());
+                }
+            }
+            found
+        } else {
+            None
+        };
+
+        if let Some(d) = wayland_disp {
+            cmd.env("WAYLAND_DISPLAY", d);
+        }
+        if let Ok(s) = std::env::var("XDG_RUNTIME_DIR") {
+            cmd.env("XDG_RUNTIME_DIR", s);
+        }
+        cmd.env("XDG_CURRENT_DESKTOP", "SolarUI");
+        cmd.env("XDG_SESSION_DESKTOP", "SolarUI");
+        cmd
+    }
 }
 
 #[async_trait]
@@ -89,7 +130,7 @@ impl ShellProvider for NoctaliaProvider {
 
     async fn start(&self) -> Result<()> {
         if self.health_check().await.unwrap_or(false) {
-            info!("Noctalia v5 zaten çalışıyor.");
+            info!("Noctalia v5 zaten calisiyor.");
             return Ok(());
         }
 
@@ -98,37 +139,28 @@ impl ShellProvider for NoctaliaProvider {
         }
 
         info!(
-            "Noctalia v5 native kabuğu başlatılıyor: {:?}",
+            "Noctalia v5 native kabugu baslatiliyor: {:?}",
             self.binary_path
         );
 
-        let mut cmd = tokio::process::Command::new(&self.binary_path);
+        let mut cmd = self.cmd();
         cmd.arg("--daemon");
-        cmd.env("NOCTALIA_ASSETS_DIR", &self.assets_dir);
-
-        // Niri/Wayland ortam değişkenlerini aktar
-        if let Ok(d) = std::env::var("WAYLAND_DISPLAY") {
-            cmd.env("WAYLAND_DISPLAY", d);
-        }
-        if let Ok(s) = std::env::var("XDG_RUNTIME_DIR") {
-            cmd.env("XDG_RUNTIME_DIR", s);
-        }
 
         let mut child = cmd.spawn()?;
         tokio::spawn(async move {
             let _ = child.wait().await;
         });
 
-        // Başlatılmasını doğrula (Reconciliation / Guard - VM veya llvmpipe altında 5-8 sn sürebilir)
-        for i in 1..=80 {
-            sleep(Duration::from_millis(100)).await;
+        // Baslatilmasini dogrula (Reconciliation / Guard - aninda tepki icin 20ms yoklama)
+        for i in 1..=500 {
+            sleep(Duration::from_millis(20)).await;
             if self.health_check().await.unwrap_or(false) {
-                info!("Noctalia v5 başarıyla başlatıldı ve doğrulandı ({}ms).", i * 100);
+                info!("Noctalia v5 basariyla baslatildi ve dogrulandi ({}ms).", i * 20);
                 return Ok(());
             }
         }
 
-        bail!("Noctalia v5 başlatılamadı veya zaman aşımına uğradı!");
+        bail!("Noctalia v5 baslatilamadi veya zaman asimina ugradi!");
     }
 
     async fn stop(&self) -> Result<()> {
@@ -137,26 +169,26 @@ impl ShellProvider for NoctaliaProvider {
             return Ok(());
         }
 
-        info!("Noctalia v5 sonlandırılıyor (PID'ler: {:?})...", pids);
+        info!("Noctalia v5 sonlandiriliyor (PID'ler: {:?})...", pids);
 
-        // 1. Aşama: SIGTERM gönder
+        // 1. Asama: SIGTERM gonder
         let _ = tokio::process::Command::new("pkill")
             .args(["-u", &solar_common::current_uid().to_string()])
             .args(["-15", "-x", "noctalia"])
             .checked_status()
             .await;
 
-        // 2. Aşama: Kapanmasını doğrula (en fazla 1.5 saniye)
+        // 2. Asama: Kapanmasini dogrula (en fazla 1.5 saniye)
         for _ in 0..15 {
             sleep(Duration::from_millis(100)).await;
             if self.get_pids().await.is_empty() {
-                info!("Noctalia v5 başarıyla ve temiz bir şekilde kapandı.");
+                info!("Noctalia v5 basariyla ve temiz bir sekilde kapandi.");
                 return Ok(());
             }
         }
 
-        // 3. Aşama: Hala kapanmadıysa SIGKILL ile zorla kapat
-        warn!("Noctalia v5 SIGTERM'e yanıt vermedi, SIGKILL uygulanıyor...");
+        // 3. Asama: Hala kapanmadiysa SIGKILL ile zorla kapat
+        warn!("Noctalia v5 SIGTERM'e yanit vermedi, SIGKILL uygulaniyor...");
         let _ = tokio::process::Command::new("pkill")
             .args(["-u", &solar_common::current_uid().to_string()])
             .args(["-9", "-x", "noctalia"])
@@ -168,7 +200,7 @@ impl ShellProvider for NoctaliaProvider {
             info!("Noctalia v5 zorlanarak temizlendi.");
             Ok(())
         } else {
-            bail!("Noctalia v5 süreçleri sonlandırılamadı!");
+            bail!("Noctalia v5 surecleri sonlandirilamadi!");
         }
     }
 
@@ -176,45 +208,48 @@ impl ShellProvider for NoctaliaProvider {
         if self.get_pids().await.is_empty() {
             return Ok(false);
         }
-        let output = tokio::process::Command::new(&self.binary_path)
-            .args(["msg", "status"])
-            .output_timeout()
-            .await?;
+        let mut cmd = self.cmd();
+        cmd.args(["msg", "status"]);
+        let output = match cmd.output_timeout().await {
+            Ok(o) => o,
+            Err(_) => return Ok(false),
+        };
         if !output.status.success() {
             return Ok(false);
         }
-        let status: serde_json::Value = serde_json::from_slice(&output.stdout)?;
-        Ok(status
-            .get("barVisible")
-            .is_some_and(serde_json::Value::is_boolean))
+        let status: serde_json::Value = match serde_json::from_slice(&output.stdout) {
+            Ok(v) => v,
+            Err(_) => return Ok(false),
+        };
+        Ok(status.is_object())
     }
 
     async fn dispatch(&self, action: ShellAction) -> Result<()> {
-        info!("Noctalia IPC yönlendiriliyor: {:?}", action);
+        info!("Noctalia IPC yonlendiriliyor: {:?}", action);
 
         let res = match action {
-            ShellAction::Launcher => tokio::process::Command::new(&self.binary_path)
+            ShellAction::Launcher => self.cmd()
                 .args(["msg", "panel-toggle", "launcher"])
                 .checked_status()
                 .await
                 .map(|_| ())
                 .map_err(|e| anyhow::anyhow!(e)),
             ShellAction::ControlCenter | ShellAction::Dashboard => {
-                tokio::process::Command::new(&self.binary_path)
+                self.cmd()
                     .args(["msg", "panel-toggle", "control-center"])
                     .checked_status()
                     .await
                     .map(|_| ())
                     .map_err(|e| anyhow::anyhow!(e))
             }
-            ShellAction::Session => tokio::process::Command::new(&self.binary_path)
+            ShellAction::Session => self.cmd()
                 .args(["msg", "panel-toggle", "session"])
                 .checked_status()
                 .await
                 .map(|_| ())
                 .map_err(|e| anyhow::anyhow!(e)),
             ShellAction::Settings => {
-                let status = tokio::process::Command::new(&self.binary_path)
+                let status = self.cmd()
                     .args(["msg", "settings-toggle"])
                     .checked_status()
                     .await;

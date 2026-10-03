@@ -104,7 +104,9 @@ impl SolarShellSupervisor {
         match (desired, actual) {
             (ShellEngine::Noctalia, ActualEngine::Noctalia) => true,
             (ShellEngine::Caelestia, ActualEngine::Caelestia) => true,
-            (ShellEngine::Hybrid, ActualEngine::Noctalia | ActualEngine::Hybrid) => true,
+            // Hybrid modda her iki bilesenin de calisir olmasi gerekir.
+            // Sadece Noctalia calısıyorsa Caelestia cokmus demektir ve onarilmali.
+            (ShellEngine::Hybrid, ActualEngine::Hybrid) => true,
             _ => false,
         }
     }
@@ -137,6 +139,33 @@ impl SolarShellSupervisor {
             loop {
                 // Delay after completion: do not replay missed ticks in a restart storm.
                 tokio::time::sleep(std::time::Duration::from_secs(delay)).await;
+
+                // Anaconda kurulum sureci calısıyorsa shell gecislerini durdur.
+                // Kurulum sırasında health_check geçici basarısız donebilir ve
+                // watchdog'un yanlis engine'e gecmesine yol acar.
+                // /proc dosya sistemi uzerinden kontrol: fork/exec gerektirmez.
+                let anaconda_running = std::path::Path::new("/run/anaconda.pid").exists()
+                    || std::fs::read_dir("/proc")
+                        .map(|entries| {
+                            entries.flatten().any(|e| {
+                                let name = e.file_name();
+                                if name.to_str().map(|s| s.chars().all(|c| c.is_ascii_digit())).unwrap_or(false) {
+                                    std::fs::read_to_string(e.path().join("comm"))
+                                        .map(|c| c.trim() == "anaconda")
+                                        .unwrap_or(false)
+                                } else {
+                                    false
+                                }
+                            })
+                        })
+                        .unwrap_or(false);
+
+                if anaconda_running {
+                    tracing::debug!("Anaconda kurulumu devam ediyor; watchdog shell gecisi askiya alindi.");
+                    delay = 5;
+                    continue;
+                }
+
                 match self.reconcile().await {
                     Ok(()) => delay = 3,
                     Err(e) => {

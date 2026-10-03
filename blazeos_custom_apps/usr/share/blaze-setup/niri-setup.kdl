@@ -1,0 +1,83 @@
+// BlazeOS Setup Assistant - Dedicated Niri Session Configuration
+// Flawless fullscreen presentation before display manager / desktop
+
+spawn-at-startup "/usr/bin/blaze-setup" "--fullscreen"
+
+hotkey-overlay {
+    skip-at-startup
+}
+
+input {
+    keyboard {
+        xkb {
+            layout "tr,tr,us,de,fr"
+            variant ",f,,,"
+            options "grp:alt_shift_toggle"
+        }
+    }
+    touchpad {
+        tap
+        dwt
+        natural-scroll
+        accel-speed 0.2
+    }
+    mouse {
+        accel-speed 0.0
+    }
+}
+
+output "eDP-1" {
+    scale 1.0
+}
+
+output "Virtual-1" {
+    scale 1.0
+}
+
+layout {
+    gaps 0
+    center-focused-column "always"
+    background-color "#0a0c10"
+
+    default-column-width { proportion 1.0; }
+
+    focus-ring {
+        off
+    }
+    border {
+        off
+    }
+}
+
+window-rule {
+    match app-id=r#"(org\.blazeos\.setup|blaze-setup|python3|firefox)"#
+    open-maximized true
+    open-fullscreen true
+    geometry-corner-radius 0
+    clip-to-geometry false
+    border {
+        off
+    }
+    focus-ring {
+        off
+    }
+}
+
+window-rule {
+    match title=r#"^Blaze Setup Assistant"#
+    open-maximized true
+    open-fullscreen true
+    geometry-corner-radius 0
+    clip-to-geometry false
+    border {
+        off
+    }
+    focus-ring {
+        off
+    }
+}
+
+binds {
+    Mod+Shift+E { quit; }
+    Ctrl+Alt+Escape { quit; }
+}

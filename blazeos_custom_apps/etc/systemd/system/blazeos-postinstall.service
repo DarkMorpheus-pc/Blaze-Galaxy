@@ -11,4 +11,4 @@ ExecStart=/usr/local/bin/blazeos-postinstall
 RemainAfterExit=yes
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=multi-user.target graphical.target

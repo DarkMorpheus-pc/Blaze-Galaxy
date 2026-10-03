@@ -25,6 +25,7 @@ pub enum OmnibarItemType {
     App(AppInfo),
     Calculation(String, f64),
     Conversion(String, String),
+    Clipboard(String, String), // raw_entry, decoded_text
     ProcessKill(u32, String),
     SystemAction(String, String, String), // id, label, command
     WebSearch(String, String),            // query, url
@@ -158,7 +159,7 @@ fn build_omnibar_ui(main_loop: glib::MainLoop) {
     // Search input
     let entry = Entry::new();
     entry.add_css_class("omnibar-entry");
-    entry.set_placeholder_text(Some("Komut, uygulama, matematik veya birim ara... (örn: = 25 * 1024, 100 usd in try, kill, game)"));
+    entry.set_placeholder_text(Some("Komut, pano (cb), matematik veya kur/kripto çevir... (örn: cb, 100 usd to try, 1 btc in usd, kill, berp)"));
     root_box.append(&entry);
 
     // Results container
@@ -191,6 +192,7 @@ fn build_omnibar_ui(main_loop: glib::MainLoop) {
 
     // Key event controller for entry
     let key_controller = EventControllerKey::new();
+    key_controller.set_propagation_phase(gtk4::PropagationPhase::Capture);
     let list_weak = list_box.downgrade();
     let win_weak = window.downgrade();
     let items_ref = current_items.clone();
@@ -253,6 +255,51 @@ fn build_omnibar_ui(main_loop: glib::MainLoop) {
         glib::Propagation::Proceed
     });
     entry.add_controller(key_controller);
+
+    // Entry activate handler (Enter key inside GtkEntry)
+    let win_act = window.downgrade();
+    let loop_act = main_loop.clone();
+    let items_act = current_items.clone();
+    let list_act = list_box.downgrade();
+    entry.connect_activate(move |_| {
+        let selected_idx = list_act
+            .upgrade()
+            .and_then(|l| l.selected_row().map(|r| r.index()))
+            .unwrap_or(0);
+
+        let item_opt = items_act
+            .lock()
+            .ok()
+            .and_then(|items| items.get(selected_idx as usize).cloned());
+
+        if let Some(item) = item_opt {
+            execute_omnibar_item(&item);
+            if let Some(win) = win_act.upgrade() {
+                win.close();
+            }
+            loop_act.quit();
+        }
+    });
+
+    // ListBox row click handler
+    let win_row = window.downgrade();
+    let loop_row = main_loop.clone();
+    let items_row = current_items.clone();
+    list_box.connect_row_activated(move |_list, row| {
+        let idx = row.index();
+        let item_opt = items_row
+            .lock()
+            .ok()
+            .and_then(|items| items.get(idx as usize).cloned());
+
+        if let Some(item) = item_opt {
+            execute_omnibar_item(&item);
+            if let Some(win) = win_row.upgrade() {
+                win.close();
+            }
+            loop_row.quit();
+        }
+    });
 
     // Search query update
     let list_clone = list_box.clone();
@@ -326,6 +373,7 @@ fn build_omnibar_ui(main_loop: glib::MainLoop) {
 }
 
 fn execute_omnibar_item(item: &OmnibarItem) {
+    let _ = crate::delight::play_acoustic_feedback("click");
     match &item.item_type {
         OmnibarItemType::App(app) => {
             println!("Launching application: {} ({})", app.name, app.exec);
@@ -333,12 +381,7 @@ fn execute_omnibar_item(item: &OmnibarItem) {
             if let Some(cmd) = parts.next() {
                 // Strip freedesktop %u, %f flags
                 let args: Vec<&str> = parts.filter(|a| !a.starts_with('%')).collect();
-                let _ = Command::new("niri")
-                    .arg("msg")
-                    .arg("action")
-                    .arg("spawn")
-                    .arg("--")
-                    .arg(cmd)
+                let _ = Command::new(cmd)
                     .args(&args)
                     .spawn();
             }
@@ -356,6 +399,60 @@ fn execute_omnibar_item(item: &OmnibarItem) {
             let _ = Command::new("wl-copy").arg(val).spawn();
             let _ = Command::new("notify-send")
                 .args(["-a", "SolarUI Omnibar", "Dönüştürme Panoya Kopyalandı", val])
+                .spawn();
+        }
+        OmnibarItemType::Clipboard(raw_entry, text) => {
+            println!("Copying to clipboard: {}", text);
+            let is_cliphist = raw_entry.split('\t').next().map(|s| s.chars().all(|c| c.is_ascii_digit())).unwrap_or(false);
+            let mut copied = false;
+            if is_cliphist {
+                if let Ok(mut child) = Command::new("cliphist")
+                    .arg("decode")
+                    .stdin(std::process::Stdio::piped())
+                    .stdout(std::process::Stdio::piped())
+                    .spawn()
+                {
+                    use std::io::Write;
+                    if let Some(mut stdin) = child.stdin.take() {
+                        let _ = stdin.write_all(raw_entry.as_bytes());
+                    }
+                    if let Ok(output) = child.wait_with_output() {
+                        if output.status.success() && !output.stdout.is_empty() {
+                            if let Ok(mut copy_proc) = Command::new("wl-copy")
+                                .stdin(std::process::Stdio::piped())
+                                .spawn()
+                            {
+                                if let Some(mut cp_in) = copy_proc.stdin.take() {
+                                    let _ = cp_in.write_all(&output.stdout);
+                                }
+                                let _ = copy_proc.wait();
+                                copied = true;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if !copied {
+                if let Ok(mut copy_proc) = Command::new("wl-copy")
+                    .stdin(std::process::Stdio::piped())
+                    .spawn()
+                {
+                    use std::io::Write;
+                    if let Some(mut cp_in) = copy_proc.stdin.take() {
+                        let _ = cp_in.write_all(text.as_bytes());
+                    }
+                    let _ = copy_proc.wait();
+                }
+            }
+
+            let preview_short = if text.len() > 50 {
+                format!("{}...", &text[..50])
+            } else {
+                text.clone()
+            };
+            let _ = Command::new("notify-send")
+                .args(["-a", "SolarUI Omnibar", "Pano Kopyalandı", &preview_short])
                 .spawn();
         }
         OmnibarItemType::ProcessKill(pid, name) => {
@@ -398,9 +495,107 @@ fn url_encode_query(input: &str) -> String {
     encoded
 }
 
+fn scan_clipboard_items(filter: &str, limit: usize) -> Vec<OmnibarItem> {
+    let mut items = Vec::new();
+    let q_lower = filter.trim().to_lowercase();
+
+    // 1. Try cliphist list
+    if let Ok(out) = Command::new("cliphist").arg("list").output() {
+        if out.status.success() {
+            let s = String::from_utf8_lossy(&out.stdout);
+            for line in s.lines() {
+                if line.trim().is_empty() {
+                    continue;
+                }
+                let parts: Vec<&str> = line.splitn(2, '\t').collect();
+                let (id_str, preview) = if parts.len() == 2 {
+                    (parts[0], parts[1])
+                } else {
+                    ("", line)
+                };
+
+                if q_lower.is_empty() || preview.to_lowercase().contains(&q_lower) {
+                    let title = if preview.len() > 65 {
+                        format!("{}...", &preview[..65])
+                    } else {
+                        preview.to_string()
+                    };
+
+                    let subtitle = if !id_str.is_empty() {
+                        format!("Pano Kaydı #{} • Seçmek için Enter", id_str)
+                    } else {
+                        "Pano Kaydı • Seçmek için Enter".to_string()
+                    };
+
+                    items.push(OmnibarItem {
+                        title,
+                        subtitle,
+                        badge: "PANO".to_string(),
+                        icon_name: Some("edit-paste".to_string()),
+                        item_type: OmnibarItemType::Clipboard(line.to_string(), preview.to_string()),
+                    });
+
+                    if items.len() >= limit {
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. If no items from cliphist, check active clipboard via wl-paste
+    if items.is_empty() {
+        if let Ok(out) = Command::new("wl-paste").output() {
+            if out.status.success() {
+                let text = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                if !text.is_empty() && (q_lower.is_empty() || text.to_lowercase().contains(&q_lower)) {
+                    let title = if text.len() > 65 {
+                        format!("{}...", &text[..65])
+                    } else {
+                        text.clone()
+                    };
+                    items.push(OmnibarItem {
+                        title,
+                        subtitle: "Mevcut Pano İçeriği • Kopyalamak için Enter".to_string(),
+                        badge: "PANO".to_string(),
+                        icon_name: Some("edit-paste".to_string()),
+                        item_type: OmnibarItemType::Clipboard(text.clone(), text),
+                    });
+                }
+            }
+        }
+    }
+
+    items
+}
+
 fn generate_omnibar_items(raw_query: &str, apps: &[AppInfo]) -> Vec<OmnibarItem> {
     let query = raw_query.trim();
     let mut items = Vec::new();
+    let q_lower = query.to_lowercase();
+
+    // 0. Pano Geçmişi (Clipboard History) - cb, pano, clip prefixes
+    let is_clipboard_prefix = q_lower.starts_with("cb") || q_lower.starts_with("pano") || q_lower.starts_with("clip");
+    if is_clipboard_prefix {
+        let filter = if q_lower.starts_with("cb ") {
+            &query[3..]
+        } else if q_lower.starts_with("cb") {
+            &query[2..]
+        } else if q_lower.starts_with("pano ") {
+            &query[5..]
+        } else if q_lower.starts_with("pano") {
+            &query[4..]
+        } else if q_lower.starts_with("clip ") {
+            &query[5..]
+        } else if q_lower.starts_with("clip") {
+            &query[4..]
+        } else {
+            ""
+        };
+
+        let clip_items = scan_clipboard_items(filter, 20);
+        items.extend(clip_items);
+    }
 
     // 1. Math calculation check
     if query.starts_with('=') || query.chars().any(|c| "+-*/^%".contains(c)) && query.chars().any(|c| c.is_ascii_digit()) {
@@ -416,8 +611,8 @@ fn generate_omnibar_items(raw_query: &str, apps: &[AppInfo]) -> Vec<OmnibarItem>
         }
     }
 
-    // 2. Unit & Currency converter check
-    if query.contains(" to ") || query.contains(" in ") {
+    // 2. Unit, Currency & Crypto converter check
+    if query.contains(" to ") || query.contains(" in ") || query.contains("->") || query.chars().any(|c| "$€₺£".contains(c)) || query.split_whitespace().count() == 3 {
         if let Some((title, res_str)) = evaluate_units(query) {
             items.push(OmnibarItem {
                 title,
@@ -446,17 +641,24 @@ fn generate_omnibar_items(raw_query: &str, apps: &[AppInfo]) -> Vec<OmnibarItem>
 
     // 4. System quick actions
     let sys_commands = [
+        ("oobe", "BlazeOS Apple 'Hello' Karşılama ve Kurulum Asistanı", "Dil, bölge, kullanıcı ve masaüstü ilk kurulum sihirbazı", "/usr/bin/blaze-setup", "system-software-install"),
+        ("setup", "İlk Kurulum Asistanı (OOBE)", "Sistem ayarlarını ve kullanıcı tercihlerini yapılandır", "/usr/bin/blaze-setup", "system-software-install"),
         ("game", "Blaze GameZone Tam Ekran Oyun Kabuğu", "Steam Deck / Xbox UI Konsol Modunu Başlat", "solar-shell gamezone", "input-gaming"),
-        ("berp", "Blaze Emergency Recovery Protocol (BERP)", "Kurtarma ve Zaman Makinesi Konsolunu Başlat", "solar-shell recovery", "system-error"),
+        ("berp", "Blaze Emergency Recovery Protocol (BERP)", "Kurtarma ve Zaman Makinesi Konsolunu Başlat", "ptyxis -- blaze-recovery", "system-error"),
+        ("kurtarma", "Blaze Acil Kurtarma ve Zaman Makinesi", "Sistem geri yükleme ve donanım denetim konsolu", "ptyxis -- blaze-recovery", "system-error"),
+        ("konami", "Blaze SolarEvolution Retro Modu (Easter Egg)", "80'ler CRT ve Matrix atmosferini tetikle", "solar-shell konami", "input-gaming"),
+        ("season", "Mevsimsel Atmosfer ve Renk Teması", "Gündönümü ve ekinoks renk tonunu göster", "solar-shell season", "preferences-desktop-wallpaper"),
         ("theme", "Masaüstü Kabuk Motorunu Değiştir", "Noctalia ve Caelestia arasında geçiş yap", "solar-shell switch caelestia", "preferences-desktop-theme"),
-        ("settings", "SolarUI ve Masaüstü Ayarları", "Görev çubuğu, tema ve sistem tercihlerini yönet", "solar-shell settings", "preferences-system"),
+        ("settings", "SolarUI ve Masaüstü Ayarları", "Görev çubuğu, tema, ekran ve sistem tercihlerini yönet", "solar-shell settings", "preferences-system"),
+        ("ekran", "Ekran Çözünürlüğü ve Bağımsız DPI Ölçeği", "Çoklu monitör ve arayüz boyutlandırma ayarları", "solar-shell settings", "video-display"),
+        ("pano", "Pano Geçmişi Yöneticisi", "Kopyalanan metinleri ve panoyu filtrele (cb)", "fuzzel-clipboard", "edit-paste"),
         ("lock", "Ekranı Kilitle", "Oturumu güvenle kilitle", "solar-lock", "system-lock-screen"),
         ("reboot", "Sistemi Yeniden Başlat", "Bilgisayarı baştan başlat", "systemctl reboot", "system-reboot"),
         ("power", "Bilgisayarı Kapat", "Sistemi güvenle kapat", "systemctl poweroff", "system-shutdown"),
     ];
 
     for (cmd_id, title, desc, action, icon) in sys_commands {
-        if query.is_empty() || cmd_id.contains(&query.to_lowercase()) || title.to_lowercase().contains(&query.to_lowercase()) {
+        if query.is_empty() || cmd_id.contains(&q_lower) || title.to_lowercase().contains(&q_lower) {
             items.push(OmnibarItem {
                 title: title.to_string(),
                 subtitle: desc.to_string(),
@@ -488,6 +690,12 @@ fn generate_omnibar_items(raw_query: &str, apps: &[AppInfo]) -> Vec<OmnibarItem>
         if items.len() >= 30 {
             break;
         }
+    }
+
+    // 5.5. Pano geçmişi eşleşmeleri (kullanıcı cb yazmasa bile eşleşenleri göster)
+    if !is_clipboard_prefix && query.len() >= 3 {
+        let clip_matches = scan_clipboard_items(query, 3);
+        items.extend(clip_matches);
     }
 
     // 6. Web and AI Search Integration
@@ -565,34 +773,111 @@ fn evaluate_simple_math(expr: &str) -> Option<f64> {
 }
 
 fn evaluate_units(query: &str) -> Option<(String, String)> {
-    let q = query.to_lowercase();
+    let mut q = query.to_lowercase();
+    // Normalize currency symbols
+    q = q.replace('$', " usd ");
+    q = q.replace('€', " eur ");
+    q = q.replace('₺', " try ");
+    q = q.replace('£', " gbp ");
+
     let parts: Vec<&str> = q.split_whitespace().collect();
-    if parts.len() < 4 {
+    if parts.len() < 3 {
         return None;
     }
 
     let val = parts[0].parse::<f64>().ok()?;
     let from_unit = parts[1];
-    let to_unit = parts[3];
+    let to_unit = if parts.len() >= 4 && (parts[2] == "to" || parts[2] == "in" || parts[2] == "->" || parts[2] == "=") {
+        parts[3]
+    } else if parts.len() == 3 {
+        parts[2]
+    } else {
+        parts[parts.len() - 1]
+    };
 
-    // Currency conversions (standard offline rates)
-    if (from_unit == "usd" || from_unit == "$") && to_unit == "try" {
-        let res = val * 38.5;
-        return Some((format!("{:.2} ₺ TRY", res), format!("{:.2}", res)));
-    }
-    if (from_unit == "eur" || from_unit == "€") && to_unit == "try" {
-        let res = val * 42.0;
-        return Some((format!("{:.2} ₺ TRY", res), format!("{:.2}", res)));
+    // Standard offline conversion rates
+    // Currencies
+    if from_unit == "usd" && to_unit == "try" {
+        let res = val * 38.50;
+        return Some((format!("{:.2} TRY (TL)", res), format!("{:.2}", res)));
     }
     if from_unit == "try" && to_unit == "usd" {
-        let res = val / 38.5;
-        return Some((format!("{:.2} $ USD", res), format!("{:.2}", res)));
+        let res = val / 38.50;
+        return Some((format!("{:.2} USD ($)", res), format!("{:.2}", res)));
+    }
+    if from_unit == "eur" && to_unit == "try" {
+        let res = val * 42.20;
+        return Some((format!("{:.2} TRY (TL)", res), format!("{:.2}", res)));
+    }
+    if from_unit == "try" && to_unit == "eur" {
+        let res = val / 42.20;
+        return Some((format!("{:.2} EUR", res), format!("{:.2}", res)));
+    }
+    if from_unit == "gbp" && to_unit == "try" {
+        let res = val * 49.80;
+        return Some((format!("{:.2} TRY (TL)", res), format!("{:.2}", res)));
+    }
+    if from_unit == "try" && to_unit == "gbp" {
+        let res = val / 49.80;
+        return Some((format!("{:.2} GBP", res), format!("{:.2}", res)));
+    }
+    if from_unit == "eur" && to_unit == "usd" {
+        let res = val * 1.096;
+        return Some((format!("{:.2} USD ($)", res), format!("{:.2}", res)));
+    }
+    if from_unit == "usd" && to_unit == "eur" {
+        let res = val / 1.096;
+        return Some((format!("{:.2} EUR", res), format!("{:.2}", res)));
+    }
+
+    // Crypto
+    if (from_unit == "btc" || from_unit == "bitcoin") && to_unit == "usd" {
+        let res = val * 95000.0;
+        return Some((format!("{:.2} USD ($)", res), format!("{:.2}", res)));
+    }
+    if from_unit == "usd" && (to_unit == "btc" || to_unit == "bitcoin") {
+        let res = val / 95000.0;
+        return Some((format!("{:.6} BTC", res), format!("{:.6}", res)));
+    }
+    if (from_unit == "btc" || from_unit == "bitcoin") && to_unit == "try" {
+        let res = val * 95000.0 * 38.50;
+        return Some((format!("{:.2} TRY (TL)", res), format!("{:.2}", res)));
+    }
+    if (from_unit == "eth" || from_unit == "ethereum") && to_unit == "usd" {
+        let res = val * 2750.0;
+        return Some((format!("{:.2} USD ($)", res), format!("{:.2}", res)));
+    }
+    if from_unit == "usd" && (to_unit == "eth" || to_unit == "ethereum") {
+        let res = val / 2750.0;
+        return Some((format!("{:.5} ETH", res), format!("{:.5}", res)));
+    }
+    if (from_unit == "eth" || from_unit == "ethereum") && to_unit == "try" {
+        let res = val * 2750.0 * 38.50;
+        return Some((format!("{:.2} TRY (TL)", res), format!("{:.2}", res)));
+    }
+    if (from_unit == "sol" || from_unit == "solana") && to_unit == "usd" {
+        let res = val * 190.0;
+        return Some((format!("{:.2} USD ($)", res), format!("{:.2}", res)));
+    }
+    if (from_unit == "sol" || from_unit == "solana") && to_unit == "try" {
+        let res = val * 190.0 * 38.50;
+        return Some((format!("{:.2} TRY (TL)", res), format!("{:.2}", res)));
+    }
+
+    // Precious metals
+    if (from_unit == "gold" || from_unit == "xau" || from_unit == "ons") && to_unit == "usd" {
+        let res = val * 2700.0;
+        return Some((format!("{:.2} USD ($)", res), format!("{:.2}", res)));
+    }
+    if (from_unit == "gold" || from_unit == "altin" || from_unit == "gram") && to_unit == "try" {
+        let res = val * 3350.0;
+        return Some((format!("{:.2} TRY (TL)", res), format!("{:.2}", res)));
     }
 
     // Distance
     if from_unit == "km" && (to_unit == "mi" || to_unit == "miles") {
         let res = val * 0.621371;
-        return Some((format!("{:.2} Miles", res), format!("{:.2}", res)));
+        return Some((format!("{:.2} Mil", res), format!("{:.2}", res)));
     }
     if (from_unit == "mi" || from_unit == "miles") && to_unit == "km" {
         let res = val * 1.60934;
@@ -617,6 +902,10 @@ fn evaluate_units(query: &str) -> Option<(String, String)> {
     if from_unit == "mb" && to_unit == "gb" {
         let res = val / 1024.0;
         return Some((format!("{:.2} GB", res), format!("{:.2}", res)));
+    }
+    if from_unit == "tb" && to_unit == "gb" {
+        let res = val * 1024.0;
+        return Some((format!("{:.0} GB", res), format!("{:.0}", res)));
     }
 
     None
@@ -662,8 +951,16 @@ mod tests {
         assert!(title.contains("TRY"));
         assert_eq!(res, "3850.00");
 
+        let (title_btc, res_btc) = evaluate_units("1 btc to usd").unwrap();
+        assert!(title_btc.contains("USD"));
+        assert_eq!(res_btc, "95000.00");
+
+        let (title_eth, res_eth) = evaluate_units("2 eth to usd").unwrap();
+        assert!(title_eth.contains("USD"));
+        assert_eq!(res_eth, "5500.00");
+
         let (title_km, _) = evaluate_units("50 km in miles").unwrap();
-        assert!(title_km.contains("Miles"));
+        assert!(title_km.contains("Mil"));
 
         let (title_gb, _) = evaluate_units("16 gb in mb").unwrap();
         assert!(title_gb.contains("16384 MB"));

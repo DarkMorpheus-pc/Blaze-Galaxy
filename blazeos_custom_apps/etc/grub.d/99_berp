@@ -1,0 +1,127 @@
+#!/usr/bin/sh
+set -e
+
+prefix="/usr"
+exec_prefix="/usr"
+datarootdir="/usr/share"
+
+if [ -f "$pkgdatadir/grub-mkconfig_lib" ]; then
+  . "$pkgdatadir/grub-mkconfig_lib"
+fi
+
+version_test_gt ()
+{
+  local a=`echo "$1" | sed -e "s/[^-]*-//"`
+  local b=`echo "$2" | sed -e "s/[^-]*-//"`
+  [ "$a" = "$b" ] && return 1
+  local c=`printf '%s\n' "$a" "$b" | sort -V | head -n 1`
+  [ "$c" = "$b" ] && return 0
+  return 1
+}
+
+# En guncel normal cekirdegi bul (0-rescue haric tutulur)
+latest_version=""
+for i in /boot/vmlinuz-* /vmlinuz-* ; do
+  [ -f "$i" ] || continue
+  case "$i" in
+    *0-rescue*) continue ;;
+  esac
+  version=`echo "$i" | sed -e "s/^.*vmlinuz-//"`
+  if [ -z "$latest_version" ] || version_test_gt "$version" "$latest_version"; then
+    latest_version="$version"
+  fi
+done
+
+# Eger normal cekirdek bulunamazsa herhangi bir cekirdege don
+if [ -z "$latest_version" ]; then
+  for i in /boot/vmlinuz-* /vmlinuz-* ; do
+    [ -f "$i" ] || continue
+    version=`echo "$i" | sed -e "s/^.*vmlinuz-//"`
+    latest_version="$version"
+    break
+  done
+fi
+
+if [ -n "$latest_version" ]; then
+  # Root aygitini belirle
+  if [ -z "${LINUX_ROOT_DEVICE}" ]; then
+    if [ -n "${GRUB_DEVICE_UUID}" ]; then
+      LINUX_ROOT_DEVICE="UUID=${GRUB_DEVICE_UUID}"
+    elif [ -n "${GRUB_DEVICE}" ]; then
+      LINUX_ROOT_DEVICE="${GRUB_DEVICE}"
+    fi
+  fi
+
+  # Btrfs subvolume destegi
+  rootsubvol=""
+  case "x$GRUB_FS" in
+    xbtrfs)
+      subvol="`make_system_path_relative_to_its_root / 2>/dev/null || echo ""`"
+      subvol="${subvol#/}"
+      if [ -n "${subvol}" ]; then
+        rootsubvol="rootflags=subvol=${subvol}"
+      fi
+      ;;
+  esac
+
+  # Cekirdek ve initramfs dosya yollari
+  kernel_file=""
+  initrd_file=""
+  if [ -f "/boot/vmlinuz-${latest_version}" ]; then
+    kernel_file="/boot/vmlinuz-${latest_version}"
+  elif [ -f "/vmlinuz-${latest_version}" ]; then
+    kernel_file="/vmlinuz-${latest_version}"
+  fi
+
+  if [ -f "/boot/initramfs-${latest_version}.img" ]; then
+    initrd_file="/boot/initramfs-${latest_version}.img"
+  elif [ -f "/initramfs-${latest_version}.img" ]; then
+    initrd_file="/initramfs-${latest_version}.img"
+  fi
+
+  # /boot bolumu ayri ise relpath hesapla
+  rel_kernel="${kernel_file}"
+  rel_initrd="${initrd_file}"
+  if command -v make_system_path_relative_to_its_root >/dev/null 2>&1; then
+    rel_kernel="`make_system_path_relative_to_its_root "${kernel_file}" 2>/dev/null || echo "${kernel_file}"`"
+    rel_initrd="`make_system_path_relative_to_its_root "${initrd_file}" 2>/dev/null || echo "${initrd_file}"`"
+  fi
+
+  # /boot erisim komutlari
+  boot_device_access=""
+  if [ -n "${GRUB_DEVICE_BOOT}" ] && command -v prepare_grub_to_access_device >/dev/null 2>&1; then
+    boot_device_access="`prepare_grub_to_access_device ${GRUB_DEVICE_BOOT} 2>/dev/null | sed -e "s/^/\t/"`"
+  fi
+
+  # Fallback: eger boot_device_access bos ise UUID ile arama
+  if [ -z "${boot_device_access}" ]; then
+    target_uuid="${GRUB_DEVICE_BOOT_UUID:-${GRUB_DEVICE_UUID}}"
+    if [ -n "${target_uuid}" ]; then
+      boot_device_access="	insmod part_gpt
+	insmod ext2
+	insmod btrfs
+	search --no-floppy --fs-uuid --set=root ${target_uuid}"
+    fi
+  fi
+
+  cat << BERPENTRY
+menuentry "BlazeOS Recovery Environment (BERE - Powered by BERP)" --hotkey space --class recovery --class tool {
+	load_video
+	set gfxpayload=keep
+	insmod gzio
+${boot_device_access}
+	linux ${rel_kernel} root=${LINUX_ROOT_DEVICE} ${rootsubvol} ro quiet rhgb systemd.unit=blaze-recovery-gui.target
+	initrd ${rel_initrd}
+}
+
+menuentry "Blaze Emergency Recovery Protocol (BERP Console - TUI)" --hotkey b --class recovery --class tool {
+	load_video
+	set gfxpayload=keep
+	insmod gzio
+${boot_device_access}
+	linux ${rel_kernel} root=${LINUX_ROOT_DEVICE} ${rootsubvol} ro quiet rhgb console=tty1 systemd.unit=blaze-recovery.target
+	initrd ${rel_initrd}
+}
+BERPENTRY
+fi
+

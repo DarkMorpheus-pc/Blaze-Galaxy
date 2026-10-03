@@ -42,7 +42,7 @@ output "Virtual-1" {
 layout {
     gaps 14
     center-focused-column "never"
-    background-color "transparent" // Required for Noctalia wallpaper & glassmorphism
+    background-color "transparent" // Transparent so Noctalia wallpaper on backdrop is visible
 
     preset-column-widths {
         proportion 0.33333
@@ -209,21 +209,19 @@ window-rule {
     default-window-height { fixed 520; }
 }
 
-// SolarUI Omnibar (Raycast / Spotlight Command Hub)
+// Blaze Setup Assistant Window Rule
 window-rule {
-    match app-id="^solar-omnibar$"
+    match app-id=r#"(org\.blazeos\.setup|blaze-setup)"#
     open-floating true
-    default-column-width { fixed 680; }
-    default-window-height { fixed 460; }
-    geometry-corner-radius 20
-    clip-to-geometry true
+    open-focused true
+    open-fullscreen true
 }
 
-// Blaze GameZone Fullscreen Gaming Shell
 window-rule {
-    match app-id="^solar-gamezone$"
+    match title=r#"^Blaze Setup Assistant"#
+    open-floating true
+    open-focused true
     open-fullscreen true
-    geometry-corner-radius 0
 }
 
 // Steam & Dialog Window Rules
@@ -286,9 +284,7 @@ binds {
     Mod+D     { spawn "solar-shell" "route" "dashboard"; }
 
     // ── SolarUI Panels & Settings (Routed via SolarSurfaceRouter) ──
-    Mod+Space           { spawn "solar-shell" "omnibar"; }
-    Mod+G               { spawn "solar-shell" "gamezone"; }
-    Mod+Alt+K           { spawn "solar-shell" "easter-egg" "konami"; }
+    Mod+Space           { spawn "solar-shell" "route" "launcher"; }
     Mod+S               { spawn "solar-shell" "route" "control-center"; }
     Mod+I               { spawn "solar-shell" "route" "settings"; }
     Mod+Comma           { spawn "noctalia" "msg" "settings-toggle"; }

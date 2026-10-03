@@ -1,0 +1,592 @@
+#!/usr/bin/env python3
+# ==============================================================================
+# BlazeOS Apple-Style "Hello" Setup Assistant Backend & Launcher
+# Strict Zero Emojis • Native Wayland • Pre-SDDM OOBE Service
+# ==============================================================================
+
+import os
+import sys
+import json
+import time
+import socket
+import threading
+import subprocess
+import re
+import glob
+from http.server import HTTPServer, SimpleHTTPRequestHandler
+
+PORT = 49222
+SETUP_DIR = "/usr/share/blaze-setup"
+if not os.path.isdir(SETUP_DIR):
+    local_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../share/blaze-setup"))
+    if os.path.isdir(local_dir):
+        SETUP_DIR = local_dir
+
+COMPLETED_FLAG = "/etc/blazeos-setup-completed"
+
+def privileged_run(cmd, stdin_data=None):
+    if os.getuid() != 0:
+        cmd = ["sudo", "-n"] + cmd
+    if stdin_data:
+        p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        p.communicate(stdin_data)
+        return p.returncode == 0
+    else:
+        return subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
+
+def privileged_write(path, content):
+    if os.getuid() == 0:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(content)
+    else:
+        cmd = ["sudo", "-n", "tee", path]
+        p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        p.communicate(content.encode("utf-8"))
+
+def privileged_read(path):
+    if os.getuid() == 0:
+        if os.path.exists(path):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    return f.read()
+            except Exception:
+                return None
+        return None
+    else:
+        res = subprocess.run(["sudo", "-n", "cat", path], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+        if res.returncode == 0:
+            return res.stdout
+        return None
+
+def privileged_rm(path):
+    if os.getuid() == 0:
+        try:
+            if os.path.exists(path):
+                os.remove(path)
+        except OSError:
+            pass
+    else:
+        subprocess.run(["sudo", "-n", "rm", "-f", path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+class SetupAPIHandler(SimpleHTTPRequestHandler):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, directory=SETUP_DIR, **kwargs)
+
+    def log_message(self, format, *args):
+        # Quiet logging
+        pass
+
+    def do_POST(self):
+        if self.path == "/api/action":
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(content_length).decode("utf-8")
+            try:
+                payload = json.loads(body)
+                action = payload.get("action")
+                data = payload.get("data", {})
+                res = self.handle_action(action, data)
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps(res).encode("utf-8"))
+            except Exception as e:
+                self.send_response(500)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode("utf-8"))
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+    def handle_action(self, action, data):
+        print(f"[BLAZE-SETUP] Executing action: {action}")
+
+        if action == "set_keymap":
+            km = data.get("keymap", "tr")
+            keymap_data = {
+                "tr": {"idx": 0, "xkb_layout": "tr", "xkb_variant": "", "console": "trq"},
+                "tr-f": {"idx": 1, "xkb_layout": "tr", "xkb_variant": "f", "console": "trf"},
+                "us": {"idx": 2, "xkb_layout": "us", "xkb_variant": "", "console": "us"},
+                "de": {"idx": 3, "xkb_layout": "de", "xkb_variant": "", "console": "de"},
+                "fr": {"idx": 4, "xkb_layout": "fr", "xkb_variant": "", "console": "fr"},
+            }
+            info = keymap_data.get(km, keymap_data["tr"])
+            idx = info["idx"]
+
+            # 1. Switch active Niri compositor layout live
+            niri_env = os.environ.copy()
+            if "NIRI_SOCKET" not in niri_env:
+                for pat in ["/run/user/*/niri.*.sock", f"{niri_env.get('XDG_RUNTIME_DIR', '/run/user/1000')}/niri.*.sock"]:
+                    found_socks = glob.glob(pat)
+                    if found_socks:
+                        niri_env["NIRI_SOCKET"] = found_socks[0]
+                        break
+            subprocess.run(["niri", "msg", "action", "switch-layout", str(idx)], env=niri_env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+            # 2. Update system-wide configuration via localectl
+            if info["xkb_variant"]:
+                privileged_run(["localectl", "set-x11-keymap", info["xkb_layout"], "pc105", info["xkb_variant"]])
+            else:
+                privileged_run(["localectl", "set-x11-keymap", info["xkb_layout"], "pc105"])
+            privileged_run(["localectl", "set-keymap", info["console"]])
+
+            return {"status": "ok", "keymap": km, "index": idx}
+
+        elif action == "get_network_status":
+            interfaces = []
+            try:
+                out = subprocess.check_output(["ip", "-j", "addr"], timeout=2).decode("utf-8")
+                links = json.loads(out)
+                for l in links:
+                    name = l.get("ifname", "")
+                    if name == "lo":
+                        continue
+                    state = l.get("operstate", "UNKNOWN").upper()
+                    addr_infos = l.get("addr_info", [])
+                    ipv4 = None
+                    for a in addr_infos:
+                        if a.get("family") == "inet":
+                            ipv4 = a.get("local")
+                            break
+                    is_wifi = name.startswith("wl")
+                    if_type = "wifi" if is_wifi else "ethernet"
+                    interfaces.append({
+                        "name": name,
+                        "type": if_type,
+                        "state": state,
+                        "ip": ipv4 or "",
+                        "connected": state == "UP" and ipv4 is not None
+                    })
+            except Exception as e:
+                print(f"[BLAZE-SETUP] Error reading network status: {e}")
+
+            has_internet = any(i["connected"] for i in interfaces)
+            return {
+                "status": "ok",
+                "interfaces": interfaces,
+                "has_internet": has_internet
+            }
+
+        elif action == "set_timezone":
+            tz = data.get("tz", "Europe/Istanbul")
+            privileged_run(["timedatectl", "set-timezone", tz])
+            return {"status": "ok", "timezone": tz}
+
+        elif action == "play_sound":
+            snd = data.get("sound", "click")
+            # Try solar-shell sound or fallback to freedesktop sounds
+            if subprocess.run(["solar-shell", "sound", snd], stderr=subprocess.DEVNULL).returncode != 0:
+                sound_file = "/usr/share/sounds/freedesktop/stereo/button-pressed.oga"
+                if os.path.exists(sound_file):
+                    subprocess.Popen(["pw-play", sound_file], stderr=subprocess.DEVNULL)
+            return {"status": "ok"}
+
+        elif action == "create_user":
+            username = data.get("username", "blaze").strip().lower()
+            fullname = data.get("fullname", "Blaze").strip()
+            if not fullname:
+                fullname = username.capitalize() if username else "Blaze"
+            hostname = data.get("hostname", "blazeos").strip().lower() or "blazeos"
+            password = data.get("password", "")
+            is_admin = data.get("isAdmin", True)
+
+            if not username:
+                return {"status": "error", "message": "Geçersiz kullanıcı adı"}
+
+            print(f"[BLAZE-SETUP] Creating user: username={username}, fullname={fullname}, hostname={hostname}, admin={is_admin}")
+
+            # 1. Configure hostname and hosts system-wide
+            try:
+                privileged_write("/etc/hostname", f"{hostname}\n")
+                privileged_run(["hostnamectl", "set-hostname", hostname])
+                hosts_content = f"127.0.0.1   localhost localhost.localdomain {hostname}\n::1         localhost localhost.localdomain {hostname}\n"
+                privileged_write("/etc/hosts", hosts_content)
+            except Exception as e:
+                print(f"[BLAZE-SETUP-WARN] Failed to set hostname: {e}")
+
+            # Collect existing groups safely (Fedora 45 may not have storage or certain legacy groups)
+            available_groups = []
+            if is_admin:
+                candidate_groups = ["wheel", "video", "audio", "render", "input"]
+                for g in candidate_groups:
+                    if subprocess.run(["getent", "group", g], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
+                        available_groups.append(g)
+
+            # Check if user already exists
+            check_u = subprocess.run(["id", "-u", username], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            if check_u.returncode != 0:
+                cmd = ["useradd", "-m", "-c", fullname, "-s", "/bin/bash"]
+                if available_groups:
+                    cmd.extend(["-G", ",".join(available_groups)])
+                cmd.append(username)
+                ok = privileged_run(cmd)
+                if not ok:
+                    print(f"[BLAZE-SETUP-ERR] useradd failed for {username}")
+            else:
+                # User already exists, ensure supplementary groups and shell
+                if available_groups:
+                    privileged_run(["usermod", "-aG", ",".join(available_groups), username])
+                privileged_run(["usermod", "-s", "/bin/bash", "-c", fullname, username])
+
+            # Ensure GECOS / Real Name is applied
+            privileged_run(["chfn", "-f", fullname, username])
+            privileged_run(["usermod", "-c", fullname, username])
+
+            # Verify user exists in passwd database
+            verify_u = subprocess.run(["id", "-u", username], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            if verify_u.returncode != 0:
+                return {"status": "error", "message": f"Kullanıcı oluşturulamadı: {username}"}
+
+            # Set password using chpasswd
+            if password:
+                print(f"[BLAZE-SETUP] Setting password for {username} via chpasswd...")
+                p_ok = privileged_run(["chpasswd"], stdin_data=f"{username}:{password}\n".encode("utf-8"))
+                if not p_ok:
+                    print(f"[BLAZE-SETUP-ERR] chpasswd failed for {username}")
+                    return {"status": "error", "message": "Parola ayarlanamadı"}
+                # Ensure account is unlocked
+                privileged_run(["passwd", "-u", username])
+
+            # Ensure user home directory has correct ownership
+            user_home = f"/home/{username}"
+            if os.path.isdir(user_home):
+                privileged_run(["chown", "-R", f"{username}:{username}", user_home])
+
+            # Register with AccountsService immediately
+            try:
+                os.makedirs("/var/lib/AccountsService/users", exist_ok=True)
+                asc_init = f"[User]\nRealName={fullname}\nUserName={username}\nSession=solarui\nSessionType=wayland\nSystemAccount=false\nIcon=/usr/share/icons/hicolor/256x256/apps/solarui.png\n"
+                privileged_write(f"/var/lib/AccountsService/users/{username}", asc_init)
+                privileged_run(["chmod", "0600", f"/var/lib/AccountsService/users/{username}"])
+            except Exception as e:
+                print(f"[BLAZE-SETUP-WARN] AccountsService user write failed: {e}")
+
+            print(f"[BLAZE-SETUP] User {username} ({fullname}@{hostname}) successfully created and configured.")
+            return {"status": "ok", "user": username}
+
+        elif action == "save_desktop_config":
+            username = data.get("username", "blaze").strip().lower()
+            layout = data.get("layout", "noctalia").strip().lower()
+            if layout not in ["noctalia", "caelestia"]:
+                layout = "noctalia"
+            theme = data.get("theme", "solar_amber")
+            appearance = data.get("appearance", "dark").strip().lower()  # "light", "dark", "auto"
+            acoustic = data.get("acoustic", True)
+
+            print(f"[BLAZE-SETUP] Saving desktop config: user={username}, engine={layout}, appearance={appearance}, theme={theme}")
+
+            theme_mode = "light" if appearance == "light" else "dark"
+            gtk_theme = "Adwaita" if appearance == "light" else "Adwaita-dark"
+            color_scheme = "prefer-light" if appearance == "light" else "prefer-dark"
+
+            user_home = f"/home/{username}"
+            if os.path.isdir(user_home):
+                # 1. SolarUI configuration
+                cfg_dir = os.path.join(user_home, ".config/solarui")
+                privileged_run(["mkdir", "-p", cfg_dir])
+
+                cfg_content = f"""# BlazeOS User Configuration
+[shell]
+engine = "{layout}"
+
+[taskbar]
+enabled = false
+theme_mode = "{theme_mode}"
+
+[display]
+scale = 1.0
+
+[branding]
+distro_name = "BlazeOS"
+edition = "SolarEvolution"
+accent = "{theme}"
+
+[acoustic]
+enabled = {str(acoustic).lower()}
+volume = 0.6
+"""
+                privileged_write(os.path.join(cfg_dir, "config.toml"), cfg_content)
+
+                # Ensure niri.kdl in user home
+                user_niri = os.path.join(cfg_dir, "niri.kdl")
+                if not os.path.exists(user_niri):
+                    if os.path.exists("/etc/solarui/niri.kdl"):
+                        privileged_run(["cp", "-a", "/etc/solarui/niri.kdl", user_niri])
+                    elif os.path.exists("/etc/skel/.config/solarui/niri.kdl"):
+                        privileged_run(["cp", "-a", "/etc/skel/.config/solarui/niri.kdl", user_niri])
+
+                # Update niri.kdl keyboard layout to match user's OOBE selection
+                keymap = data.get("keymap", "tr")
+                keymap_niri = {
+                    "tr":   {"layout": "tr,us",  "variant": None},
+                    "tr-f": {"layout": "tr,us",  "variant": "f,"},
+                    "us":   {"layout": "us,tr",  "variant": None},
+                    "de":   {"layout": "de,us",  "variant": None},
+                    "fr":   {"layout": "fr,us",  "variant": None},
+                }
+                niri_km = keymap_niri.get(keymap, keymap_niri["tr"])
+                niri_content = privileged_read(user_niri)
+                if niri_content:
+                    try:
+                        # Replace layout line
+                        niri_content = re.sub(
+                            r'(layout\s+)"[^"]*"',
+                            f'\\1"{niri_km["layout"]}"',
+                            niri_content,
+                            count=1
+                        )
+                        # Handle variant: add or update
+                        if niri_km["variant"]:
+                            if re.search(r'variant\s+"[^"]*"', niri_content):
+                                niri_content = re.sub(
+                                    r'(variant\s+)"[^"]*"',
+                                    f'\\1"{niri_km["variant"]}"',
+                                    niri_content,
+                                    count=1
+                                )
+                            else:
+                                # Add variant line after layout line
+                                niri_content = re.sub(
+                                    r'(layout\s+"[^"]*")',
+                                    f'\\1\n            variant "{niri_km["variant"]}"',
+                                    niri_content,
+                                    count=1
+                                )
+                        else:
+                            # Remove variant line if exists (user chose a layout without variant)
+                            niri_content = re.sub(
+                                r'\n\s*variant\s+"[^"]*"', '',
+                                niri_content,
+                                count=1
+                            )
+                        privileged_write(user_niri, niri_content)
+                        print(f"[BLAZE-SETUP] Updated niri.kdl keyboard: layout={niri_km['layout']}, variant={niri_km['variant']}")
+                    except Exception as e:
+                        print(f"[BLAZE-SETUP-WARN] Failed to update niri.kdl keyboard: {e}")
+
+                # Ensure Noctalia state and configuration
+                noctalia_state = os.path.join(user_home, ".local/state/noctalia")
+                noctalia_cfg = os.path.join(user_home, ".config/noctalia")
+                privileged_run(["mkdir", "-p", noctalia_state, noctalia_cfg])
+                privileged_run(["touch", os.path.join(noctalia_state, ".setup-complete")])
+                if os.path.exists("/etc/skel/.config/noctalia/settings.toml"):
+                    privileged_run(["cp", "-a", "/etc/skel/.config/noctalia/settings.toml", noctalia_cfg])
+                    privileged_run(["cp", "-a", "/etc/skel/.config/noctalia/settings.toml", noctalia_state])
+
+                # Ensure Caelestia skeleton if missing
+                caelestia_cfg = os.path.join(user_home, ".config/quickshell/caelestia")
+                if not os.path.exists(os.path.join(caelestia_cfg, "shell.qml")):
+                    if os.path.exists("/etc/skel/.config/quickshell/caelestia"):
+                        privileged_run(["mkdir", "-p", os.path.join(user_home, ".config/quickshell")])
+                        privileged_run(["cp", "-a", "/etc/skel/.config/quickshell/caelestia", os.path.join(user_home, ".config/quickshell/")])
+
+
+                # 2. GTK 3 & GTK 4 Configuration for User
+                for gtk_ver in ["gtk-3.0", "gtk-4.0"]:
+                    gtk_dir = os.path.join(user_home, f".config/{gtk_ver}")
+                    privileged_run(["mkdir", "-p", gtk_dir])
+                    gtk_ini = f"""[Settings]
+gtk-theme-name={gtk_theme}
+gtk-application-prefer-dark-theme={'false' if appearance == 'light' else 'true'}
+gtk-icon-theme-name=Papirus-Dark
+gtk-font-name=Inter 10
+"""
+                    privileged_write(os.path.join(gtk_dir, "settings.ini"), gtk_ini)
+
+                # 3. User profile env
+                bashrc_path = os.path.join(user_home, ".bashrc")
+                existing_bashrc = privileged_read(bashrc_path) or ""
+                if "GTK_THEME" not in existing_bashrc:
+                    privileged_write(bashrc_path, existing_bashrc + f"\nexport GTK_THEME={gtk_theme}\n")
+
+                # Set user ownership
+                privileged_run(["chown", "-R", f"{username}:{username}", user_home])
+
+            # 4. System-wide dconf override for GNOME/GTK apps & future sessions
+            dconf_dir = "/etc/dconf/db/local.d"
+            privileged_run(["mkdir", "-p", dconf_dir])
+            dconf_content = f"""[org/gnome/desktop/interface]
+color-scheme='{color_scheme}'
+gtk-theme='{gtk_theme}'
+icon-theme='Papirus-Dark'
+"""
+            privileged_write(os.path.join(dconf_dir, "00-blaze-theme"), dconf_content)
+            privileged_run(["dconf", "update"])
+
+            return {"status": "ok"}
+
+        elif action == "finish_setup":
+            username = data.get("username", "blaze").strip().lower()
+            fullname = data.get("fullname", "").strip() or username.capitalize()
+            hostname = data.get("hostname", "blazeos").strip().lower() or "blazeos"
+            autologin = data.get("autologin", False)
+            layout = data.get("layout", "noctalia").strip().lower()
+            if layout not in ["noctalia", "caelestia"]:
+                layout = "noctalia"
+
+            # 1. Mark setup completed
+            setup_info = f"setup_completed_at={time.ctime()}\nusername={username}\nfullname={fullname}\nhostname={hostname}\nlayout={layout}\n"
+            privileged_write(COMPLETED_FLAG, setup_info)
+
+            # 2. Hostname check & ensure
+            if hostname:
+                privileged_write("/etc/hostname", f"{hostname}\n")
+                privileged_run(["hostnamectl", "set-hostname", hostname])
+                hosts_content = f"127.0.0.1   localhost localhost.localdomain {hostname}\n::1         localhost localhost.localdomain {hostname}\n"
+                privileged_write("/etc/hosts", hosts_content)
+
+            # 3. Remove OOBE autologin config
+            privileged_rm("/etc/sddm.conf.d/00-blaze-oobe.conf")
+
+            # 4. Configure user autologin or standard login
+            if autologin and username:
+                autologin_content = f"[Autologin]\nUser={username}\nSession=solarui.desktop\nRelogin=false\n"
+                privileged_write("/etc/sddm.conf.d/autologin.conf", autologin_content)
+            else:
+                privileged_rm("/etc/sddm.conf.d/autologin.conf")
+
+            # 5. Register session with AccountsService so SDDM greeter knows default session and real name
+            if username:
+                asc_content = f"[User]\nRealName={fullname}\nUserName={username}\nSession=solarui\nSessionType=wayland\nSystemAccount=false\nIcon=/usr/share/icons/hicolor/256x256/apps/solarui.png\n"
+                privileged_write(f"/var/lib/AccountsService/users/{username}", asc_content)
+                privileged_run(["chmod", "0600", f"/var/lib/AccountsService/users/{username}"])
+
+                # Update SDDM state so greeter immediately defaults to the new user and solarui
+                state_content = f"[Last]\nSession=solarui.desktop\nUser={username}\n"
+                privileged_write("/var/lib/sddm/state.conf", state_content)
+
+            return {"status": "ok"}
+
+        elif action == "start_desktop":
+            print("[BLAZE-SETUP] Setup finished! Launching desktop session...")
+            # Niri quit -> SDDM display manager oturumun kapatildigini algilar
+            # ve otomatik olarak yeni greeter oturumu acar (restart gerekmez).
+            subprocess.run(["niri", "msg", "action", "quit"], stderr=subprocess.DEVNULL)
+            # Terminate this script after short delay
+            threading.Thread(target=lambda: (time.sleep(0.5), os._exit(0))).start()
+            return {"status": "ok"}
+
+        return {"status": "unknown_action"}
+
+def start_server():
+    server = HTTPServer(("127.0.0.1", PORT), SetupAPIHandler)
+    server.serve_forever()
+
+def wait_for_display(timeout_sec=10.0):
+    start = time.time()
+    while time.time() - start < timeout_sec:
+        wl = os.environ.get("WAYLAND_DISPLAY")
+        disp = os.environ.get("DISPLAY")
+        xdg_runtime = os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
+        if wl:
+            sock_path = os.path.join(xdg_runtime, wl) if not wl.startswith("/") else wl
+            if os.path.exists(sock_path):
+                return True
+        if disp:
+            return True
+        time.sleep(0.1)
+    return False
+
+def launch_firefox_silent(url):
+    profile_dir = "/tmp/blaze-oobe-profile"
+    os.makedirs(profile_dir, exist_ok=True)
+    chrome_dir = os.path.join(profile_dir, "chrome")
+    os.makedirs(chrome_dir, exist_ok=True)
+
+    userchrome_css = os.path.join(chrome_dir, "userChrome.css")
+    with open(userchrome_css, "w", encoding="utf-8") as f:
+        f.write("""
+#navigator-toolbox, #TabsToolbar, #nav-bar { visibility: collapse !important; }
+browser { background-color: #0a0c10 !important; }
+""")
+
+    user_js = os.path.join(profile_dir, "user.js")
+    with open(user_js, "w", encoding="utf-8") as f:
+        f.write("""
+user_pref("toolkit.legacyUserProfileCustomizations.stylesheets", true);
+user_pref("browser.startup.homepage", "about:blank");
+user_pref("browser.startup.firstrunSkipsHomepage", true);
+user_pref("browser.startup.homepage_override.mstone", "ignore");
+user_pref("browser.aboutwelcome.enabled", false);
+user_pref("browser.newtabpage.enabled", false);
+user_pref("browser.shell.checkDefaultBrowser", false);
+user_pref("toolkit.telemetry.enabled", false);
+user_pref("toolkit.telemetry.reportingpolicy.firstRun", false);
+user_pref("browser.rights.3.shown", true);
+user_pref("datareporting.policy.dataSubmissionEnabled", false);
+user_pref("browser.slowStartup.notificationDisabled", true);
+user_pref("browser.tabs.warnOnClose", false);
+user_pref("browser.sessionstore.resume_from_crash", false);
+user_pref("trailhead.firstrun.didSeeAboutWelcome", true);
+user_pref("browser.display.background_color", "#0a0c10");
+""")
+
+    cmd = ["firefox", "--no-remote", "--profile", profile_dir, "--kiosk", "--new-window", url]
+    subprocess.run(cmd)
+
+def launch_gui(url):
+    os.environ["WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS"] = "1"
+    os.environ["WEBKIT_DISABLE_DMABUF_RENDERER"] = "1"
+    os.environ["XDG_CACHE_HOME"] = "/tmp/blaze-setup-cache"
+    os.environ["XDG_DATA_HOME"] = "/tmp/blaze-setup-data"
+    os.makedirs("/tmp/blaze-setup-cache", exist_ok=True)
+    os.makedirs("/tmp/blaze-setup-data", exist_ok=True)
+
+    # Wayland soketi veya X11 hazır olana kadar bekle
+    wait_for_display(10.0)
+
+    # Native GTK3 + WebKit2 4.1 (Stable, zero-lag, instant start)
+    try:
+        import gi
+        gi.require_version("Gtk", "3.0")
+        gi.require_version("WebKit2", "4.1")
+        from gi.repository import Gtk, WebKit2, GLib
+
+        GLib.set_prgname("blaze-setup")
+        GLib.set_application_name("Blaze Setup Assistant")
+
+        Gtk.init()
+        win = Gtk.Window(title="Blaze Setup Assistant")
+        win.set_default_size(1280, 800)
+        win.connect("destroy", Gtk.main_quit)
+        win.fullscreen()
+
+        settings = WebKit2.Settings()
+        settings.set_enable_developer_extras(False)
+        settings.set_enable_smooth_scrolling(True)
+
+        wv = WebKit2.WebView.new_with_settings(settings)
+        wv.load_uri(url)
+        win.add(wv)
+        win.show_all()
+        Gtk.main()
+        return
+    except Exception as e:
+        print(f"[BLAZE-SETUP] GTK3 WebKit2 launch failed: {e}. Falling back to silent browser...")
+
+    # Fallback to silent Firefox kiosk (guaranteed zero splash logos)
+    try:
+        launch_firefox_silent(url)
+    except Exception as e:
+        print(f"[BLAZE-SETUP] Browser launch error: {e}")
+
+
+def main():
+    if "--help" in sys.argv:
+        print("BlazeOS Apple-Style Hello and Setup Assistant")
+        print("Usage: blaze-setup [--fullscreen]")
+        sys.exit(0)
+
+    # Start API server in background
+    srv_thread = threading.Thread(target=start_server, daemon=True)
+    srv_thread.start()
+    time.sleep(0.3)
+
+    target_url = f"http://127.0.0.1:{PORT}/index.html"
+    print(f"[BLAZE-SETUP] Running at {target_url}")
+
+    launch_gui(target_url)
+
+if __name__ == "__main__":
+    main()

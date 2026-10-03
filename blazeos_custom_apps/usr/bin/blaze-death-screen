@@ -1,0 +1,97 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+BlazeOS Screen of Death / Kernel Emergency Guard
+Terminal-based emergency interface for critical system failures.
+Direct hotkey transfer to BERE GUI recovery.
+Zero emojis, maximum reliability.
+"""
+
+import os
+import sys
+import tty
+import termios
+import subprocess
+
+def clear_screen():
+    sys.stdout.write("\033[2J\033[H")
+    sys.stdout.flush()
+
+def get_char():
+    fd = sys.stdin.fileno()
+    old_settings = termios.tcgetattr(fd)
+    try:
+        tty.setraw(fd)
+        ch = sys.stdin.read(1)
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+    return ch
+
+def render_screen():
+    clear_screen()
+    # ANSI Color Escapes
+    RED_BG = "\033[41;37;1m"
+    ORANGE = "\033[38;5;208;1m"
+    CYAN = "\033[36;1m"
+    WHITE = "\033[37;1m"
+    DIM = "\033[37;2m"
+    RESET = "\033[0m"
+
+    banner = f"""
+{RED_BG}                                                                                {RESET}
+{RED_BG}                   BLAZEOS ACIL DURUM PROTOKOLU (BERE / BERP)                   {RESET}
+{RED_BG}                     CRITICAL SYSTEM FAULT / EMERGENCY RECOVERY                 {RESET}
+{RED_BG}                                                                                {RESET}
+
+{WHITE}  [TR] Isletim sistemi baslatilamadi veya kritik bir sistem hatasi olustu.
+  Donaniminiz saglamdir; BERE Kurtarma Ortami ile sistemi onarabilir,
+  yedekten geri yukleyebilir veya dogrudan kurulum yapabilirsiniz.
+
+  [EN] The operating system failed to start or a critical error occurred.
+  Your hardware is intact. You can repair, restore, or reinstall
+  using the BERE Recovery Environment.
+{RESET}
+{DIM}  ----------------------------------------------------------------------------{RESET}
+{ORANGE}    [ ENTER ]  : BlazeOS Recovery Environment (BERE - GUI Kurtarma Ortami){RESET}
+{CYAN}    [ R ]      : Sistemi Yeniden Baslat / Reboot System{RESET}
+{WHITE}    [ S ]      : Acil Durum Konsolu / Emergency Root Shell{RESET}
+{DIM}  ----------------------------------------------------------------------------{RESET}
+
+  Lutfen bir secim yapin [ENTER / R / S]: """
+
+    sys.stdout.write(banner)
+    sys.stdout.flush()
+
+def main():
+    try:
+        render_screen()
+        while True:
+            c = get_char()
+            if c in ['\r', '\n']:
+                # Launch BERE GUI Recovery
+                clear_screen()
+                sys.stdout.write("\033[38;5;208m[BERE] BlazeOS Recovery Environment baslatiliyor...\033[0m\n")
+                sys.stdout.flush()
+                subprocess.run(["systemctl", "isolate", "blaze-recovery-gui.target"])
+                break
+            elif c in ['r', 'R']:
+                clear_screen()
+                sys.stdout.write("\033[36m[BERE] Sistem yeniden baslatiliyor...\033[0m\n")
+                sys.stdout.flush()
+                subprocess.run(["systemctl", "reboot"])
+                break
+            elif c in ['s', 'S']:
+                clear_screen()
+                sys.stdout.write("\033[37m[BERE] Acil durum root kabuguna geciliyor...\033[0m\n")
+                sys.stdout.flush()
+                if os.path.exists("/usr/bin/bash"):
+                    subprocess.run(["/usr/bin/bash"])
+                else:
+                    subprocess.run(["/bin/sh"])
+                render_screen()
+    except Exception as e:
+        sys.stderr.write(f"Death screen error: {e}\n")
+        subprocess.run(["systemctl", "isolate", "blaze-recovery-gui.target"])
+
+if __name__ == "__main__":
+    main()

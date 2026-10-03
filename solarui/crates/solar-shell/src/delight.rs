@@ -10,7 +10,7 @@ use std::process::Command;
 pub fn trigger_easter_egg(egg_type: &str) -> Result<()> {
     match egg_type {
         "konami" | "crt" => {
-            println!("🎮 [KONAMI CODE DETECTED] Blaze SolarEvolution Retro Mode Activated!");
+            println!("[KONAMI] [KONAMI CODE DETECTED] Blaze SolarEvolution Retro Mode Activated!");
 
             // 1. Play retro acoustic chime
             let _ = play_acoustic_feedback("easter-egg");
@@ -21,8 +21,8 @@ pub fn trigger_easter_egg(egg_type: &str) -> Result<()> {
                     "-a", "SolarUI Delight",
                     "-i", "input-gaming",
                     "-u", "critical",
-                    "🎮 Konami Kodu Devrede!",
-                    "Tebrikler! Blaze SolarEvolution 80'ler Retro CRT & Matrix Modunu Keşfettiniz.\n(↑ ↑ ↓ ↓ ← → ← → B A)",
+                    "[KONAMI] Konami Kodu Devrede!",
+                    "Tebrikler! Blaze SolarEvolution 80'ler Retro CRT & Matrix Modunu Keşfettiniz.\n(Yukari Yukari Asagi Asagi Sol Sag Sol Sag B A)",
                 ])
                 .status();
 
@@ -42,7 +42,7 @@ pub fn trigger_easter_egg(egg_type: &str) -> Result<()> {
                 .args([
                     "-a", "SolarUI Physics",
                     "-i", "preferences-desktop-display",
-                    "🌌 Solar Gravity Modu",
+                    "[GRAVITY] Solar Gravity Modu",
                     "Pencere yay fiziği ve elastik lastikleme (rubber-banding) maksimum ivmeye ayarlandı!",
                 ])
                 .status();

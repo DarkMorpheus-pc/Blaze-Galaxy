@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BlazeOS Setup Assistant</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="theme-dark">
+    <!-- 1. High Performance Zero-Lag Fluid Aurora Mesh Background -->
+    <div class="aurora-bg"></div>
+
+    <!-- 2. Apple-Style Cursive "Hello" Screen -->
+    <div id="hello-screen">
+        <div class="svg-stage" id="svg-stage">
+            <!-- Dynamic SVG injected via app.js -->
+        </div>
+
+        <div class="start-prompt-container" id="start-prompt">
+            <div class="start-pill">
+                <span>Başlamak için bir tuşa basın veya tıklayın</span>
+                <svg class="chevron-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. macOS Setup Assistant Card -->
+    <div id="wizard-screen">
+        <div class="card-inner">
+            <!-- Slide 0: Dil ve Ülke/Bölge (Language & Country) -->
+            <div class="wizard-slide active" id="slide-0">
+                <div class="header-icon-container">
+                    <svg class="macos-icon" viewBox="0 0 64 64" fill="none">
+                        <circle cx="32" cy="32" r="30" fill="#0071e3" fill-opacity="0.15"/>
+                        <circle cx="32" cy="32" r="28" stroke="#0071e3" stroke-width="2.5"/>
+                        <ellipse cx="32" cy="32" rx="14" ry="28" stroke="#0071e3" stroke-width="2"/>
+                        <line x1="4" y1="32" x2="60" y2="32" stroke="#0071e3" stroke-width="2"/>
+                        <line x1="8" y1="20" x2="56" y2="20" stroke="#0071e3" stroke-width="1.8"/>
+                        <line x1="8" y1="44" x2="56" y2="44" stroke="#0071e3" stroke-width="1.8"/>
+                    </svg>
+                </div>
+                <h1 class="slide-title" data-i18n="slide0_title">Dil</h1>
+                <p class="slide-subtitle" data-i18n="slide0_subtitle">Ana dili seçin. Bu ayarı daha sonra Sistem Ayarları'ndan değiştirebilirsiniz.</p>
+
+                <div class="list-container">
+                    <div class="list-item selected" data-keymap="tr" data-name="tr_TR">
+                        <span class="list-item-title">Türkçe</span>
+                        <span class="list-item-desc" data-i18n="kb_tr_desc">Q Klavye Düzeni</span>
+                    </div>
+                    <div class="list-item" data-keymap="tr-f" data-name="tr_TR">
+                        <span class="list-item-title">Türkçe (F Klavye)</span>
+                        <span class="list-item-desc" data-i18n="kb_trf_desc">F Klavye Düzeni</span>
+                    </div>
+                    <div class="list-item" data-keymap="us" data-name="en_US">
+                        <span class="list-item-title">English</span>
+                        <span class="list-item-desc" data-i18n="kb_en_desc">US Standard QWERTY</span>
+                    </div>
+                    <div class="list-item" data-keymap="de" data-name="de_DE">
+                        <span class="list-item-title">Deutsch</span>
+                        <span class="list-item-desc" data-i18n="kb_de_desc">Standard QWERTZ</span>
+                    </div>
+                    <div class="list-item" data-keymap="fr" data-name="fr_FR">
+                        <span class="list-item-title">Français</span>
+                        <span class="list-item-desc" data-i18n="kb_fr_desc">Standard AZERTY</span>
+                    </div>
+                </div>
+
+                <div class="keymap-test-row">
+                    <label class="input-label-sm" data-i18n="kb_test_label">Klavye Sınaması:</label>
+                    <input type="text" class="macos-input test-input" data-i18n-ph="kb_test_ph" placeholder="Tuşlarınızı burada deneyin: ğüşıöç 123 !?@" />
+                </div>
+            </div>
+
+            <!-- Slide 1: Ağ ve İnternet Bağlantısı (Network Connectivity) -->
+            <div class="wizard-slide" id="slide-1">
+                <div class="header-icon-container">
+                    <svg class="macos-icon" viewBox="0 0 64 64" fill="none">
+                        <circle cx="32" cy="32" r="30" fill="#0071e3" fill-opacity="0.15"/>
+                        <path d="M14 26 C24 16 40 16 50 26" stroke="#0071e3" stroke-width="2.5" stroke-linecap="round"/>
+                        <path d="M20 33 C27 25 37 25 44 33" stroke="#0071e3" stroke-width="2.5" stroke-linecap="round"/>
+                        <path d="M26 40 C29 36 35 36 38 40" stroke="#0071e3" stroke-width="2.5" stroke-linecap="round"/>
+                        <circle cx="32" cy="47" r="3" fill="#0071e3"/>
+                    </svg>
+                </div>
+                <h1 class="slide-title" data-i18n="slide1_title">Ağ Bağlantısı</h1>
+                <p class="slide-subtitle" data-i18n="slide1_subtitle">Sistem paket güncellemelerini ve donanım sürücülerini doğrulamak için ağınızı kontrol edin.</p>
+
+                <div class="network-container">
+                    <div class="network-status-box" id="network-status-box">
+                        <div class="net-row loading-row">
+                            <span class="net-spinner"></span>
+                            <span data-i18n="net_scanning">Ağ arabirimleri taranıyor...</span>
+                        </div>
+                    </div>
+
+                    <div class="offline-choice-card selected" id="offline-option">
+                        <div class="radio-details">
+                            <span class="option-title" data-i18n="net_offline_title">İnternet bağlantısı olmadan sürdür</span>
+                            <span class="option-desc" data-i18n="net_offline_desc">Kurulumu tamamen yerel ve çevrimdışı olarak tamamlayın. Ağ yapılandırmasını masaüstünden de yapabilirsiniz.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="network-action-bar">
+                    <button class="macos-btn btn-sm" id="btn-refresh-network" data-i18n="btn_refresh_network">Ağ Durumunu Yenile</button>
+                </div>
+            </div>
+
+            <!-- Slide 2: Bilgisayar Hesabı Yaratın (Account Creation) -->
+            <div class="wizard-slide" id="slide-2">
+                <div class="header-icon-container">
+                    <svg class="macos-icon" viewBox="0 0 64 64" fill="none">
+                        <circle cx="32" cy="32" r="30" fill="#0071e3" fill-opacity="0.15"/>
+                        <circle cx="32" cy="24" r="10" stroke="#0071e3" stroke-width="2.5"/>
+                        <path d="M16 50 C16 40 23 38 32 38 C41 38 48 40 48 50" stroke="#0071e3" stroke-width="2.5" stroke-linecap="round"/>
+                    </svg>
+                </div>
+                <h1 class="slide-title" data-i18n="slide2_title">Bilgisayar Hesabı Yaratın</h1>
+                <p class="slide-subtitle" data-i18n="slide2_subtitle">Bilgisayar hesabınızı yaratmak için aşağıdaki bilgileri doldurun.</p>
+
+                <div class="account-form-grid">
+                    <div class="form-fields">
+                        <div class="form-row">
+                            <label class="field-label" data-i18n="field_fullname">Tam ad:</label>
+                            <input type="text" class="macos-input" id="input-fullname" value="Blaze" data-i18n-ph="ph_fullname" placeholder="Ad ve Soyad" />
+                        </div>
+                        <div class="form-row">
+                            <label class="field-label" data-i18n="field_username">Hesap adı:</label>
+                            <div class="field-group">
+                                <input type="text" class="macos-input" id="input-username" value="blaze" data-i18n-ph="ph_username" placeholder="kullanıcı adı" />
+                                <span class="field-hint" data-i18n="hint_username">Bu, ana klasörünüzün adı olacaktır.</span>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <label class="field-label" data-i18n="field_hostname">Bilgisayar adı:</label>
+                            <div class="field-group">
+                                <input type="text" class="macos-input" id="input-hostname" value="blazeos" placeholder="blazeos" />
+                                <span class="field-hint" data-i18n="hint_hostname">Ağda ve terminalde görünecek aygıt adı.</span>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <label class="field-label" data-i18n="field_password">Parola:</label>
+                            <div class="field-group">
+                                <div class="password-pair">
+                                    <input type="password" class="macos-input" id="input-password" data-i18n-ph="ph_password" placeholder="yeni parola" value="2121" />
+                                    <input type="password" class="macos-input" id="input-password-confirm" data-i18n-ph="ph_password_confirm" placeholder="doğrula" value="2121" />
+                                </div>
+                                <span class="field-hint" id="password-match-hint" data-i18n="hint_pass_match">Parolalar eşleşiyor.</span>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <label class="field-label" data-i18n="field_hint">İpucu:</label>
+                            <input type="text" class="macos-input" id="input-hint" data-i18n-ph="ph_hint" placeholder="isteğe bağlı" />
+                        </div>
+                    </div>
+
+                    <div class="avatar-column">
+                        <div class="user-avatar-circle" id="user-avatar">
+                            <svg viewBox="0 0 64 64" width="48" height="48" fill="none">
+                                <circle cx="32" cy="24" r="12" fill="currentColor" fill-opacity="0.8"/>
+                                <path d="M12 56 C12 44 21 40 32 40 C43 40 52 44 52 56" fill="currentColor" fill-opacity="0.8"/>
+                            </svg>
+                        </div>
+                        <span class="avatar-label" data-i18n="avatar_label">Profil Resmi</span>
+                    </div>
+                </div>
+
+                <div class="account-toggles">
+                    <label class="macos-checkbox-label">
+                        <input type="checkbox" id="chk-admin" checked />
+                        <span data-i18n="chk_admin_label">Bu kullanıcının bu bilgisayarı yönetmesine izin ver (sudo yetkisi)</span>
+                    </label>
+                    <label class="macos-checkbox-label">
+                        <input type="checkbox" id="chk-autologin" />
+                        <span data-i18n="chk_autologin_label">Açılışta otomatik giriş yap</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Slide 3: Masaüstü Kabuğu ve Görünüş -->
+            <div class="wizard-slide" id="slide-3">
+                <div class="header-icon-container">
+                    <svg class="macos-icon" viewBox="0 0 64 64" fill="none">
+                        <rect x="6" y="10" width="52" height="36" rx="6" stroke="#0071e3" stroke-width="2.5" fill="#0071e3" fill-opacity="0.12"/>
+                        <line x1="6" y1="38" x2="58" y2="38" stroke="#0071e3" stroke-width="1.8"/>
+                        <path d="M22 54 L42 54 M32 46 L32 54" stroke="#0071e3" stroke-width="2.5" stroke-linecap="round"/>
+                    </svg>
+                </div>
+                <h1 class="slide-title" data-i18n="slide3_title">Masaüstü Kabuğu ve Görünüş</h1>
+                <p class="slide-subtitle" data-i18n="slide3_subtitle">BlazeOS masaüstü deneyiminizi ve sistem renk temasını seçin.</p>
+
+                <!-- Shell Engine Choice: Noctalia vs Caelestia -->
+                <div class="section-label" data-i18n="shell_section_label">Masaüstü Kabuğu:</div>
+                <div class="shell-grid">
+                    <div class="shell-card selected" data-engine="noctalia">
+                        <div class="shell-badge" data-i18n="badge_recommended">ÖNERİLEN</div>
+                        <div class="shell-icon-row">
+                            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="9" stroke="#0071e3"/>
+                                <path d="M12 3a9 9 0 0 1 9 9 9 9 0 0 1-9 9" fill="#0071e3" fill-opacity="0.3"/>
+                            </svg>
+                            <span class="shell-title">Noctalia (Stok)</span>
+                        </div>
+                        <p class="shell-desc" data-i18n="shell_noctalia_desc">Hafif, ultra akıcı ve modern stok Wayland masaüstü deneyimi. Kararlı performans ve düşük bellek tüketimi.</p>
+                        <input type="radio" name="shell-opt" value="noctalia" checked style="display:none;" />
+                    </div>
+
+                    <div class="shell-card" data-engine="caelestia">
+                        <div class="shell-icon-row">
+                            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="18" height="18" rx="4" stroke="#d946ef"/>
+                                <circle cx="8.5" cy="8.5" r="1.5" fill="#d946ef"/>
+                                <path d="M21 15l-5-5L5 21" stroke="#d946ef"/>
+                            </svg>
+                            <span class="shell-title">Caelestia</span>
+                        </div>
+                        <p class="shell-desc" data-i18n="shell_caelestia_desc">Zengin animasyonlar, widget'lar ve derin özelleştirilebilir QML arayüz bileşenleri.</p>
+                        <input type="radio" name="shell-opt" value="caelestia" style="display:none;" />
+                    </div>
+                </div>
+
+                <!-- Appearance Choice: Light / Dark / Auto -->
+                <div class="section-label" style="margin-top: 14px;" data-i18n="color_mode_label">Renk Modu:</div>
+                <div class="appearance-grid">
+                    <!-- Light Mode Card -->
+                    <div class="appearance-card" data-appearance="light">
+                        <div class="preview-mockup light-mockup">
+                            <div class="mockup-menubar">
+                                <div class="mockup-dots">
+                                    <span class="dot red"></span>
+                                    <span class="dot yellow"></span>
+                                    <span class="dot green"></span>
+                                </div>
+                                <div class="mockup-bar"></div>
+                            </div>
+                            <div class="mockup-content">
+                                <div class="mockup-sidebar"></div>
+                                <div class="mockup-main">
+                                    <div class="mockup-card-item"></div>
+                                    <div class="mockup-card-item short"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="appearance-label-row">
+                            <input type="radio" name="appearance-opt" value="light" id="opt-light" />
+                            <label for="opt-light" class="appearance-name" data-i18n="mode_light">Açık</label>
+                        </div>
+                    </div>
+
+                    <!-- Dark Mode Card -->
+                    <div class="appearance-card selected" data-appearance="dark">
+                        <div class="preview-mockup dark-mockup">
+                            <div class="mockup-menubar">
+                                <div class="mockup-dots">
+                                    <span class="dot red"></span>
+                                    <span class="dot yellow"></span>
+                                    <span class="dot green"></span>
+                                </div>
+                                <div class="mockup-bar"></div>
+                            </div>
+                            <div class="mockup-content">
+                                <div class="mockup-sidebar"></div>
+                                <div class="mockup-main">
+                                    <div class="mockup-card-item"></div>
+                                    <div class="mockup-card-item short"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="appearance-label-row">
+                            <input type="radio" name="appearance-opt" value="dark" id="opt-dark" checked />
+                            <label for="opt-dark" class="appearance-name" data-i18n="mode_dark">Koyu</label>
+                        </div>
+                    </div>
+
+                    <!-- Auto Mode Card -->
+                    <div class="appearance-card" data-appearance="auto">
+                        <div class="preview-mockup auto-mockup">
+                            <div class="mockup-split-left">
+                                <div class="mockup-menubar">
+                                    <div class="mockup-dots">
+                                        <span class="dot red"></span>
+                                        <span class="dot yellow"></span>
+                                    </div>
+                                </div>
+                                <div class="mockup-content">
+                                    <div class="mockup-sidebar"></div>
+                                </div>
+                            </div>
+                            <div class="mockup-split-right">
+                                <div class="mockup-menubar">
+                                    <div class="mockup-bar"></div>
+                                </div>
+                                <div class="mockup-content">
+                                    <div class="mockup-main">
+                                        <div class="mockup-card-item"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="appearance-label-row">
+                            <input type="radio" name="appearance-opt" value="auto" id="opt-auto" />
+                            <label for="opt-auto" class="appearance-name" data-i18n="mode_auto">Otomatik</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="appearance-info-text" data-i18n="appearance_info">
+                    Seçtiğiniz kabuk ve renk modu SolarUI, GTK/Qt uygulamalarını ve SDDM giriş ekranını kapsayacak şekilde tüm sisteme uygulanır.
+                </div>
+            </div>
+
+            <!-- Slide 4: Kurulum Tamamlanıyor (Finalizing Setup) -->
+            <div class="wizard-slide" id="slide-4">
+                <div class="header-icon-container">
+                    <svg class="macos-icon spinner-icon" viewBox="0 0 64 64" fill="none">
+                        <circle cx="32" cy="32" r="28" stroke="currentColor" stroke-width="3" stroke-opacity="0.2"/>
+                        <path d="M32 4 A28 28 0 0 1 60 32" stroke="#0071e3" stroke-width="3.5" stroke-linecap="round"/>
+                    </svg>
+                </div>
+                <h1 class="slide-title" data-i18n="slide4_title">BlazeOS Hazırlanıyor</h1>
+                <p class="slide-subtitle" data-i18n="slide4_subtitle">Ayarlarınız kaydediliyor ve masaüstü ortamınız hazırlanıyor. Lütfen bekleyin...</p>
+
+                <div class="macos-progress-list" id="status-list">
+                    <div class="progress-row" id="task-keymap">
+                        <span class="progress-badge pending">[BEKLİYOR]</span>
+                        <span class="progress-title" data-i18n="task_keymap">Dil ve klavye düzeni işleniyor</span>
+                    </div>
+                    <div class="progress-row" id="task-network">
+                        <span class="progress-badge pending">[BEKLİYOR]</span>
+                        <span class="progress-title" data-i18n="task_network">Ağ ve sistem zamanı yapılandırılıyor</span>
+                    </div>
+                    <div class="progress-row" id="task-user">
+                        <span class="progress-badge pending">[BEKLİYOR]</span>
+                        <span class="progress-title" data-i18n="task_user">Kullanıcı hesabı ve parola şifrelemesi kaydediliyor</span>
+                    </div>
+                    <div class="progress-row" id="task-appearance">
+                        <span class="progress-badge pending">[BEKLİYOR]</span>
+                        <span class="progress-title" data-i18n="task_appearance">Masaüstü kabuğu ve sistem teması yapılandırılıyor</span>
+                    </div>
+                    <div class="progress-row" id="task-finalize">
+                        <span class="progress-badge pending">[BEKLİYOR]</span>
+                        <span class="progress-title" data-i18n="task_finalize">OOBE tamamlanıyor ve oturum hazır hale getiriliyor</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- macOS Style Bottom Bar -->
+        <div class="card-footer">
+            <button class="macos-btn btn-secondary" id="btn-back" disabled data-i18n="btn_back">Geri</button>
+            <div class="footer-spacer"></div>
+            <button class="macos-btn btn-primary" id="btn-next" data-i18n="btn_next">Sürdür</button>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="words.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

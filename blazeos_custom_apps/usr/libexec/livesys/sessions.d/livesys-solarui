@@ -4,6 +4,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 
+# Remove OOBE autologin if running in live mode (OOBE runs only on installed systems)
+rm -f /etc/sddm.conf.d/00-blaze-oobe.conf
+
 # Configure SDDM automatic login for liveuser
 mkdir -p /etc/sddm.conf.d
 cat > /etc/sddm.conf.d/autologin.conf << 'SDDMEOF'
@@ -141,6 +144,17 @@ echo "grub2" > /tmp/anaconda_bootloader_choice 2>/dev/null || :
     for dev in $(nmcli -t -f DEVICE,TYPE dev 2>/dev/null | grep ':ethernet$' | cut -d: -f1); do
         nmcli device set "$dev" autoconnect yes 2>/dev/null || :
         nmcli device connect "$dev" --wait 2 2>/dev/null || :
+    done
+# Background sync loop: continuously sync Anaconda choices to target rootfs during install
+(
+    while true; do
+        sleep 2
+        for target in /mnt/sysroot /mnt/sysimage; do
+            if [ -d "$target/etc" ]; then
+                [ -f /tmp/anaconda_desktop_choice ] && cp -f /tmp/anaconda_desktop_choice "$target/etc/blazeos-desktop-choice" 2>/dev/null || :
+                [ -f /tmp/anaconda_bootloader_choice ] && cp -f /tmp/anaconda_bootloader_choice "$target/etc/blazeos-bootloader-choice" 2>/dev/null || :
+            fi
+        done
     done
 ) &
 

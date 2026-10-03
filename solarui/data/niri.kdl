@@ -42,7 +42,7 @@ output "Virtual-1" {
 layout {
     gaps 14
     center-focused-column "never"
-    background-color "transparent" // Required for Noctalia wallpaper & glassmorphism
+    background-color "transparent" // Transparent so Noctalia wallpaper on backdrop is visible
 
     preset-column-widths {
         proportion 0.33333

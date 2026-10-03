@@ -18,6 +18,10 @@ pub struct SolarConfig {
     pub display: DisplayConfig,
     #[serde(default)]
     pub omnibar: OmnibarConfig,
+    #[serde(default)]
+    pub acoustic: AcousticConfig,
+    #[serde(default)]
+    pub oobe: OobeConfig,
 }
 
 impl Default for SolarConfig {
@@ -30,8 +34,19 @@ impl Default for SolarConfig {
             branding: BrandingConfig::default(),
             display: DisplayConfig::default(),
             omnibar: OmnibarConfig::default(),
+            acoustic: AcousticConfig::default(),
+            oobe: OobeConfig::default(),
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct MonitorOutputConfig {
+    pub name: String,
+    #[serde(default = "default_scale")]
+    pub scale: f64,
+    #[serde(default)]
+    pub mode: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -43,6 +58,10 @@ pub struct DisplayConfig {
     /// Text/Font scaling factor for GTK/Adwaita applications
     #[serde(default = "default_text_scale")]
     pub text_scale: f64,
+
+    /// Per-output monitor configurations for independent multi-monitor scaling
+    #[serde(default)]
+    pub outputs: Vec<MonitorOutputConfig>,
 }
 
 fn default_scale() -> f64 {
@@ -58,6 +77,7 @@ impl Default for DisplayConfig {
         Self {
             scale: default_scale(),
             text_scale: default_text_scale(),
+            outputs: Vec::new(),
         }
     }
 }
@@ -395,7 +415,7 @@ impl std::str::FromStr for PerformanceProfile {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SolarShellConfig {
-    #[serde(default)]
+    #[serde(default, alias = "active_engine")]
     pub engine: ShellEngine,
     #[serde(default = "default_surface_noctalia")]
     pub launcher_provider: SurfaceProvider,
@@ -472,6 +492,44 @@ impl Default for OmnibarConfig {
             enable_web_search: true,
             search_engine: default_search_engine(),
             ai_api_key: String::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct AcousticConfig {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default = "default_volume")]
+    pub volume: f64,
+}
+
+fn default_volume() -> f64 {
+    0.6
+}
+
+impl Default for AcousticConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            volume: 0.6,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct OobeConfig {
+    #[serde(default = "default_true")]
+    pub completed: bool,
+    #[serde(default)]
+    pub initial_user: String,
+}
+
+impl Default for OobeConfig {
+    fn default() -> Self {
+        Self {
+            completed: true,
+            initial_user: String::new(),
         }
     }
 }

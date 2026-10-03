@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=BlazeOS Setup Assistant
+Comment=Apple-Style Out-Of-Box Setup Assistant
+Exec=niri --config /usr/share/blaze-setup/niri-setup.kdl
+Type=Application
+DesktopNames=blaze-setup

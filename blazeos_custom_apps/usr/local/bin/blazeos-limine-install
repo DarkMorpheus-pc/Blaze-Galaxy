@@ -75,6 +75,18 @@ DEFAULT_ENTRY=1
     KERNEL_PATH=boot:///vmlinuz-${KERN_VER}
     CMDLINE=root=UUID=${ROOT_UUID} ro quiet rhgb nvidia-drm.modeset=1
     MODULE_PATH=boot:///initramfs-${KERN_VER}.img
+
+/:BlazeOS Recovery Environment (BERE - Powered by BERP)
+    PROTOCOL=linux
+    KERNEL_PATH=boot:///vmlinuz-${KERN_VER}
+    CMDLINE=root=UUID=${ROOT_UUID} ro quiet rhgb systemd.unit=blaze-recovery-gui.target
+    MODULE_PATH=boot:///initramfs-${KERN_VER}.img
+
+/:Blaze Emergency Recovery Protocol (BERP Console - TUI)
+    PROTOCOL=linux
+    KERNEL_PATH=boot:///vmlinuz-${KERN_VER}
+    CMDLINE=root=UUID=${ROOT_UUID} ro quiet rhgb console=tty1 systemd.unit=blaze-recovery.target
+    MODULE_PATH=boot:///initramfs-${KERN_VER}.img
 LIMEOF
 
 log "Limine konfigürasyonu oluşturuldu: $ESP/EFI/blazeos-limine/limine.conf"

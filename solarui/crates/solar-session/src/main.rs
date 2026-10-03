@@ -82,11 +82,19 @@ fn main() -> Result<()> {
         let _ = Command::new(&solar_core_bin).spawn();
     }
 
-    // 4.5. Synchronize display scale if configured
+    // 4.5. Synchronize display scale if configured (multi-monitor & per-output)
     let solar_cfg = solar_common::SolarConfig::load();
-    if (solar_cfg.display.scale - 1.0).abs() > 0.001 {
-        let scale = solar_cfg.display.scale;
-        info!("Applying persistent display scale: {}", scale);
+    let global_scale = solar_cfg.display.scale;
+    let custom_outputs = solar_cfg.display.outputs.clone();
+    let has_custom = !custom_outputs.is_empty();
+    let has_scale_change = (global_scale - 1.0).abs() > 0.001 || has_custom;
+
+    if has_scale_change {
+        info!(
+            "Applying persistent display scale (global: {}, custom outputs: {})",
+            global_scale,
+            custom_outputs.len()
+        );
         std::thread::spawn(move || {
             for _ in 0..40 {
                 std::thread::sleep(std::time::Duration::from_millis(200));
@@ -96,15 +104,20 @@ fn main() -> Result<()> {
                 if let Ok(output) = out {
                     if output.status.success() {
                         let text = String::from_utf8_lossy(&output.stdout);
-                        let scale_str = format!("{:.2}", scale);
+                        let global_scale_str = format!("{:.2}", global_scale);
                         for token in text.split('"') {
                             if token == "Virtual-1"
                                 || token.starts_with("eDP")
                                 || token.starts_with("HDMI")
                                 || token.starts_with("DP-")
                             {
+                                let scale_to_apply = if let Some(m) = custom_outputs.iter().find(|o| o.name == token) {
+                                    format!("{:.2}", m.scale)
+                                } else {
+                                    global_scale_str.clone()
+                                };
                                 let _ = Command::new("niri")
-                                    .args(["msg", "output", token, "scale", &scale_str])
+                                    .args(["msg", "output", token, "scale", &scale_to_apply])
                                     .status();
                             }
                         }
@@ -113,7 +126,7 @@ fn main() -> Result<()> {
                                 "set",
                                 "org.gnome.desktop.interface",
                                 "text-scaling-factor",
-                                &scale_str,
+                                &global_scale_str,
                             ])
                             .status();
                         break;
@@ -133,6 +146,10 @@ fn main() -> Result<()> {
     info!("Executing Niri Wayland session: {:?}", niri_bin);
 
     let mut cmd = Command::new(&niri_bin);
+    // --session bayragi her zaman ekle: systemd ve D-Bus ortamina
+    // WAYLAND_DISPLAY, XDG_CURRENT_DESKTOP vb. degiskenleri kayit eder.
+    // solar-session-wrapper da ek olarak import-environment yapar,
+    // iki kez import zararsizdir ama eksik import sorun yaratir.
     cmd.arg("--session");
 
     if let Some(cfg) = config_path {

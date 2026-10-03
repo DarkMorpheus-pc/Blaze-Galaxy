@@ -1,0 +1,1039 @@
+/* ==========================================================================
+   BlazeOS Apple-Style "Hello" Setup Assistant Stylesheet
+   Strict Zero Emojis • Native macOS Monterey / Sonoma Design Language
+   Ultra-Fluid • Hardware-Optimized (Zero-Lag in VM)
+   ========================================================================== */
+
+:root {
+    --apple-blue: #0071e3;
+    --apple-blue-hover: #0077ed;
+    --apple-blue-active: #0062c4;
+    --apple-radius: 18px;
+    --card-radius: 12px;
+    --input-radius: 8px;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    user-select: none;
+    -webkit-user-select: none;
+    outline: none;
+}
+
+body {
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    position: relative;
+    background-color: #0b0d14;
+    color: #f5f5f7;
+    transition: background-color 0.4s ease;
+}
+
+/* ── 1. High Performance Fluid Aurora Background ────────────────────────── */
+.aurora-bg {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background:
+        radial-gradient(ellipse 80% 60% at 20% 15%, rgba(217, 70, 239, 0.28) 0%, transparent 60%),
+        radial-gradient(ellipse 70% 60% at 85% 20%, rgba(59, 130, 246, 0.35) 0%, transparent 60%),
+        radial-gradient(ellipse 80% 60% at 75% 85%, rgba(249, 115, 22, 0.25) 0%, transparent 60%),
+        radial-gradient(ellipse 90% 70% at 20% 80%, rgba(99, 102, 241, 0.35) 0%, transparent 65%),
+        #0b0d14;
+    transition: filter 0.5s ease;
+}
+
+body.theme-light .aurora-bg {
+    background:
+        radial-gradient(ellipse 80% 60% at 20% 15%, rgba(236, 72, 153, 0.22) 0%, transparent 60%),
+        radial-gradient(ellipse 70% 60% at 85% 20%, rgba(59, 130, 246, 0.28) 0%, transparent 60%),
+        radial-gradient(ellipse 80% 60% at 75% 85%, rgba(251, 146, 60, 0.20) 0%, transparent 60%),
+        radial-gradient(ellipse 90% 70% at 20% 80%, rgba(129, 140, 248, 0.28) 0%, transparent 65%),
+        #eef1f6;
+}
+
+/* ── 2. Apple-Style Cursive "Hello" Screen ─────────────────────────────── */
+#hello-screen {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#hello-screen.hidden {
+    opacity: 0;
+    transform: scale(1.08);
+    pointer-events: none;
+}
+
+.svg-stage {
+    width: 100vw;
+    max-width: 920px;
+    height: 320px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
+    overflow: visible;
+    position: relative;
+    text-align: center;
+}
+
+.svg-stage svg {
+    width: 100%;
+    height: 100%;
+    max-width: 860px;
+    max-height: 280px;
+    display: block;
+    margin: 0 auto;
+    overflow: visible;
+    filter: drop-shadow(0 4px 18px rgba(255, 255, 255, 0.45));
+}
+
+.svg-stage svg path {
+    fill: none !important;
+    stroke: #ffffff !important;
+    stroke-linecap: round !important;
+    stroke-linejoin: round !important;
+}
+
+body.theme-light .svg-stage svg {
+    filter: drop-shadow(0 4px 18px rgba(0, 0, 0, 0.25));
+}
+
+body.theme-light .svg-stage svg path {
+    stroke: #1d1d1f !important;
+}
+
+/* Bottom Start Prompt */
+.start-prompt-container {
+    position: absolute;
+    bottom: 54px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 12;
+}
+
+.start-pill {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 26px;
+    background: rgba(255, 255, 255, 0.14);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 40px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #ffffff;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+    transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+}
+
+body.theme-light .start-pill {
+    background: rgba(0, 0, 0, 0.08);
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    color: #1d1d1f;
+}
+
+.start-pill:hover {
+    background: rgba(255, 255, 255, 0.22);
+    transform: scale(1.02);
+    border-color: rgba(255, 255, 255, 0.35);
+}
+
+body.theme-light .start-pill:hover {
+    background: rgba(0, 0, 0, 0.12);
+    border-color: rgba(0, 0, 0, 0.2);
+}
+
+.start-pill .chevron-icon {
+    transition: transform 0.2s ease;
+}
+
+.start-pill:hover .chevron-icon {
+    transform: translateX(3px);
+}
+
+/* ── 3. macOS Setup Assistant Card ──────────────────────────────────────── */
+#wizard-screen {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.94);
+    z-index: 20;
+    width: 720px;
+    max-width: 92vw;
+    height: 600px;
+    max-height: 88vh;
+    border-radius: var(--apple-radius);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1), transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 32px 80px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+#wizard-screen.active {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+    pointer-events: auto;
+}
+
+/* Dark Theme (Default) */
+body.theme-dark #wizard-screen {
+    background: rgba(34, 37, 44, 0.88);
+    backdrop-filter: blur(40px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #f5f5f7;
+}
+
+/* Light Theme */
+body.theme-light #wizard-screen {
+    background: rgba(250, 250, 252, 0.94);
+    backdrop-filter: blur(40px) saturate(180%);
+    border: 1px solid rgba(0, 0, 0, 0.14);
+    color: #1d1d1f;
+    box-shadow: 0 32px 80px rgba(0, 0, 0, 0.22), 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+
+.card-inner {
+    flex: 1;
+    overflow-y: auto;
+    padding: 36px 44px 20px 44px;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ── 4. Slide Content Styles ────────────────────────────────────────────── */
+.wizard-slide {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    animation: fadeInSlide 0.35s ease forwards;
+}
+
+.wizard-slide.active {
+    display: flex;
+}
+
+@keyframes fadeInSlide {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.header-icon-container {
+    margin-bottom: 12px;
+}
+
+.macos-icon {
+    width: 60px;
+    height: 60px;
+}
+
+.spinner-icon {
+    animation: spin 1.2s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.slide-title {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    margin-bottom: 6px;
+}
+
+body.theme-dark .slide-title { color: #ffffff; }
+body.theme-light .slide-title { color: #1d1d1f; }
+
+.slide-subtitle {
+    font-size: 13.5px;
+    line-height: 1.45;
+    max-width: 540px;
+    margin-bottom: 22px;
+}
+
+body.theme-dark .slide-subtitle { color: #a1a1a6; }
+body.theme-light .slide-subtitle { color: #6e6e73; }
+
+/* ── 5. Slide 0: Language List Box (macOS Style) ────────────────────────── */
+.list-container {
+    width: 100%;
+    max-width: 440px;
+    height: 180px;
+    overflow-y: auto;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(0, 0, 0, 0.2);
+    margin-bottom: 16px;
+    text-align: left;
+}
+
+body.theme-light .list-container {
+    border: 1px solid #d2d2d7;
+    background: #ffffff;
+}
+
+.list-item {
+    padding: 10px 18px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    transition: background 0.12s ease;
+}
+
+body.theme-light .list-item {
+    border-bottom: 1px solid #f2f2f7;
+}
+
+.list-item:last-child {
+    border-bottom: none;
+}
+
+.list-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+body.theme-light .list-item:hover {
+    background: rgba(0, 0, 0, 0.04);
+}
+
+.list-item.selected {
+    background: var(--apple-blue) !important;
+    color: #ffffff !important;
+}
+
+.list-item-title {
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.list-item-desc {
+    font-size: 12px;
+    opacity: 0.75;
+}
+
+.keymap-test-row {
+    width: 100%;
+    max-width: 440px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    text-align: left;
+}
+
+.input-label-sm {
+    font-size: 12px;
+    font-weight: 600;
+    opacity: 0.8;
+}
+
+.test-input {
+    width: 100%;
+}
+
+/* ── 6. Slide 1: Network Connectivity ─────────────────────────────────── */
+.network-container {
+    width: 100%;
+    max-width: 520px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 6px;
+    text-align: left;
+}
+
+.network-status-box {
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(0, 0, 0, 0.25);
+    overflow: hidden;
+}
+
+body.theme-light .network-status-box {
+    border: 1px solid #d2d2d7;
+    background: #ffffff;
+}
+
+.net-row {
+    padding: 12px 18px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    font-size: 13.5px;
+}
+
+.net-row:last-child {
+    border-bottom: none;
+}
+
+.net-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.net-name {
+    font-weight: 600;
+}
+
+.net-ip {
+    font-size: 12px;
+    opacity: 0.7;
+}
+
+.net-status-badge {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11.5px;
+    font-weight: 600;
+}
+
+.net-status-badge.connected {
+    background: rgba(48, 209, 88, 0.2);
+    color: #30d158;
+    border: 1px solid rgba(48, 209, 88, 0.35);
+}
+
+.net-status-badge.disconnected {
+    background: rgba(255, 69, 58, 0.15);
+    color: #ff453a;
+    border: 1px solid rgba(255, 69, 58, 0.25);
+}
+
+.offline-choice-card {
+    padding: 14px 18px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+body.theme-light .offline-choice-card {
+    border: 1px solid #d2d2d7;
+    background: #ffffff;
+}
+
+.offline-choice-card.selected {
+    border-color: var(--apple-blue);
+    background: rgba(0, 113, 227, 0.12);
+}
+
+.network-action-bar {
+    margin-top: 14px;
+}
+
+.net-spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-top-color: var(--apple-blue);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    display: inline-block;
+    margin-right: 8px;
+}
+
+/* ── 7. Slide 2: Account Creation Form (macOS Style) ───────────────────── */
+.account-form-grid {
+    width: 100%;
+    max-width: 580px;
+    display: flex;
+    gap: 28px;
+    align-items: flex-start;
+    text-align: left;
+    margin-top: 6px;
+}
+
+.form-fields {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.form-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.field-label {
+    width: 90px;
+    font-size: 13.5px;
+    font-weight: 500;
+    text-align: right;
+    padding-top: 6px;
+    flex-shrink: 0;
+}
+
+body.theme-dark .field-label { color: #e5e5e7; }
+body.theme-light .field-label { color: #1d1d1f; }
+
+.field-group {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.password-pair {
+    display: flex;
+    gap: 8px;
+}
+
+.field-hint {
+    font-size: 11.5px;
+    opacity: 0.65;
+}
+
+#password-match-hint.error {
+    color: #ff453a;
+    opacity: 1;
+}
+
+.avatar-column {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding-top: 4px;
+}
+
+.user-avatar-circle {
+    width: 84px;
+    height: 84px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #0071e3 0%, #48cae4 100%);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.avatar-label {
+    font-size: 11.5px;
+    opacity: 0.7;
+}
+
+.account-toggles {
+    width: 100%;
+    max-width: 580px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 18px;
+    padding-left: 102px;
+    text-align: left;
+}
+
+.macos-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.macos-checkbox-label input[type="checkbox"] {
+    accent-color: var(--apple-blue);
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+}
+
+/* ── 8. Slide 3: Shell Engine & Appearance Selection ──────────────────── */
+.section-label {
+    width: 100%;
+    max-width: 580px;
+    text-align: left;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    opacity: 0.75;
+    margin-bottom: 8px;
+}
+
+.shell-grid {
+    width: 100%;
+    max-width: 580px;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    margin-bottom: 12px;
+}
+
+.shell-card {
+    position: relative;
+    padding: 14px 16px;
+    border-radius: 12px;
+    border: 2px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    cursor: pointer;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    transition: all 0.2s ease;
+}
+
+body.theme-light .shell-card {
+    border: 2px solid #d2d2d7;
+    background: #ffffff;
+}
+
+.shell-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(0, 113, 227, 0.5);
+}
+
+.shell-card.selected {
+    border-color: var(--apple-blue);
+    background: rgba(0, 113, 227, 0.1);
+    box-shadow: 0 4px 20px rgba(0, 113, 227, 0.2);
+}
+
+.shell-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-size: 10px;
+    font-weight: 700;
+    background: var(--apple-blue);
+    color: #ffffff;
+    padding: 2px 8px;
+    border-radius: 10px;
+    letter-spacing: 0.04em;
+}
+
+.shell-icon-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.shell-title {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.shell-desc {
+    font-size: 11.5px;
+    line-height: 1.4;
+    opacity: 0.75;
+}
+
+.appearance-grid {
+    width: 100%;
+    max-width: 580px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    margin: 10px 0 16px 0;
+}
+
+.appearance-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    padding: 12px;
+    border-radius: 14px;
+    border: 2px solid transparent;
+    transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+.appearance-card:hover {
+    transform: translateY(-2px);
+}
+
+.appearance-card.selected {
+    border-color: var(--apple-blue);
+    background: rgba(0, 113, 227, 0.08);
+}
+
+body.theme-light .appearance-card.selected {
+    background: rgba(0, 113, 227, 0.06);
+}
+
+/* macOS Window Mockups */
+.preview-mockup {
+    width: 140px;
+    height: 94px;
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.light-mockup {
+    background: #ffffff;
+    border: 1px solid #d2d2d7;
+}
+
+.light-mockup .mockup-menubar {
+    background: #e5e5ea;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    padding: 0 6px;
+    gap: 6px;
+}
+
+.light-mockup .mockup-content {
+    flex: 1;
+    display: flex;
+    background: #f8f8fa;
+}
+
+.light-mockup .mockup-sidebar {
+    width: 36px;
+    background: #eef0f4;
+    border-right: 1px solid #e1e3e8;
+}
+
+.light-mockup .mockup-main {
+    flex: 1;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.light-mockup .mockup-card-item {
+    height: 12px;
+    background: #ffffff;
+    border-radius: 3px;
+    border: 1px solid #e5e5ea;
+}
+
+.light-mockup .mockup-card-item.short {
+    width: 60%;
+}
+
+.dark-mockup {
+    background: #1e2026;
+    border: 1px solid #333842;
+}
+
+.dark-mockup .mockup-menubar {
+    background: #2a2d36;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    padding: 0 6px;
+    gap: 6px;
+}
+
+.dark-mockup .mockup-content {
+    flex: 1;
+    display: flex;
+    background: #17181c;
+}
+
+.dark-mockup .mockup-sidebar {
+    width: 36px;
+    background: #21242d;
+    border-right: 1px solid #2d313c;
+}
+
+.dark-mockup .mockup-main {
+    flex: 1;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.dark-mockup .mockup-card-item {
+    height: 12px;
+    background: #282c37;
+    border-radius: 3px;
+}
+
+.dark-mockup .mockup-card-item.short {
+    width: 60%;
+}
+
+.auto-mockup {
+    display: flex;
+    flex-direction: row;
+    border: 1px solid #444;
+}
+
+.mockup-split-left {
+    flex: 1;
+    background: #ffffff;
+    border-right: 1px solid #999;
+    display: flex;
+    flex-direction: column;
+}
+
+.mockup-split-left .mockup-menubar {
+    background: #e5e5ea;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    padding: 0 6px;
+}
+
+.mockup-split-left .mockup-content {
+    flex: 1;
+    background: #f8f8fa;
+}
+
+.mockup-split-right {
+    flex: 1;
+    background: #17181c;
+    display: flex;
+    flex-direction: column;
+}
+
+.mockup-split-right .mockup-menubar {
+    background: #2a2d36;
+    height: 16px;
+}
+
+.mockup-split-right .mockup-content {
+    flex: 1;
+    background: #17181c;
+    padding: 8px;
+}
+
+.mockup-split-right .mockup-card-item {
+    height: 12px;
+    background: #282c37;
+    border-radius: 3px;
+}
+
+.mockup-dots {
+    display: flex;
+    gap: 3px;
+}
+
+.dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+}
+
+.dot.red { background: #ff5f56; }
+.dot.yellow { background: #ffbd2e; }
+.dot.green { background: #27c93f; }
+
+.appearance-label-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+}
+
+.appearance-name {
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.appearance-info-text {
+    font-size: 12.5px;
+    opacity: 0.72;
+    max-width: 520px;
+    text-align: center;
+    margin-top: 10px;
+}
+
+/* ── 9. Slide 4: Progress Checklist ────────────────────────────────────── */
+.macos-progress-list {
+    width: 100%;
+    max-width: 480px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 16px;
+    text-align: left;
+}
+
+.progress-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 18px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+body.theme-light .progress-row {
+    background: #ffffff;
+    border: 1px solid #e5e5ea;
+}
+
+.progress-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 4px;
+}
+
+.progress-badge.pending {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.6);
+}
+
+body.theme-light .progress-badge.pending {
+    background: rgba(0, 0, 0, 0.06);
+    color: rgba(0, 0, 0, 0.5);
+}
+
+.progress-badge.done {
+    background: rgba(40, 167, 69, 0.2);
+    color: #38b000;
+}
+
+.progress-badge.active {
+    background: rgba(0, 113, 227, 0.2);
+    color: var(--apple-blue);
+}
+
+.progress-title {
+    font-size: 13.5px;
+    font-weight: 500;
+}
+
+/* ── 10. General Input & Button Components ──────────────────────────────── */
+.macos-input {
+    padding: 8px 12px;
+    font-size: 13.5px;
+    font-family: inherit;
+    border-radius: var(--input-radius);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+body.theme-dark .macos-input {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    color: #ffffff;
+}
+
+body.theme-dark .macos-input:focus {
+    border-color: var(--apple-blue);
+    box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.35);
+}
+
+body.theme-light .macos-input {
+    background: #ffffff;
+    border: 1px solid #d2d2d7;
+    color: #1d1d1f;
+}
+
+body.theme-light .macos-input:focus {
+    border-color: var(--apple-blue);
+    box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.25);
+}
+
+/* Card Bottom Footer */
+.card-footer {
+    display: flex;
+    align-items: center;
+    padding: 16px 36px 24px 36px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(0, 0, 0, 0.08);
+}
+
+body.theme-light .card-footer {
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    background: rgba(0, 0, 0, 0.03);
+}
+
+.footer-spacer {
+    flex: 1;
+}
+
+.macos-btn {
+    padding: 7px 20px;
+    font-size: 13.5px;
+    font-weight: 500;
+    font-family: inherit;
+    border-radius: 6px;
+    cursor: pointer;
+    border: none;
+    transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.macos-btn:active {
+    transform: scale(0.98);
+}
+
+.macos-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* Geri Button (Subtle gray) */
+.btn-secondary {
+    background: rgba(255, 255, 255, 0.12);
+    color: #f5f5f7;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+body.theme-light .btn-secondary {
+    background: rgba(0, 0, 0, 0.06);
+    color: #1d1d1f;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.18);
+}
+
+body.theme-light .btn-secondary:hover:not(:disabled) {
+    background: rgba(0, 0, 0, 0.1);
+}
+
+/* Sürdür Button (Apple Blue) */
+.btn-primary {
+    background: var(--apple-blue);
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(0, 113, 227, 0.35);
+}
+
+.btn-primary:hover:not(:disabled) {
+    background: var(--apple-blue-hover);
+}
+
+.btn-primary:active:not(:disabled) {
+    background: var(--apple-blue-active);
+}

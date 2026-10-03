@@ -51,8 +51,10 @@ chmod 2755 "$ROOTFS/usr/bin/unix_chkpwd" 2>/dev/null || true
 chmod 2755 "$ROOTFS/usr/bin/crontab" 2>/dev/null || true
 chmod 2755 "$ROOTFS/usr/bin/at" 2>/dev/null || true
 chmod 2755 "$ROOTFS/usr/bin/chage" 2>/dev/null || true
-chmod 2755 "$ROOTFS/usr/bin/lockdev" 2>/dev/null || true
 chmod 2755 "$ROOTFS/usr/libexec/utempter/utempter" 2>/dev/null || true
+chown -R 961:961 "$ROOTFS/var/lib/blaze-setup" 2>/dev/null || true
+chmod 755 "$ROOTFS/var/lib/blaze-setup" 2>/dev/null || true
+chmod 0440 "$ROOTFS/etc/sudoers.d/99-blaze-setup" 2>/dev/null || true
 if [ ! -f "$ROOTFS/usr/lib/kitty/bin/kitty" ]; then
     echo "  -> Fetching Kitty standalone bundle..."
     mkdir -p "$ROOTFS/usr/lib/kitty"
@@ -79,12 +81,23 @@ chmod 755 "$ROOTFS/usr/bin/quickshell" 2>/dev/null || true
 chmod 755 "$ROOTFS/usr/bin/quickshell.bin" 2>/dev/null || true
 chmod 755 "$ROOTFS/usr/bin/qs" 2>/dev/null || true
 chmod 755 "$ROOTFS/usr/bin/sddm" 2>/dev/null || true
-chmod 755 "$ROOTFS/usr/bin/sddm-greeter-qt6" 2>/dev/null || true
 chmod 755 "$ROOTFS/usr/bin/weston" 2>/dev/null || true
+chmod 755 "$ROOTFS/usr/bin/berp-recovery-gui" 2>/dev/null || true
+chmod 755 "$ROOTFS/usr/bin/blaze-setup" 2>/dev/null || true
+chmod 755 "$ROOTFS/usr/bin/gen_grub_cfgstub" 2>/dev/null || true
+chmod 755 "$ROOTFS/etc/grub.d/09_berp" 2>/dev/null || true
+chmod 755 "$ROOTFS/etc/grub.d/11_berp" 2>/dev/null || true
+chmod 755 "$ROOTFS/usr/local/bin/solar-torture" 2>/dev/null || true
+chmod 600 "$ROOTFS/etc/NetworkManager/system-connections/"*.nmconnection 2>/dev/null || true
 
 echo "  -> Ensuring SDDM default display manager and masking GDM..."
 mkdir -p "$ROOTFS/etc/systemd/system"
+mkdir -p "$ROOTFS/etc/systemd/system/graphical.target.wants"
+mkdir -p "$ROOTFS/etc/systemd/system/multi-user.target.wants"
 ln -sf /usr/lib/systemd/system/sddm.service "$ROOTFS/etc/systemd/system/display-manager.service"
+ln -sf /usr/lib/systemd/system/sddm.service "$ROOTFS/etc/systemd/system/graphical.target.wants/sddm.service"
+ln -sf /usr/lib/systemd/system/sddm.service "$ROOTFS/etc/systemd/system/multi-user.target.wants/display-manager.service"
+ln -sf /usr/lib/systemd/system/graphical.target "$ROOTFS/etc/systemd/system/default.target"
 ln -sf /dev/null "$ROOTFS/etc/systemd/system/gdm.service"
 
 echo "  -> Updating dynamic linker cache (ldconfig)..."
@@ -93,11 +106,13 @@ chroot "$ROOTFS" ldconfig 2>/dev/null || ldconfig -r "$ROOTFS" -f "$ROOTFS/etc/l
 
 echo "  -> Setting SELinux contexts with setfiles..."
 LD_LIBRARY_PATH="$ROOTFS/usr/lib64" "$ROOTFS/usr/sbin/setfiles" -r "$ROOTFS" "$ROOTFS/etc/selinux/targeted/contexts/files/file_contexts" "$ROOTFS" 2>&1 | tail -10
+chroot "$ROOTFS" semanage permissive -a virt_qemu_ga_t 2>/dev/null || true
 
 echo "  -> Explicitly ensuring systemd and custom apps have correct labels..."
 setfattr -n security.selinux -v "system_u:object_r:init_exec_t:s0" "$ROOTFS/usr/lib/systemd/systemd"
 setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/local/bin/blazeos-welcome" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/local/bin/blazeos-control" 2>/dev/null || true
+setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/local/bin/solar-torture" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/local/bin/blazeos-nvidia-setup" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/solar-shell" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/solar-session" 2>/dev/null || true
@@ -124,6 +139,13 @@ setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/bl
 setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/blaze-sentinel" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:systemd_unit_file_t:s0" "$ROOTFS/etc/systemd/system/blaze-recovery.target" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:systemd_unit_file_t:s0" "$ROOTFS/etc/systemd/system/blaze-recovery.service" 2>/dev/null || true
+setfattr -n security.selinux -v "system_u:object_r:systemd_unit_file_t:s0" "$ROOTFS/etc/systemd/system/blaze-recovery-gui.target" 2>/dev/null || true
+setfattr -n security.selinux -v "system_u:object_r:systemd_unit_file_t:s0" "$ROOTFS/etc/systemd/system/blaze-recovery-gui.service" 2>/dev/null || true
+setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/blaze-recovery-gui-launcher" 2>/dev/null || true
+setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/seatd" 2>/dev/null || true
+setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/seatd-launch" 2>/dev/null || true
+setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/berp-recovery-gui" 2>/dev/null || true
+setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/gen_grub_cfgstub" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:systemd_unit_file_t:s0" "$ROOTFS/etc/systemd/system/blaze-sentinel.service" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:systemd_unit_file_t:s0" "$ROOTFS/etc/systemd/system/blaze-boot-success.service" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/solar-shell" 2>/dev/null || true
@@ -141,6 +163,11 @@ setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/qu
 setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/qs" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/caelestia" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/liveinst" 2>/dev/null || true
+setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/blaze-setup" 2>/dev/null || true
+setfattr -n security.selinux -v "system_u:object_r:etc_t:s0" "$ROOTFS/etc/sddm.conf.d/00-blaze-oobe.conf" 2>/dev/null || true
+setfattr -n security.selinux -v "system_u:object_r:etc_t:s0" "$ROOTFS/etc/sudoers.d/99-blaze-setup" 2>/dev/null || true
+setfattr -n security.selinux -v "system_u:object_r:usr_t:s0" "$ROOTFS/usr/share/wayland-sessions/blaze-oobe.desktop" 2>/dev/null || true
+find "$ROOTFS/usr/share/blaze-setup" -exec setfattr -n security.selinux -v "system_u:object_r:usr_t:s0" {} + 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/libexec/livesys/sessions.d/livesys-solarui" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:xdm_exec_t:s0" "$ROOTFS/usr/bin/sddm" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:xdm_exec_t:s0" "$ROOTFS/usr/bin/sddm-greeter-qt6" 2>/dev/null || true

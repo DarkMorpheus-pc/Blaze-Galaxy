@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name=BlazeOS Welcome
+Name[tr]=BlazeOS Hoş Geldin
+Name[de]=BlazeOS Willkommen
+Comment=First-boot setup wizard
+Comment[tr]=İlk açılış kurulum sihirbazı
+Comment[de]=Ersteinrichtungsassistent
+Exec=/usr/local/bin/blazeos-welcome
+Icon=/usr/share/blazeos/icons/blazeos-logo.png
+Terminal=false
+X-GNOME-Autostart-enabled=true
+X-GNOME-Autostart-Delay=8
+StartupNotify=false

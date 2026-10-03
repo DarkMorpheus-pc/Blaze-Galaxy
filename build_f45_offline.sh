@@ -33,6 +33,9 @@ cp -a "'"$ROOTFS_SRC"'" "$ROOTFS"
 echo "  -> Ensuring root:root ownership..."
 chown -R 0:0 "$ROOTFS"
 
+echo "  -> Applying tracked BlazeOS overlay..."
+cp -a --no-preserve=ownership "'"${BLAZEOS_ROOT:-$(pwd)}"'/blazeos_custom_apps/." "$ROOTFS/"
+
 echo "  -> Restoring SUID/SGID permissions..."
 chmod 4755 "$ROOTFS/usr/bin/sudo" 2>/dev/null || true
 chmod 4755 "$ROOTFS/usr/bin/su" 2>/dev/null || true
@@ -54,10 +57,10 @@ chroot "$ROOTFS" dnf install -y --setopt=install_weak_deps=False \
   hyprland foot wofi \
   cinnamon nemo \
   xfce4-session xfwm4 xfce4-panel thunar xfce4-terminal xfce4-settings \
-  sway waybar 2>&1 || true
+  sway waybar 2>&1
 
 echo "  -> Setting SELinux contexts with setfiles..."
-LD_LIBRARY_PATH="$ROOTFS/usr/lib64" "$ROOTFS/usr/sbin/setfiles" -r "$ROOTFS" "$ROOTFS/etc/selinux/targeted/contexts/files/file_contexts" "$ROOTFS" 2>&1 | tail -10 || true
+LD_LIBRARY_PATH="$ROOTFS/usr/lib64" "$ROOTFS/usr/sbin/setfiles" -r "$ROOTFS" "$ROOTFS/etc/selinux/targeted/contexts/files/file_contexts" "$ROOTFS" 2>&1 | tail -10
 
 echo "  -> Explicitly ensuring systemd and custom apps have correct labels..."
 setfattr -n security.selinux -v "system_u:object_r:init_exec_t:s0" "$ROOTFS/usr/lib/systemd/systemd"
