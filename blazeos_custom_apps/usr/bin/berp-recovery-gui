@@ -15,9 +15,12 @@ import shutil
 import subprocess
 import threading
 import ctypes
+import re
+import secrets
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 
 PORT = 49223
+API_TOKEN = secrets.token_urlsafe(32)
 STATIC_DIR = "/usr/share/berp-recovery"
 if not os.path.isdir(STATIC_DIR):
     local_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../share/berp-recovery")
@@ -73,6 +76,9 @@ class RecoveryAPIHandler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         if self.path.startswith("/api/"):
+            if not secrets.compare_digest(self.headers.get("X-BERP-Token", ""), API_TOKEN):
+                self.send_error(403, "Forbidden")
+                return
             endpoint = self.path[len("/api/"):]
             length = int(self.headers.get("Content-Length", 0))
             body = self.rfile.read(length) if length > 0 else b"{}"
@@ -91,6 +97,9 @@ class RecoveryAPIHandler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         if self.path.startswith("/api/"):
+            if not secrets.compare_digest(self.headers.get("X-BERP-Token", ""), API_TOKEN):
+                self.send_error(403, "Forbidden")
+                return
             endpoint = self.path[len("/api/"):]
             res = self.handle_api(endpoint, {})
             self.send_response(200)
@@ -160,30 +169,83 @@ class RecoveryAPIHandler(SimpleHTTPRequestHandler):
                 return {"status": "error", "message": "Gecerli bir ISO dosyasi bulunamadi."}
 
             try:
-                cfg_d = "/boot/grub2/grub.cfg.d"
-                os.makedirs(cfg_d, exist_ok=True)
-                target_cfg = os.path.join(cfg_d, "40_iso_boot.cfg")
+                iso_path = os.path.realpath(iso_path)
+                def iso_has(path):
+                    check = subprocess.run(
+                        ["xorriso", "-indev", iso_path, "-ls", path],
+                        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, timeout=20
+                    )
+                    return check.returncode == 0 and path in check.stdout
 
-                df_out = subprocess.check_output(["df", "--output=source", iso_path]).decode().strip().split("\n")[-1]
-                uuid_out = subprocess.check_output(["blkid", "-s", "UUID", "-o", "value", df_out]).decode().strip()
+                if iso_has("/boot/x86_64/loader/linux") and iso_has("/boot/x86_64/loader/initrd"):
+                    kernel_path = "/boot/x86_64/loader/linux"
+                    initrd_path = "/boot/x86_64/loader/initrd"
+                elif iso_has("/images/pxeboot/vmlinuz") and iso_has("/images/pxeboot/initrd.img"):
+                    kernel_path = "/images/pxeboot/vmlinuz"
+                    initrd_path = "/images/pxeboot/initrd.img"
+                else:
+                    return {"status": "error", "message": "Bu kalıp desteklenen bir Blaze/Fedora Live ISO değil."}
+
+                mount_info = subprocess.check_output(
+                    ["findmnt", "-n", "-o", "SOURCE,TARGET", "-T", iso_path], text=True
+                ).strip().split(None, 1)
+                if len(mount_info) != 2:
+                    return {"status": "error", "message": "ISO dosyasının bulunduğu dosya sistemi belirlenemedi."}
+                source_dev, mount_point = mount_info
+                uuid_out = subprocess.check_output(
+                    ["blkid", "-s", "UUID", "-o", "value", source_dev], text=True
+                ).strip()
+                rel_path = "/" + os.path.relpath(iso_path, mount_point).lstrip("/")
+                if rel_path.startswith("/../") or not uuid_out:
+                    return {"status": "error", "message": "ISO için güvenli GRUB yolu üretilemedi."}
+
+                def grub_escape(value):
+                    return value.replace("\\", "\\\\").replace('"', '\\"').replace("$", "\\$")
+
+                iso_label = subprocess.check_output(
+                    ["blkid", "-p", "-s", "LABEL", "-o", "value", iso_path], text=True
+                ).strip()
+                safe_path = grub_escape(rel_path)
+                safe_label = grub_escape(iso_label)
+                safe_name = os.path.basename(iso_path).replace('"', "'")
 
                 iso_entry = f"""# BlazeOS Loopback ISO Boot
-menuentry "BlazeOS Direct ISO Boot ({os.path.basename(iso_path)})" --id=blaze_iso_boot {{
+menuentry "BlazeOS Direct ISO Boot ({safe_name})" --id=blaze_iso_boot {{
     insmod part_gpt
+    insmod part_msdos
+    insmod lvm
     insmod ext2
     insmod btrfs
+    insmod xfs
     search --no-floppy --fs-uuid --set=root {uuid_out}
-    set isofile="{iso_path}"
+    set isofile="{safe_path}"
     loopback loop ($root)$isofile
-    linux (loop)/images/pxeboot/vmlinuz iso-scan/filename=$isofile root=live:CDLABEL=Blaze-SolarEvolution-5-x86_64 rd.live.image quiet
-    initrd (loop)/images/pxeboot/initrd.img
+    linux (loop){kernel_path} iso-scan/filename=$isofile root=live:CDLABEL={safe_label} rd.live.image quiet
+    initrd (loop){initrd_path}
 }}
 """
-                with open(target_cfg, "w", encoding="utf-8") as f:
-                    f.write(iso_entry)
+                target_cfg = "/boot/grub2/custom.cfg"
+                begin = "# BEGIN BERP ISO BOOT"
+                end = "# END BERP ISO BOOT"
+                previous = ""
+                if os.path.exists(target_cfg):
+                    with open(target_cfg, "r", encoding="utf-8") as f:
+                        previous = f.read()
+                previous = re.sub(
+                    rf"(?s){re.escape(begin)}.*?{re.escape(end)}\n?", "", previous
+                ).rstrip()
+                tmp_cfg = target_cfg + ".tmp"
+                with open(tmp_cfg, "w", encoding="utf-8") as f:
+                    if previous:
+                        f.write(previous + "\n\n")
+                    f.write(f"{begin}\n{iso_entry}{end}\n")
+                os.chmod(tmp_cfg, 0o600)
+                os.replace(tmp_cfg, target_cfg)
 
                 if shutil.which("grub2-reboot"):
-                    subprocess.run(["grub2-reboot", "blaze_iso_boot"], check=False)
+                    subprocess.run(["grub2-reboot", "blaze_iso_boot"], check=True)
+                else:
+                    return {"status": "error", "message": "grub2-reboot bulunamadı."}
 
                 return {"status": "ok", "message": "ISO baslatma yapilandirildi."}
             except Exception as e:
@@ -242,6 +304,14 @@ menuentry "BlazeOS Direct ISO Boot ({os.path.basename(iso_path)})" --id=blaze_is
             if not snap_path or not os.path.exists(snap_path):
                 return {"status": "error", "message": "Yedek yolu bulunamadi."}
 
+            # A live root subvolume cannot be atomically replaced from inside
+            # itself. The former code only created a *.restore-tmp snapshot and
+            # falsely claimed it would become active after reboot.
+            return {
+                "status": "error",
+                "message": "Güvenli çevrimdışı Btrfs rollback akışı henüz kurulu değil; mevcut sistem değiştirilmedi."
+            }
+
             try:
                 # Btrfs snapshot rollback: hedef subvolume'u sil, snapshot'i yerine tasi
                 # Ornek: snap_path = "/.bere-snapshots/root/pre-update-state"
@@ -286,7 +356,7 @@ menuentry "BlazeOS Direct ISO Boot ({os.path.basename(iso_path)})" --id=blaze_is
             except Exception:
                 pass
 
-            smart_info = "SMART Bilgisi: Diskler saglikli gorunuyor."
+            smart_info = "SMART bilgisi okunamadı; sağlık durumu doğrulanmadı."
             try:
                 nvme_check = subprocess.check_output(["nvme", "list"], stderr=subprocess.DEVNULL).decode("utf-8")
                 smart_info = nvme_check
@@ -361,9 +431,16 @@ menuentry "BlazeOS Direct ISO Boot ({os.path.basename(iso_path)})" --id=blaze_is
                     os.makedirs("/etc/sddm.conf.d", exist_ok=True)
                     with open("/etc/sddm.conf.d/00-blaze-oobe.conf", "w", encoding="utf-8") as f:
                         f.write("[Autologin]\nUser=blaze-setup\nSession=blaze-oobe\nRelogin=false\n")
+                    oobe_template = "/usr/share/blaze-setup/blaze-oobe.desktop"
+                    oobe_session = "/usr/share/wayland-sessions/blaze-oobe.desktop"
+                    if os.path.isfile(oobe_template):
+                        with open(oobe_template, "r", encoding="utf-8") as src:
+                            with open(oobe_session, "w", encoding="utf-8") as dst:
+                                dst.write(src.read())
                     cleared.append("Kullanıcı hesapları silindi, ilk kurulum sihirbazı (OOBE) aktif edildi" if lang == "tr" else "User accounts deleted, first-boot wizard (OOBE) restored")
 
                 if data.get("factory"):
+                    return {"status": "error", "message": "Fabrika imajı doğrulanmadığı için bu işlem güvenlik amacıyla devre dışı."}
                     try:
                         with open("/etc/passwd", "r") as f:
                             lines = f.readlines()
@@ -396,12 +473,25 @@ menuentry "BlazeOS Direct ISO Boot ({os.path.basename(iso_path)})" --id=blaze_is
                     os.makedirs("/etc/sddm.conf.d", exist_ok=True)
                     with open("/etc/sddm.conf.d/00-blaze-oobe.conf", "w", encoding="utf-8") as f:
                         f.write("[Autologin]\nUser=blaze-setup\nSession=blaze-oobe\nRelogin=false\n")
+                    oobe_template = "/usr/share/blaze-setup/blaze-oobe.desktop"
+                    oobe_session = "/usr/share/wayland-sessions/blaze-oobe.desktop"
+                    if os.path.isfile(oobe_template):
+                        with open(oobe_template, "r", encoding="utf-8") as src:
+                            with open(oobe_session, "w", encoding="utf-8") as dst:
+                                dst.write(src.read())
 
                     clean_path_contents("/var/log")
                     clean_path_contents("/tmp")
                     cleared.append("Sistem fabrika ayarlarına sıfırlandı" if lang == "tr" else "System reset to factory defaults")
 
                 if data.get("hard_reset"):
+                    recovery_root = "/boot/bere/recovery.squashfs"
+                    recovery_initrd = "/boot/bere/recovery-initramfs.img"
+                    if not (os.path.isfile(recovery_root) and os.path.isfile(recovery_initrd)):
+                        return {
+                            "status": "error",
+                            "message": "Bağımsız BERE kurtarma imajı kurulu ve doğrulanmış değil; sistemi önyüklenemez hale getirmemek için Hard Reset engellendi."
+                        }
                     sync_bere_to_boot()
                     # Hard Reset: Wipe OS and user directories on /, protecting /boot and /dev and /proc and /sys
                     dirs_to_clean = ["/bin", "/sbin", "/lib", "/lib64", "/usr", "/var", "/etc", "/home", "/root", "/opt", "/srv", "/tmp"]
@@ -452,9 +542,7 @@ menuentry "BlazeOS Direct ISO Boot ({os.path.basename(iso_path)})" --id=blaze_is
                     p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
                     out_msg = p.stdout
                 elif target == "efi":
-                    cmd = ["efibootmgr", "-v"]
-                    p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-                    out_msg = p.stdout
+                    return {"status": "error", "message": "EFI onarımı için hedef disk ve EFI bölümü seçilmelidir; salt listeleme onarım değildir."}
                 elif target == "dracut":
                     cmd = ["dracut", "--regenerate-all", "--force"]
                     p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
@@ -569,8 +657,8 @@ def main():
     t.start()
     time.sleep(0.2)
 
-    url = f"http://127.0.0.1:{PORT}/index.html"
-    print(f"[BERP-RECOVERY] Started server at {url}")
+    url = f"http://127.0.0.1:{PORT}/index.html?token={API_TOKEN}"
+    print("[BERP-RECOVERY] Started local recovery interface")
 
     if "--daemon" in sys.argv:
         while True:

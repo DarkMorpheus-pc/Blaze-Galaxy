@@ -1,0 +1,11 @@
+[Unit]
+Description=Remove completed BlazeOS one-time setup session
+Before=display-manager.service sddm.service
+ConditionPathExists=/etc/blazeos-setup-completed
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/blazeos-oobe-hygiene
+
+[Install]
+WantedBy=graphical.target

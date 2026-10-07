@@ -58,17 +58,18 @@ find_esp_dir() {
     return 1
 }
 
-find_root_uuid() {
+find_root_spec() {
     local fstab="${SYSROOT}/etc/fstab"
-    local uuid=""
+    local spec=""
     if [[ -f "$fstab" ]]; then
-        # Search for mount point / (root)
-        uuid=$(awk '$2 == "/" { if ($1 ~ /^UUID=/) { split($1, a, "="); print a[2] } }' "$fstab" | head -1)
+        spec=$(awk '$2 == "/" && $1 !~ /^#/ { print $1; exit }' "$fstab")
     fi
-    if [[ -z "$uuid" ]]; then
+    if [[ -z "$spec" ]]; then
+        local uuid
         uuid=$(findmnt -n -o UUID "${SYSROOT:-/}" 2>/dev/null || true)
+        [[ -n "$uuid" ]] && spec="UUID=$uuid"
     fi
-    echo "$uuid"
+    echo "$spec"
 }
 
 do_status() {
@@ -165,10 +166,10 @@ do_switch_to_limine() {
     fi
 
     # 3. Create limine.conf
-    local root_uuid
-    root_uuid=$(find_root_uuid)
-    if [[ -z "$root_uuid" ]]; then
-        root_uuid="LABEL=BlazeOS"
+    local root_spec
+    root_spec=$(find_root_spec)
+    if [[ -z "$root_spec" ]]; then
+        root_spec="LABEL=BlazeOS"
     fi
 
     cat > "$esp/EFI/limine/limine.conf" << LIMEOF
@@ -187,19 +188,19 @@ interface_branding_colour: 6
     protocol: linux
     kernel_path: boot():/blazeos/vmlinuz
     module_path: boot():/blazeos/initramfs.img
-    cmdline: root=UUID=${root_uuid} ro quiet rhgb splash
+    cmdline: root=${root_spec} ro quiet rhgb splash
 
 /Blaze Emergency Recovery Protocol (BERP)
     protocol: linux
     kernel_path: boot():/blazeos/vmlinuz
     module_path: boot():/blazeos/initramfs.img
-    cmdline: root=UUID=${root_uuid} ro systemd.unit=blaze-recovery.target single
+    cmdline: root=${root_spec} ro systemd.unit=blaze-recovery.target single
 
 /Blaze SolarEvolution (Kurtarma Modu)
     protocol: linux
     kernel_path: boot():/blazeos/vmlinuz
     module_path: boot():/blazeos/initramfs.img
-    cmdline: root=UUID=${root_uuid} ro single
+    cmdline: root=${root_spec} ro single
 
 /GNU GRUB2 (Fedora)
     protocol: efi

@@ -58,6 +58,8 @@ Bu sürüm (`5.03`), masaüstü deneyimini, dil desteğini, sistem entegrasyonun
 ### 🖥️ 8. SDDM Varsayılan Giriş Yöneticisi & GNOME Bileşenlerinden Arındırma
 - **SDDM Varsayılan Olarak Etkinleştirildi:** GDM3 ve ağır GNOME arka plan servisleri devreden çıkarıldı. SDDM 0.21 (Qt6) hafif oturum yöneticisi sisteme entegre edildi (`/etc/systemd/system/display-manager.service -> sddm.service`). Sistem açılışında doğrudan ~350-400 MB RAM tasarrufu sağlandı.
 - **GNOME Ayarlar ve Çakışmalar Kaldırıldı:** Sistemde açılmayan, çöken ve arayüzü kalabalıklaştıran `gnome-control-center`, `gnome-shell`, `gnome-tour`, `gnome-initial-setup` ve GNOME kabuk eklentileri paket seviyesinde temizlendi. Uygulama menüsündeki tüm ayar talepleri doğrudan yerel **SolarUI Ayarları** (`solar-settings`) aracına yönlendirildi.
+- **Sistem İzleyicisi:** GNOME Sistem Monitörü ISO'dan çıkarıldı. Yerine resmî Fedora 45 `htop` paketi ve SolarUI/Kitty ile açılan `Blaze Sistem İzleyicisi` masaüstü girdisi eklendi.
+- **UEFI GRUB Onarımı:** Kurulumdan sonra çıplak `grub>` istemine düşmeye neden olan mock derleme yolu temizlendi; taşınabilir EFI GRUB stub'ı ve kurulum sonrası otomatik onarım eklendi.
 - **SDDM Canlı Açılış ve Weston Kiosk Entegrasyonu:** SDDM'in Wayland modunda ihtiyaç duyduğu `CompositorCommand=weston --shell=kiosk` yapılandırması tanımlandı; `sddm.service.d/10-livesys.conf` ile oturum başlangıcı `livesys.service` arkasına güvenle sıralandı. Ağ bağlantı sorguları asenkron arka plana alınarak açılış kilitlenmeleri giderildi ve sistem GRUB sonrası ~18 saniyede doğrudan SolarUI masaüstüne ulaştı.
 - **Deklaratif SDDM Otomatik Giriş:** `/etc/sddm.conf.d/autologin.conf` üzerinden Live ISO ve kurulu sistem için `liveuser` otomatik oturumu `solarui.desktop` Wayland oturumuyla birebir kilitlendi.
 
@@ -76,7 +78,7 @@ Bu sürüm (`5.03`), masaüstü deneyimini, dil desteğini, sistem entegrasyonun
 
 **Blaze SolarEvolution 5.03** is a high-performance Linux operating system ecosystem built on Fedora Workstation, specifically optimized for gamers, developers, and content creators.
 
-The system brings together the innovative **SolarUI (Niri Wayland + Noctalia + Caelestia)** desktop shell, a choice of 9 different desktop environments, and dual bootloader management (GRUB2 & Limine) in a unified setup.
+The system ships **SolarUI (Niri Wayland + Noctalia + Caelestia)** as its only offline stock desktop. Eight optional sessions can be selected when the installer verifies access to the official Fedora repositories. GRUB2 and the bundled upstream Limine release are available as bootloader choices on supported firmware.
 
 ---
 
@@ -87,17 +89,17 @@ The system brings together the innovative **SolarUI (Niri Wayland + Noctalia + C
   <img width="1205" height="753" alt="image" src="https://github.com/user-attachments/assets/beac43d9-0943-44c9-b951-712629f23456" />
 </p>
 
-- **9 Desktop Environment Options:**
+- **SolarUI plus 8 Online Desktop Options:**
   - **SolarUI:** The default fluid Hybrid desktop (Noctalia + Caelestia, Available Offline)
-  - **GNOME:** Modern and stable GNOME 50 (Available Offline)
-  - **Niri (Standalone):** A standalone window manager with infinite scrolling (Available Offline)
+  - **GNOME:** Installed on demand from the official Fedora repositories
+  - **Niri (Standalone):** An optional standalone session using SolarUI's bundled Niri compositor
   - **KDE Plasma:** Highly customizable Plasma 6 on Wayland
   - **COSMIC:** An independent, modern, Rust-based desktop by System76
   - **Hyprland:** A dynamic tiling Wayland environment with fluid animations
   - **Cinnamon:** A classic and practical desktop layout
   - **XFCE:** An extremely lightweight and fast X11 environment
   - **Sway:** An i3-compatible, keyboard-driven tiling environment
-- **Limine & GRUB2 Bootloader Support:** Switch between the Limine bootloader for lightning-fast startup and standard GRUB2 with Secure Boot support using a single command (`blaze-bootloader`).
+- **Limine & GRUB2 Bootloader Support:** GRUB2 remains the Secure Boot compatible default. UEFI installations can select the bundled official Limine 12.9.0 release; no third-party COPR is enabled during installation.
 - **BlazeOS Control Center (`blazeos-control`):** A system control center built using GTK4 / Libadwaita, featuring 5 tabs: Updates, Desktop, Performance, Tools, and About.
 - **Low Latency & ZRAM Improvements:** DNF5 configurations for faster downloads, default ZRAM optimizations, and CachyOS kernel/animation tuning settings.
 - **Online & Offline ISO Architecture:** Build support for a lightweight 3.5 GB Online ISO and a fully bundled 10 GB+ Offline ISO.

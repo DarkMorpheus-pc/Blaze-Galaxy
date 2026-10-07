@@ -192,8 +192,9 @@ mod tests {
             ShellEngine::Caelestia,
             &ActualEngine::Caelestia
         ));
-        // Hybrid modunda Noctalia omurgası yeterlidir
-        assert!(SolarShellSupervisor::is_reconciled(
+        // Hybrid requires both providers; a lone Noctalia process means the
+        // Caelestia half crashed and the supervisor must reconcile it.
+        assert!(!SolarShellSupervisor::is_reconciled(
             ShellEngine::Hybrid,
             &ActualEngine::Noctalia
         ));

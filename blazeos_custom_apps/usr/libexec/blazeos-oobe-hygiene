@@ -1,0 +1,18 @@
+#!/bin/sh
+set -eu
+ROOT="${BLAZEOS_SYSROOT:-}"
+
+# OOBE is a one-shot session. Keep its template for recovery, but make the
+# selectable session and its autologin route disappear after completion.
+if [ -f "${ROOT}/etc/blazeos-setup-completed" ]; then
+    rm -f "${ROOT}/etc/sddm.conf.d/00-blaze-oobe.conf"
+    rm -f "${ROOT}/usr/share/wayland-sessions/blaze-oobe.desktop"
+    rm -f "${ROOT}/var/lib/AccountsService/users/blaze-setup"
+
+    if [ -f "${ROOT}/etc/sddm.conf.d/autologin.conf" ] &&
+       grep -q '^User=blaze-setup$' "${ROOT}/etc/sddm.conf.d/autologin.conf"; then
+        rm -f "${ROOT}/etc/sddm.conf.d/autologin.conf"
+    fi
+fi
+
+exit 0

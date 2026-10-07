@@ -13,6 +13,8 @@ import threading
 import subprocess
 import re
 import glob
+import pwd
+import secrets
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 
 PORT = 49222
@@ -23,6 +25,7 @@ if not os.path.isdir(SETUP_DIR):
         SETUP_DIR = local_dir
 
 COMPLETED_FLAG = "/etc/blazeos-setup-completed"
+API_TOKEN = secrets.token_urlsafe(32)
 
 def privileged_run(cmd, stdin_data=None):
     if os.getuid() != 0:
@@ -39,10 +42,12 @@ def privileged_write(path, content):
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w", encoding="utf-8") as f:
             f.write(content)
+        return True
     else:
         cmd = ["sudo", "-n", "tee", path]
         p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         p.communicate(content.encode("utf-8"))
+        return p.returncode == 0
 
 def privileged_read(path):
     if os.getuid() == 0:
@@ -64,10 +69,15 @@ def privileged_rm(path):
         try:
             if os.path.exists(path):
                 os.remove(path)
+            return True
         except OSError:
-            pass
+            return False
     else:
-        subprocess.run(["sudo", "-n", "rm", "-f", path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return subprocess.run(
+            ["sudo", "-n", "rm", "-f", path],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        ).returncode == 0
 
 class SetupAPIHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
@@ -79,6 +89,9 @@ class SetupAPIHandler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         if self.path == "/api/action":
+            if not secrets.compare_digest(self.headers.get("X-Blaze-Token", ""), API_TOKEN):
+                self.send_error(403, "Forbidden")
+                return
             content_length = int(self.headers.get("Content-Length", 0))
             body = self.rfile.read(content_length).decode("utf-8")
             try:
@@ -191,8 +204,19 @@ class SetupAPIHandler(SimpleHTTPRequestHandler):
             password = data.get("password", "")
             is_admin = data.get("isAdmin", True)
 
-            if not username:
+            if not re.fullmatch(r"[a-z_][a-z0-9_-]{0,31}", username):
                 return {"status": "error", "message": "Geçersiz kullanıcı adı"}
+            if not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", hostname):
+                return {"status": "error", "message": "Geçersiz bilgisayar adı"}
+            if not password:
+                return {"status": "error", "message": "Boş parola kullanılamaz"}
+
+            try:
+                existing = pwd.getpwnam(username)
+                if existing.pw_uid < 1000 or existing.pw_uid >= 65534:
+                    return {"status": "error", "message": "Bu kullanıcı adı sistem tarafından ayrılmış"}
+            except KeyError:
+                existing = None
 
             print(f"[BLAZE-SETUP] Creating user: username={username}, fullname={fullname}, hostname={hostname}, admin={is_admin}")
 
@@ -214,8 +238,7 @@ class SetupAPIHandler(SimpleHTTPRequestHandler):
                         available_groups.append(g)
 
             # Check if user already exists
-            check_u = subprocess.run(["id", "-u", username], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            if check_u.returncode != 0:
+            if existing is None:
                 cmd = ["useradd", "-m", "-c", fullname, "-s", "/bin/bash"]
                 if available_groups:
                     cmd.extend(["-G", ",".join(available_groups)])
@@ -425,9 +448,14 @@ icon-theme='Papirus-Dark'
             if layout not in ["noctalia", "caelestia"]:
                 layout = "noctalia"
 
-            # 1. Mark setup completed
+            if not re.fullmatch(r"[a-z_][a-z0-9_-]{0,31}", username):
+                return {"status": "error", "message": "Geçersiz kullanıcı adı"}
+            if not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", hostname):
+                return {"status": "error", "message": "Geçersiz bilgisayar adı"}
+
+            # Write the completion marker only after every required setting
+            # succeeds. Otherwise a partial failure permanently skips OOBE.
             setup_info = f"setup_completed_at={time.ctime()}\nusername={username}\nfullname={fullname}\nhostname={hostname}\nlayout={layout}\n"
-            privileged_write(COMPLETED_FLAG, setup_info)
 
             # 2. Hostname check & ensure
             if hostname:
@@ -436,17 +464,16 @@ icon-theme='Papirus-Dark'
                 hosts_content = f"127.0.0.1   localhost localhost.localdomain {hostname}\n::1         localhost localhost.localdomain {hostname}\n"
                 privileged_write("/etc/hosts", hosts_content)
 
-            # 3. Remove OOBE autologin config
-            privileged_rm("/etc/sddm.conf.d/00-blaze-oobe.conf")
-
-            # 4. Configure user autologin or standard login
+            # 3. Configure user autologin or standard login
             if autologin and username:
                 autologin_content = f"[Autologin]\nUser={username}\nSession=solarui.desktop\nRelogin=false\n"
-                privileged_write("/etc/sddm.conf.d/autologin.conf", autologin_content)
+                if not privileged_write("/etc/sddm.conf.d/autologin.conf", autologin_content):
+                    return {"status": "error", "message": "Otomatik giriş ayarı yazılamadı"}
             else:
-                privileged_rm("/etc/sddm.conf.d/autologin.conf")
+                if not privileged_rm("/etc/sddm.conf.d/autologin.conf"):
+                    return {"status": "error", "message": "Eski otomatik giriş ayarı temizlenemedi"}
 
-            # 5. Register session with AccountsService so SDDM greeter knows default session and real name
+            # 4. Register session with AccountsService so SDDM greeter knows default session and real name
             if username:
                 asc_content = f"[User]\nRealName={fullname}\nUserName={username}\nSession=solarui\nSessionType=wayland\nSystemAccount=false\nIcon=/usr/share/icons/hicolor/256x256/apps/solarui.png\n"
                 privileged_write(f"/var/lib/AccountsService/users/{username}", asc_content)
@@ -456,13 +483,30 @@ icon-theme='Papirus-Dark'
                 state_content = f"[Last]\nSession=solarui.desktop\nUser={username}\n"
                 privileged_write("/var/lib/sddm/state.conf", state_content)
 
+            if not privileged_write(COMPLETED_FLAG, setup_info):
+                return {"status": "error", "message": "Kurulum tamamlanma kaydı yazılamadı"}
+
+            # 5. Retire the one-shot OOBE session before Niri exits. SDDM then
+            # rescans the session directory and can only offer real desktops.
+            cleanup_paths = [
+                "/etc/sddm.conf.d/00-blaze-oobe.conf",
+                "/usr/share/wayland-sessions/blaze-oobe.desktop",
+                "/var/lib/AccountsService/users/blaze-setup",
+            ]
+            cleanup_results = [privileged_rm(path) for path in cleanup_paths]
+            if not all(cleanup_results):
+                privileged_rm(COMPLETED_FLAG)
+                return {"status": "error", "message": "Geçici kurulum oturumu temizlenemedi; yeniden deneyin"}
+
+            privileged_run(["systemctl", "start", "--no-block", "blazeos-oobe-hygiene.service"])
+
             return {"status": "ok"}
 
         elif action == "start_desktop":
             print("[BLAZE-SETUP] Setup finished! Launching desktop session...")
             # Niri quit -> SDDM display manager oturumun kapatildigini algilar
             # ve otomatik olarak yeni greeter oturumu acar (restart gerekmez).
-            subprocess.run(["niri", "msg", "action", "quit"], stderr=subprocess.DEVNULL)
+            subprocess.run(["niri", "msg", "action", "quit", "--skip-confirmation"], stderr=subprocess.DEVNULL)
             # Terminate this script after short delay
             threading.Thread(target=lambda: (time.sleep(0.5), os._exit(0))).start()
             return {"status": "ok"}
@@ -578,13 +622,20 @@ def main():
         print("Usage: blaze-setup [--fullscreen]")
         sys.exit(0)
 
+    # A completed assistant must never be launchable as a desktop session,
+    # even if a stale session file is restored by an update or interrupted I/O.
+    if os.path.exists(COMPLETED_FLAG):
+        privileged_rm("/etc/sddm.conf.d/00-blaze-oobe.conf")
+        privileged_rm("/usr/share/wayland-sessions/blaze-oobe.desktop")
+        sys.exit(0)
+
     # Start API server in background
     srv_thread = threading.Thread(target=start_server, daemon=True)
     srv_thread.start()
     time.sleep(0.3)
 
-    target_url = f"http://127.0.0.1:{PORT}/index.html"
-    print(f"[BLAZE-SETUP] Running at {target_url}")
+    target_url = f"http://127.0.0.1:{PORT}/index.html?token={API_TOKEN}"
+    print(f"[BLAZE-SETUP] Running on local setup interface")
 
     launch_gui(target_url)
 

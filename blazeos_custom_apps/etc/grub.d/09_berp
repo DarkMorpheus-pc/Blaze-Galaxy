@@ -1,20 +1,12 @@
 #!/usr/bin/sh -e
-# Blaze Emergency Recovery Protocol (BERP) Early Shift & Watchdog Hook
+# Blaze Emergency Recovery Protocol (BERP) watchdog hook
 
 cat << 'BERPEOF'
-# === Blaze Emergency Recovery Protocol (BERP) Early Shift Detection ===
-if [ "${grub_platform}" = "pc" ]; then
-  if insmod keystatus; then
-    if keystatus --shift; then
-      set default="BlazeOS Recovery Environment (BERE - Powered by BERP)"
-      set timeout=2
-    fi
-  fi
-fi
-
+# GRUB keystatus is unreliable on some UEFI/USB keyboards and can report a
+# phantom Shift press, booting recovery forever. Recovery remains available
+# from the visible menu and its Space/B hotkeys.
 if [ "${blaze_recovery}" = "alert" ]; then
   set default="BlazeOS Recovery Environment (BERE - Powered by BERP)"
   set timeout=0
 fi
 BERPEOF
-

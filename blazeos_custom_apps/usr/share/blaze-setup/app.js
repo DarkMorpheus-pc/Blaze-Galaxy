@@ -352,10 +352,10 @@ document.addEventListener("DOMContentLoaded", () => {
         keymap: "tr",
         locale: "tr_TR.UTF-8",
         networkMode: "auto",
-        fullname: "Blaze",
-        username: "blaze",
+        fullname: "",
+        username: "",
         hostname: "blazeos",
-        password: "2121",
+        password: "",
         isAdmin: true,
         autologin: false,
         appearance: "dark",
@@ -721,9 +721,19 @@ document.addEventListener("DOMContentLoaded", () => {
             const p = inPass.value;
             const pc = inPassConfirm.value;
 
-            if (!u) {
+            if (!/^[a-z_][a-z0-9_-]{0,31}$/.test(u)) {
                 alert(dict.alert_invalid_user || "Lütfen geçerli bir hesap adı girin.");
                 inUsername.focus();
+                return;
+            }
+            if (!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(hn)) {
+                alert("Geçerli bir bilgisayar adı girin (harf, rakam ve tire).");
+                inHostname.focus();
+                return;
+            }
+            if (!p) {
+                alert("Boş parola kullanılamaz.");
+                inPass.focus();
                 return;
             }
             if (p !== pc) {
@@ -763,12 +773,15 @@ document.addEventListener("DOMContentLoaded", () => {
     // ── 9. Backend Communication ──────────────────────────────────────────
     async function callBackend(action, data = {}) {
         try {
+            const apiToken = new URLSearchParams(window.location.search).get("token") || "";
             const res = await fetch("/api/action", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: { "Content-Type": "application/json", "X-Blaze-Token": apiToken },
                 body: JSON.stringify({ action, data })
             });
-            return await res.json();
+            const payload = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(payload.message || `HTTP ${res.status}`);
+            return payload;
         } catch (err) {
             console.error(`[API-ERR] Action ${action} failed:`, err);
             return { status: "error", message: err.toString() };
@@ -802,7 +815,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // 1. Task: Keymap & Locale
         setTaskStatus("task-keymap", "active", dict.task_keymap ? `${dict.task_keymap}...` : "Dil ve klavye düzeni işleniyor...");
-        await callBackend("set_keymap", { keymap: setupData.keymap });
+        const keymapRes = await callBackend("set_keymap", { keymap: setupData.keymap });
+        if (keymapRes.status !== "ok") throw new Error(keymapRes.message || "Klavye ayarlanamadı");
         setTaskStatus("task-keymap", "done", dict.task_keymap ? `${dict.task_keymap} [OK]` : "Dil ve klavye düzeni uygulandı.");
         await new Promise((r) => setTimeout(r, 400));
 
@@ -834,7 +848,7 @@ document.addEventListener("DOMContentLoaded", () => {
         // 4. Task: Appearance & Desktop Config (Engine: Noctalia or Caelestia)
         const engineLabel = setupData.layout === "caelestia" ? "Caelestia" : "Noctalia";
         setTaskStatus("task-appearance", "active", dict.task_appearance ? `${dict.task_appearance}...` : "Masaüstü kabuğu yapılandırılıyor...");
-        await callBackend("save_desktop_config", {
+        const appearanceRes = await callBackend("save_desktop_config", {
             username: setupData.username,
             layout: setupData.layout,
             theme: setupData.theme,
@@ -842,18 +856,28 @@ document.addEventListener("DOMContentLoaded", () => {
             keymap: setupData.keymap,
             acoustic: setupData.acousticFeedback
         });
+        if (appearanceRes.status !== "ok") {
+            setTaskStatus("task-appearance", "error", appearanceRes.message || "Masaüstü ayarlanamadı");
+            btnBack.disabled = false;
+            return;
+        }
         setTaskStatus("task-appearance", "done", `${engineLabel} (${setupData.appearance.toUpperCase()}) [OK]`);
         await new Promise((r) => setTimeout(r, 400));
 
         // 5. Task: Finalize OOBE
         setTaskStatus("task-finalize", "active", dict.task_finalize ? `${dict.task_finalize}...` : "OOBE tamamlanıyor...");
-        await callBackend("finish_setup", {
+        const finishRes = await callBackend("finish_setup", {
             username: setupData.username,
             fullname: setupData.fullname,
             hostname: setupData.hostname,
             autologin: setupData.autologin,
             layout: setupData.layout
         });
+        if (finishRes.status !== "ok") {
+            setTaskStatus("task-finalize", "error", finishRes.message || "Kurulum tamamlanamadı");
+            btnBack.disabled = false;
+            return;
+        }
         setTaskStatus("task-finalize", "done", "BlazeOS [READY]");
         await new Promise((r) => setTimeout(r, 600));
 

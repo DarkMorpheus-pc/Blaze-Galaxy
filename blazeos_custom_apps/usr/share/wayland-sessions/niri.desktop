@@ -3,5 +3,6 @@ Name=Niri
 Comment=A scrollable-tiling Wayland compositor
 Exec=niri-session
 Type=Application
+NoDisplay=true
 DesktopNames=niri
 Keywords=wayland;compositor;tiling;

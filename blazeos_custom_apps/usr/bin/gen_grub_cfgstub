@@ -11,19 +11,45 @@ fi
 GRUB_HOME=$1
 EFI_HOME=$2
 
-# Ensure target EFI directory exists
-mkdir -p "${EFI_HOME}"
+# Anaconda invokes this helper inside the target-system chroot. A fresh EFI
+# system partition does not necessarily contain the vendor directory yet.
+mkdir -p -- "${GRUB_HOME}" "${EFI_HOME}"
 
-# create a stub grub2 config in EFI
-BOOT_UUID=$(grub2-probe --target=fs_uuid "${GRUB_HOME}")
-GRUB_DIR=$(grub2-mkrelpath "${GRUB_HOME}")
+TMP_CFG="${EFI_HOME}/grub.cfg.stb.$$"
+trap 'rm -f -- "${TMP_CFG}"' EXIT HUP INT TERM
 
-cat << EOF > "${EFI_HOME}"/grub.cfg.stb
+# Prefer an exact filesystem UUID. Some image-based Anaconda payloads invoke
+# this helper before grub2-probe can resolve the freshly mounted /boot. In that
+# case a file-searching stub is still safe and prevents the mock build path from
+# the source image leaking into the installed ESP.
+BOOT_UUID=$(grub2-probe --target=fs_uuid "${GRUB_HOME}" 2>/dev/null || true)
+GRUB_DIR=$(grub2-mkrelpath "${GRUB_HOME}" 2>/dev/null || true)
+
+if [ -n "${BOOT_UUID}" ] && [ -n "${GRUB_DIR}" ]; then
+    cat << EOF > "${TMP_CFG}"
 search --no-floppy --root-dev-only --fs-uuid --set=dev ${BOOT_UUID}
 set prefix=(\$dev)${GRUB_DIR}
 export \$prefix
 configfile \$prefix/grub.cfg
 EOF
+else
+    echo "gen_grub_cfgstub: UUID lookup unavailable; writing portable /boot search stub" >&2
+    if [ -f /usr/share/blazeos/grub-efi-stub.cfg ]; then
+        cat /usr/share/blazeos/grub-efi-stub.cfg > "${TMP_CFG}"
+    else
+        cat << 'EOF' > "${TMP_CFG}"
+if search --no-floppy --file --set=dev /grub2/grub.cfg; then
+    set prefix=($dev)/grub2
+elif search --no-floppy --file --set=dev /boot/grub2/grub.cfg; then
+    set prefix=($dev)/boot/grub2
+fi
+export $prefix
+configfile $prefix/grub.cfg
+EOF
+    fi
+fi
 
-mv "${EFI_HOME}/grub.cfg.stb" "${EFI_HOME}/grub.cfg"
+chmod 0600 "${TMP_CFG}"
+mv -f -- "${TMP_CFG}" "${EFI_HOME}/grub.cfg"
 chmod 0600 "${EFI_HOME}/grub.cfg"
+trap - EXIT HUP INT TERM

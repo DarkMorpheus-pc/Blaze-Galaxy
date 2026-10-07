@@ -1,0 +1,19 @@
+#!/bin/bash
+set -euo pipefail
+
+if ! command -v htop >/dev/null 2>&1; then
+    notify-send "Sistem İzleyicisi" "htop bulunamadı; klasik top açılıyor." 2>/dev/null || true
+    monitor_command=(top)
+else
+    monitor_command=(htop)
+fi
+
+if command -v kitty >/dev/null 2>&1; then
+    exec kitty --class blaze-system-monitor --title "Blaze Sistem İzleyicisi" "${monitor_command[@]}"
+elif command -v ptyxis >/dev/null 2>&1; then
+    exec ptyxis -- "${monitor_command[@]}"
+elif command -v foot >/dev/null 2>&1; then
+    exec foot "${monitor_command[@]}"
+fi
+
+exec "${monitor_command[@]}"

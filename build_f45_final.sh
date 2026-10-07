@@ -9,6 +9,27 @@ ROOTFS_SRC="$WORK/rootfs"
 NEW_SQUASHFS="$WORK/LiveOS/squashfs.img"
 PATCHED_INITRD="$WORK/initrd_work/patched_initrd"
 GRUB_CFG="$WORK/iso_mods/boot/grub2/grub.cfg"
+OVERLAY="${BLAZEOS_ROOT:-$(pwd)}/blazeos_custom_apps"
+
+echo "=== [0/5] Validating tracked installer and first-boot code ==="
+bash -n \
+    "$OVERLAY/usr/libexec/livesys/sessions.d/livesys-solarui" \
+    "$OVERLAY/usr/local/bin/blazeos-postinstall" \
+    "$OVERLAY/usr/local/bin/blaze-bootloader" \
+    "$OVERLAY/usr/local/bin/blazeos-limine-install" \
+    "$OVERLAY/usr/bin/blaze-system-monitor"
+node --check "$OVERLAY/usr/share/cockpit/anaconda-webui/index.js"
+python3 -c 'compile(open("'"$OVERLAY/usr/bin/blaze-setup"'", encoding="utf-8").read(), "blaze-setup", "exec")'
+python3 -c 'compile(open("'"$OVERLAY/usr/bin/berp-recovery-gui"'", encoding="utf-8").read(), "berp-recovery-gui", "exec")'
+if grep -Eq '/root/var/lib/mock|image-root' "$OVERLAY/boot/efi/EFI/fedora/grub.cfg"; then
+    echo "Refusing to build: EFI grub.cfg contains a build-host path" >&2
+    exit 1
+fi
+grep -q 'search --no-floppy --file --set=dev /grub2/grub.cfg' \
+    "$OVERLAY/boot/efi/EFI/fedora/grub.cfg"
+test -L "$OVERLAY/etc/systemd/system/graphical.target.wants/blazeos-oobe-hygiene.service"
+cmp -s "$OVERLAY/usr/share/wayland-sessions/blaze-oobe.desktop" \
+    "$OVERLAY/usr/share/blaze-setup/blaze-oobe.desktop"
 
 echo "=== [1/5] Building Squashfs with full SELinux labels in tmpfs ==="
 UNSHARE_FLAGS="-rm"
@@ -31,6 +52,23 @@ chown -R 0:0 "$ROOTFS"
 
 echo "  -> Applying tracked BlazeOS overlay..."
 cp -a --no-preserve=ownership "'"${BLAZEOS_ROOT:-$(pwd)}"'/blazeos_custom_apps/." "$ROOTFS/"
+
+# Cockpit prefers pre-compressed assets when the browser advertises gzip.
+# Rebuild the compressed bundle so it can never lag behind the patched source.
+echo "  -> Synchronizing Anaconda WebUI compressed bundle..."
+gzip -9 -n -c "$ROOTFS/usr/share/cockpit/anaconda-webui/index.js" > "$ROOTFS/usr/share/cockpit/anaconda-webui/index.js.gz"
+
+echo "  -> Replacing GNOME System Monitor with Fedora htop..."
+HTOP_RPM="'"${BLAZEOS_ROOT:-$(pwd)}"'/packages/htop-3.5.3-1.fc45.x86_64.rpm"
+HTOP_SHA256="a5f21195a6094f6abe43b97fb90554dc8617ff98dc8ee1ff92e85e6782719573"
+HWLOC_RPM="'"${BLAZEOS_ROOT:-$(pwd)}"'/packages/hwloc-libs-2.14.0-2.fc45.x86_64.rpm"
+HWLOC_SHA256="6e187ec895352dcd52d46a9cb0299b83389acae2d8051b93811b78720838d464"
+echo "${HTOP_SHA256}  ${HTOP_RPM}" | sha256sum --check --status
+echo "${HWLOC_SHA256}  ${HWLOC_RPM}" | sha256sum --check --status
+if rpm --root "$ROOTFS" -q gnome-system-monitor >/dev/null 2>&1; then
+    rpm --root "$ROOTFS" -e --nodeps --noscripts gnome-system-monitor
+fi
+rpm --root "$ROOTFS" -Uvh --replacepkgs --noscripts "$HWLOC_RPM" "$HTOP_RPM"
 
 echo "  -> Restoring SUID/SGID permissions stripped by chown..."
 chmod 4755 "$ROOTFS/usr/bin/sudo" 2>/dev/null || true
@@ -84,9 +122,10 @@ chmod 755 "$ROOTFS/usr/bin/sddm" 2>/dev/null || true
 chmod 755 "$ROOTFS/usr/bin/weston" 2>/dev/null || true
 chmod 755 "$ROOTFS/usr/bin/berp-recovery-gui" 2>/dev/null || true
 chmod 755 "$ROOTFS/usr/bin/blaze-setup" 2>/dev/null || true
+chmod 755 "$ROOTFS/usr/bin/blaze-system-monitor" 2>/dev/null || true
 chmod 755 "$ROOTFS/usr/bin/gen_grub_cfgstub" 2>/dev/null || true
 chmod 755 "$ROOTFS/etc/grub.d/09_berp" 2>/dev/null || true
-chmod 755 "$ROOTFS/etc/grub.d/11_berp" 2>/dev/null || true
+chmod 755 "$ROOTFS/etc/grub.d/99_berp" 2>/dev/null || true
 chmod 755 "$ROOTFS/usr/local/bin/solar-torture" 2>/dev/null || true
 chmod 600 "$ROOTFS/etc/NetworkManager/system-connections/"*.nmconnection 2>/dev/null || true
 
@@ -101,7 +140,6 @@ ln -sf /usr/lib/systemd/system/graphical.target "$ROOTFS/etc/systemd/system/defa
 ln -sf /dev/null "$ROOTFS/etc/systemd/system/gdm.service"
 
 echo "  -> Updating dynamic linker cache (ldconfig)..."
-rm -f "$ROOTFS/etc/ld.so.conf.d/quickshell.conf"
 chroot "$ROOTFS" ldconfig 2>/dev/null || ldconfig -r "$ROOTFS" -f "$ROOTFS/etc/ld.so.conf" -C "/etc/ld.so.cache" 2>/dev/null || true
 
 echo "  -> Setting SELinux contexts with setfiles..."
@@ -164,6 +202,7 @@ setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/qs
 setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/caelestia" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/liveinst" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/blaze-setup" 2>/dev/null || true
+setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/blaze-system-monitor" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:etc_t:s0" "$ROOTFS/etc/sddm.conf.d/00-blaze-oobe.conf" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:etc_t:s0" "$ROOTFS/etc/sudoers.d/99-blaze-setup" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:usr_t:s0" "$ROOTFS/usr/share/wayland-sessions/blaze-oobe.desktop" 2>/dev/null || true

@@ -56,9 +56,9 @@ const TRANSLATIONS = {
         wipe_home_title: "Kullanıcı Hesaplarını ve Verilerini Sıfırla (/home)",
         wipe_home_desc: "Tüm kullanıcı belgeleri ve hesapları silinir. Sistem ilk kurulum sihirbazına (OOBE) döner.",
         wipe_factory_title: "Tam Fabrika Sıfırlaması (Format Data / Root Subvolumes)",
-        wipe_factory_desc: "Sistem kökünü ve ayarları tamamen sıfırlar.",
+        wipe_factory_desc: "Doğrulanmış fabrika imajı gerektirir. İmaj yoksa işlem güvenli biçimde engellenir.",
         wipe_hard_reset_title: "Tam Sistem Temizliği (Hard Reset / Wipe System Data - sudo rm -rf /*)",
-        wipe_hard_reset_desc: "Tüm kök dosya sistemini siler. BERE kurtarma çekirdeği /boot/bere altında korunur. Güvenlik için 'YES' ve parola onayı gerektirir.",
+        wipe_hard_reset_desc: "Yalnız bağımsız BERE kurtarma kökü kuruluysa çalışır; aksi halde sistemi önyüklenemez bırakmamak için engellenir.",
         wipe_slider_warn: "Dikkat: Seçilen alanlar kalıcı olarak temizlenecektir.",
         wipe_slider_label: "Kaydırarak Temizlemeyi Başlat",
         wipe_running: "Temizleniyor...",
@@ -184,9 +184,9 @@ const TRANSLATIONS = {
         wipe_home_title: "Reset User Accounts & Data (/home)",
         wipe_home_desc: "Deletes all user documents and accounts. System restarts into first-boot wizard (OOBE).",
         wipe_factory_title: "Full Factory Reset (Format Data / Root Subvolumes)",
-        wipe_factory_desc: "Completely wipes root operating system and resets settings to default.",
+        wipe_factory_desc: "Requires a verified factory image. The operation is safely blocked when no image is installed.",
         wipe_hard_reset_title: "Complete System Wipe (Hard Reset / Wipe System Data - sudo rm -rf /*)",
-        wipe_hard_reset_desc: "Wipes all root filesystem trees. BERE emergency kernel is preserved in /boot/bere. Requires typing 'YES' and password confirmation.",
+        wipe_hard_reset_desc: "Runs only when a standalone BERE recovery root is installed; otherwise it is blocked to prevent an unbootable system.",
         wipe_slider_warn: "Warning: Selected target areas will be permanently erased.",
         wipe_slider_label: "Slide to Start Wipe",
         wipe_running: "Wiping...",
@@ -312,13 +312,16 @@ function initLanguage() {
 // REST API Helper
 async function apiCall(endpoint, data = null) {
     try {
+        const token = new URLSearchParams(window.location.search).get("token") || "";
         const options = {
             method: data ? "POST" : "GET",
-            headers: { "Content-Type": "application/json" }
+            headers: { "Content-Type": "application/json", "X-BERP-Token": token }
         };
         if (data) options.body = JSON.stringify(data);
         const res = await fetch("/api/" + endpoint, options);
-        return await res.json();
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(payload.message || `HTTP ${res.status}`);
+        return payload;
     } catch (e) {
         console.error("API call error:", e);
         return { status: "error", message: e.toString() };

@@ -1,6 +1,6 @@
 [Unit]
 Description=BlazeOS Post-Installation Setup
-Before=display-manager.service gdm.service sddm.service
+After=NetworkManager.service network-online.target
 ConditionKernelCommandLine=!rd.live.image
 ConditionPathExists=!/run/initramfs/live
 ConditionPathExists=/usr/local/bin/blazeos-postinstall
@@ -9,6 +9,7 @@ ConditionPathExists=/usr/local/bin/blazeos-postinstall
 Type=oneshot
 ExecStart=/usr/local/bin/blazeos-postinstall
 RemainAfterExit=yes
+TimeoutStartSec=20min
 
 [Install]
-WantedBy=multi-user.target graphical.target
+WantedBy=multi-user.target
