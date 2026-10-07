@@ -12,8 +12,12 @@ GRUB_CFG="$WORK/iso_mods/boot/grub2/grub.cfg"
 OVERLAY="${BLAZEOS_ROOT:-$(pwd)}/blazeos_custom_apps"
 
 echo "=== [0/5] Validating tracked installer and first-boot code ==="
+grep -qx 'VERSION="5.04"' "$OVERLAY/etc/os-release"
+grep -qx 'VERSION_ID=5.04' "$OVERLAY/etc/os-release"
+grep -qx 'PRETTY_NAME="Blaze SolarEvolution 5.04"' "$OVERLAY/etc/os-release"
 bash -n \
     "$OVERLAY/usr/libexec/livesys/sessions.d/livesys-solarui" \
+    "$OVERLAY/usr/libexec/blazeos-oobe-hygiene" \
     "$OVERLAY/usr/local/bin/blazeos-postinstall" \
     "$OVERLAY/usr/local/bin/blaze-bootloader" \
     "$OVERLAY/usr/local/bin/blazeos-limine-install" \
@@ -30,6 +34,16 @@ grep -q 'search --no-floppy --file --set=dev /grub2/grub.cfg' \
 test -L "$OVERLAY/etc/systemd/system/graphical.target.wants/blazeos-oobe-hygiene.service"
 cmp -s "$OVERLAY/usr/share/wayland-sessions/blaze-oobe.desktop" \
     "$OVERLAY/usr/share/blaze-setup/blaze-oobe.desktop"
+if grep -Eq 'id="input-password(-confirm)?"[^>]*value=' \
+    "$OVERLAY/usr/share/blaze-setup/index.html"; then
+    echo "Refusing to build: OOBE password fields must never contain a preset value" >&2
+    exit 1
+fi
+if grep -Eq 'cat > /etc/sddm\.conf\.d/(10-blaze-session|autologin)\.conf|DisplayServer=wayland|CompositorCommand=weston' \
+    "$OVERLAY/usr/local/bin/blazeos-postinstall"; then
+    echo "Refusing to build: postinstall overrides the known-good SDDM greeter path" >&2
+    exit 1
+fi
 
 echo "=== [1/5] Building Squashfs with full SELinux labels in tmpfs ==="
 UNSHARE_FLAGS="-rm"

@@ -1,4 +1,4 @@
-# Blaze SolarEvolution 5.03 — Kurulum ve Günlük Kullanım Test Formu
+# Blaze SolarEvolution 5.04 — Kurulum ve Günlük Kullanım Test Formu
 
 Bu formu her fiziksel bilgisayar veya sanal makine için ayrı kopyalayın. Her satırı `GEÇTİ`, `KALDI`, `UYGULANAMAZ` olarak işaretleyin; kalan maddelerde ekran görüntüsü ve günlük ekleyin.
 
@@ -6,7 +6,7 @@ Bu formu her fiziksel bilgisayar veya sanal makine için ayrı kopyalayın. Her 
 
 - Tarih / test eden:
 - ISO dosyası: `Blaze-SolarEvolution-5-x86_64.iso`
-- ISO SHA-256: `aaa9cd9c9d814ac7032d2e666de910bd800c3b17080f486f43457344b133851a`
+- ISO SHA-256: `afab6337b8c1826c71003b82d303f25573543a94610966b9e946e2deca769df2`
 - Donanım / VM yazılımı:
 - Firmware: UEFI / Legacy BIOS
 - Secure Boot: Açık / Kapalı
@@ -84,10 +84,14 @@ Bu formu her fiziksel bilgisayar veya sanal makine için ayrı kopyalayın. Her 
 ## 6. İlk açılış ve masaüstü seçimi
 
 - [ ] İlk açılış yardımcısı kullanıcı, parola, klavye, saat dilimi ve dil işlemlerini tamamlar.
+- [ ] Parola ve parola doğrulama alanları ilk açılışta boştur; kaynakta veya arayüzde hazır parola bulunmaz.
+- [ ] Otomatik giriş varsayılan olarak kapalıdır; kapalı bırakıldığında her yeniden başlatmada SDDM parola ister.
 - [ ] Yardımcı yarıda kapatılıp yeniden başlatıldığında veri bozulmadan devam eder.
 - [ ] Tahmin edilebilir `blaze/blaze` hesabı veya parolasız sudo hesabı yoktur.
 - [ ] SolarUI ilk oturumda açılır; GNOME kabuğu kendiliğinden başlamaz.
 - [ ] Oturum seçicide stok olarak SolarUI görünür; saf Niri ve GNOME gizlidir.
+- [ ] OOBE tamamlanınca `BlazeOS Kurulum Asistanı` oturumu, OOBE autologin ayarı ve geçici AccountsService hesabı silinir; yeniden başlatmada geri gelmez.
+- [ ] OOBE sonrası ikinci açılışta siyah ekran oluşmaz ve SDDM'nin oturum listesinde yalnız SolarUI görünür.
 - [ ] Çevrimiçi seçilen masaüstü resmi Fedora deposundan kurulur ve bir sonraki girişte varsayılan olur.
 - [ ] İndirme başarısızsa SolarUI çalışır; `/var/log/blazeos-postinstall.log` açık hata içerir ve sonraki açılışta yeniden dener.
 - [ ] Her çevrimiçi seçenek ayrı kurulumda sınandı: GNOME / Niri / KDE / COSMIC / Hyprland / Cinnamon / XFCE / Sway.

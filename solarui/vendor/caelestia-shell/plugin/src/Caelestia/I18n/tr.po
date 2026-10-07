@@ -1,6 +1,6 @@
 msgid ""
 msgstr ""
-"Project-Id-Version: Caelestia Shell 5.03\n"
+"Project-Id-Version: Caelestia Shell 5.04\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2026-09-28 19:10+0300\n"
 "PO-Revision-Date: 2026-09-28 19:25+0300\n"

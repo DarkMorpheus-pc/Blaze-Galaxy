@@ -1,4 +1,4 @@
-# Blaze SolarEvolution 5.03 — Masaüstü ve Önyükleyici Kaynak Denetimi
+# Blaze SolarEvolution 5.04 — Masaüstü ve Önyükleyici Kaynak Denetimi
 
 ## Masaüstü kaynakları
 
@@ -36,4 +36,3 @@ Bağlantı göstergesi tek başına ağ kartı durumuna güvenmez. Kurulum aray�
 ## Yerel paketler
 
 GNOME Sistem Monitörü ISO'dan çıkarılır. Yerine Fedora 45 tarafından imzalanmış `htop` ve bağımlılığı `hwloc-libs` eklenir. Dosya kökenleri ve SHA-256 değerleri `packages/README.md` içinde sabitlenmiştir. Uygulama menüsündeki Blaze başlatıcısı htop'u Kitty, Ptyxis veya Foot içinde açar.
-

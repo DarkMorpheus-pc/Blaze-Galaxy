@@ -89,14 +89,10 @@ chmod 4755 /usr/bin/newuidmap /usr/bin/newgidmap /usr/sbin/newuidmap /usr/sbin/n
 # 2. Configure SDDM & GDM for Primary Human User
 echo "Ensuring SDDM and display manager configuration for $FIRST_HUMAN_USER..."
 mkdir -p /etc/sddm.conf.d
-cat > /etc/sddm.conf.d/10-blaze-session.conf << 'SDDMEOF'
-[General]
-DisplayServer=wayland
-GreeterEnvironment=QT_WAYLAND_SHELL_INTEGRATION=layer-shell
-
-[Wayland]
-CompositorCommand=weston --shell=kiosk
-SDDMEOF
+# Keep SDDM's packaged greeter/display-server defaults. Forcing the greeter
+# through a nested Weston kiosk compositor produces a persistent black screen
+# on some GPUs and virtual machines after OOBE completes.
+rm -f /etc/sddm.conf.d/10-blaze-session.conf
 
 # OOBE owns the user's autologin choice. Never create autologin here: doing so
 # bypasses SDDM and causes a fresh login keyring password prompt. If OOBE made

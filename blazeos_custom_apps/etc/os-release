@@ -1,11 +1,11 @@
 NAME="Blaze SolarEvolution"
-VERSION="5.03"
+VERSION="5.04"
 ID=blazeos
 ID_LIKE=fedora
-VERSION_ID=5
+VERSION_ID=5.04
 VARIANT="SolarEvolution"
 VARIANT_ID=solarevolution
-PRETTY_NAME="Blaze SolarEvolution 5.03"
+PRETTY_NAME="Blaze SolarEvolution 5.04"
 ANSI_COLOR="0;38;2;255;102;0"
 LOGO=blazeos-logo
 HOME_URL="https://github.com/DarkMorpheus-pc"

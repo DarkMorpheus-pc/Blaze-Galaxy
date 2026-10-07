@@ -1,4 +1,4 @@
-# Blaze SolarEvolution 5.03 (Blaze-Galaxy)
+# Blaze SolarEvolution 5.04 (Blaze-Galaxy)
 
 [**Upgrade to BlazeOS (ISO)**](https://archive.org/details/blaze-solar-evolution-5-test)
 
@@ -14,9 +14,9 @@
 
 ---
 
-## 📋 Sürüm Notları (Release Notes) — Blaze SolarEvolution 5.03
+## 📋 Sürüm Notları (Release Notes) — Blaze SolarEvolution 5.04
 
-Bu sürüm (`5.03`), masaüstü deneyimini, dil desteğini, sistem entegrasyonunu ve arayüz tutarlılığını zirveye taşıyan kapsamlı iyileştirmeler içerir:
+Bu sürüm (`5.04`), 5.03 masaüstü ve Türkçe dil altyapısının üzerine güvenilir kurulum, kalıcı UEFI önyükleme, tek seferlik OOBE ve ikinci açılış kararlılığı ekler:
 
 ### 🇹🇷 1. Caelestia Tam Türkçe Yama & Canlı Dil Seçimi
 - **%100 Türkçe Yerelleştirme:** Caelestia kaynak kodundaki 670+ arayüz dizesi (Nexus Ayarları, Yan Panel/Sidebar, Sistem Tepsisi, Bildirimler, Kilit Ekranı, Medya Oynatıcı, Hızlı Anahtarlar, Saat, Ağ ve Güç Menüleri) Türkçeleştirildi.
@@ -60,8 +60,9 @@ Bu sürüm (`5.03`), masaüstü deneyimini, dil desteğini, sistem entegrasyonun
 - **GNOME Ayarlar ve Çakışmalar Kaldırıldı:** Sistemde açılmayan, çöken ve arayüzü kalabalıklaştıran `gnome-control-center`, `gnome-shell`, `gnome-tour`, `gnome-initial-setup` ve GNOME kabuk eklentileri paket seviyesinde temizlendi. Uygulama menüsündeki tüm ayar talepleri doğrudan yerel **SolarUI Ayarları** (`solar-settings`) aracına yönlendirildi.
 - **Sistem İzleyicisi:** GNOME Sistem Monitörü ISO'dan çıkarıldı. Yerine resmî Fedora 45 `htop` paketi ve SolarUI/Kitty ile açılan `Blaze Sistem İzleyicisi` masaüstü girdisi eklendi.
 - **UEFI GRUB Onarımı:** Kurulumdan sonra çıplak `grub>` istemine düşmeye neden olan mock derleme yolu temizlendi; taşınabilir EFI GRUB stub'ı ve kurulum sonrası otomatik onarım eklendi.
-- **SDDM Canlı Açılış ve Weston Kiosk Entegrasyonu:** SDDM'in Wayland modunda ihtiyaç duyduğu `CompositorCommand=weston --shell=kiosk` yapılandırması tanımlandı; `sddm.service.d/10-livesys.conf` ile oturum başlangıcı `livesys.service` arkasına güvenle sıralandı. Ağ bağlantı sorguları asenkron arka plana alınarak açılış kilitlenmeleri giderildi ve sistem GRUB sonrası ~18 saniyede doğrudan SolarUI masaüstüne ulaştı.
-- **Deklaratif SDDM Otomatik Giriş:** `/etc/sddm.conf.d/autologin.conf` üzerinden Live ISO ve kurulu sistem için `liveuser` otomatik oturumu `solarui.desktop` Wayland oturumuyla birebir kilitlendi.
+- **SDDM Canlı Açılış ve Weston Kiosk Entegrasyonu:** Weston kiosk bileşimi yalnız canlı ISO yolunda kullanılıyor; kurulu sistem paketlenmiş, donanım uyumlu SDDM greeter yolunu koruyor. `sddm.service.d/10-livesys.conf` ile canlı oturum başlangıcı `livesys.service` arkasına güvenle sıralandı.
+- **Tek Seferlik OOBE ve Oturum Temizliği:** İlk kurulum tamamlanınca `BlazeOS Kurulum Asistanı` oturumu, geçici autologin ayarı ve AccountsService kaydı atomik olarak kaldırılıyor. Açılış öncesi hijyen servisi yarım kalan temizliği tamamlıyor; SDDM'de stok olarak yalnız SolarUI kalıyor.
+- **Kullanıcı Kontrollü Otomatik Giriş:** Live ISO'nun `liveuser` girişi ayrı tutuluyor. Kurulu sistemde otomatik giriş yalnız OOBE'de kullanıcı açıkça seçerse oluşturuluyor; parola alanları hazır değer içermiyor.
 
 ### 🎯 9. Performans GiB Gösterimi, Bellenim, Çeviriler ve Ekran Köşeleri Sınırlandırması
 - **Performans Çekmecesi GiB Gösterimi:** `MemoryCard.qml` ve `StorageCard.qml` içindeki tanımsız fonksiyon referansı giderilerek `Units.formatKibUsage(...)` bağlandı. Bellek ve disk kartlarında yüzdelik bilginin altında dinamik `14.4 / 62.4 GiB` ve `675 / 937.9 GiB` değerlerinin kusursuz görüntülenmesi sağlandı.
@@ -72,11 +73,18 @@ Bu sürüm (`5.03`), masaüstü deneyimini, dil desteğini, sistem entegrasyonun
   - **Anaconda Kurulum Sihirbazı Kuralı:** Kurulum penceresi ekranda tam ekran yayılmak yerine %88 genişlik/yükseklikte ortalanmış ve yüzen (`open-floating`) pencere olarak yapılandırıldı. Sağ-alt köşedeki "İleri" butonunun köşe tetikleyicileriyle çakışması kökten önlendi.
   - **Caelestia Çekmece Maskesi Daraltması:** Çekmeceler kapalıyken ekran kenarında oluşan 10–35 piksellik gereksiz girdi maskesi maksimum 2–3 piksele sıkıştırıldı; pencerelerin kenar ve köşe tıklama alanları tamamen serbest bırakıldı.
 
+### 🧰 10. Kurulum, OOBE ve Önyükleme Dayanıklılığı
+- **Kalıcı UEFI GRUB Düzeltmesi:** Kurulum ortamına ait `/root/var/lib/mock/.../image-root` yolu ESP'ye sızdırılmıyor. Taşınabilir EFI güvenlik stub'ı gerçek `/grub2/grub.cfg` veya `/boot/grub2/grub.cfg` dosyasını bularak sistemi çıplak `grub>` istemine düşmeden açıyor.
+- **Tek Seferlik Kurulum Asistanı:** OOBE tamamlandığında `BlazeOS Kurulum Asistanı` oturumu, geçici autologin yapılandırması ve `blaze-setup` AccountsService kaydı kaldırılıyor. Açılış öncesi hijyen servisi yarıda kalan temizliği güvenle tamamlıyor.
+- **Güvenli Hesap Oluşturma:** Parola alanları boş başlıyor; ISO içinde tahmin edilebilir hazır parola bulunmuyor. Otomatik giriş yalnız kullanıcı açıkça seçerse etkinleşiyor.
+- **İkinci Açılış Siyah Ekran Düzeltmesi:** Kurulu sistemi Weston kiosk greeter yoluna zorlayan SDDM ayarı kaldırıldı. Donanımla uyumlu paket varsayılanı korunuyor ve oturum listesinde stok olarak yalnız SolarUI gösteriliyor.
+- **Derleme Güvenlik Kapıları:** ISO üretimi; derleme makinesi yolu taşıyan GRUB dosyasını, hazır OOBE parolasını, bozuk OOBE servis bağlantısını veya sorunlu SDDM greeter zorlamasını algılarsa duruyor.
+
 ---
 
 ## 🌟 About (Hakkında)
 
-**Blaze SolarEvolution 5.03** is a high-performance Linux operating system ecosystem built on Fedora Workstation, specifically optimized for gamers, developers, and content creators.
+**Blaze SolarEvolution 5.04** is a high-performance Linux operating system ecosystem built on Fedora Workstation, specifically optimized for gamers, developers, and content creators.
 
 The system ships **SolarUI (Niri Wayland + Noctalia + Caelestia)** as its only offline stock desktop. Eight optional sessions can be selected when the installer verifies access to the official Fedora repositories. GRUB2 and the bundled upstream Limine release are available as bootloader choices on supported firmware.
 
@@ -109,7 +117,7 @@ The system ships **SolarUI (Niri Wayland + Noctalia + Caelestia)** as its only o
 ## 🛠️ Architecture (Sistem Yapısı)
 
 ```text
-Blaze-Galaxy / Blaze SolarEvolution 5.03
+Blaze-Galaxy / Blaze SolarEvolution 5.04
 ├── build_f45_final.sh          # Online ISO build script (Squashfs + xorriso + SELinux)
 ├── build_f45_offline.sh        # Offline ISO build script
 ├── blazeos_custom_apps/        # Custom-developed system tools and desktop configurations
@@ -125,7 +133,7 @@ Blaze-Galaxy / Blaze SolarEvolution 5.03
 ├── solarui/                    # SolarUI components and source code
 │   └── vendor/caelestia-shell/ # Caelestia shell QML and C++ I18n plugin code
 ├── work_f45/rootfs/            # Live system root filesystem
-└── README.md                   # Release documentation (5.03)
+└── README.md                   # Release documentation (5.04)
 ```
 
 ---

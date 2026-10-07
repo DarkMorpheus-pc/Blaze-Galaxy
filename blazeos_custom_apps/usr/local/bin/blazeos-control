@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 BlazeOS Control Center (blazeos-control)
-Flagship System Management Suite for Blaze SolarEvolution 5
+Flagship System Management Suite for Blaze SolarEvolution 5.04
 Written natively in GTK4 + Libadwaita for maximum performance, responsiveness, and Wayland integration.
 """
 
@@ -21,7 +21,7 @@ gi.require_version("Adw", "1")
 from gi.repository import Gtk, Adw, GLib, Gio
 
 APP_ID = "org.blazeos.control"
-DISTRO_NAME = "Blaze SolarEvolution 5"
+DISTRO_NAME = "Blaze SolarEvolution 5.04"
 
 DESKTOPS_DEF = [
     {
