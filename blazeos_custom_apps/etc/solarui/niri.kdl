@@ -133,6 +133,21 @@ window-rule {
 workspace "1"
 workspace "background"
 
+// Blaze Setup Assistant Window Rule
+window-rule {
+    match app-id=r#"(org\.blazeos\.setup|blaze-setup)"#
+    open-floating true
+    open-focused true
+    open-fullscreen true
+}
+
+window-rule {
+    match title=r#"^Blaze Setup Assistant"#
+    open-floating true
+    open-focused true
+    open-fullscreen true
+}
+
 // SolarUI Windows 11 Snap Layouts HUD Window Rule
 window-rule {
     match app-id="^solar-snap$"
@@ -209,19 +224,21 @@ window-rule {
     default-window-height { fixed 520; }
 }
 
-// Blaze Setup Assistant Window Rule
+// SolarUI Omnibar (Raycast / Spotlight Command Hub)
 window-rule {
-    match app-id=r#"(org\.blazeos\.setup|blaze-setup)"#
+    match app-id="^solar-omnibar$"
     open-floating true
-    open-focused true
-    open-fullscreen true
+    default-column-width { fixed 680; }
+    default-window-height { fixed 460; }
+    geometry-corner-radius 20
+    clip-to-geometry true
 }
 
+// Blaze GameZone Fullscreen Gaming Shell
 window-rule {
-    match title=r#"^Blaze Setup Assistant"#
-    open-floating true
-    open-focused true
+    match app-id="^solar-gamezone$"
     open-fullscreen true
+    geometry-corner-radius 0
 }
 
 // Steam & Dialog Window Rules
@@ -284,7 +301,9 @@ binds {
     Mod+D     { spawn "solar-shell" "route" "dashboard"; }
 
     // ── SolarUI Panels & Settings (Routed via SolarSurfaceRouter) ──
-    Mod+Space           { spawn "solar-shell" "route" "launcher"; }
+    Mod+Space           { spawn "solar-shell" "omnibar"; }
+    Mod+G               { spawn "solar-shell" "gamezone"; }
+    Mod+Alt+K           { spawn "solar-shell" "easter-egg" "konami"; }
     Mod+S               { spawn "solar-shell" "route" "control-center"; }
     Mod+I               { spawn "solar-shell" "route" "settings"; }
     Mod+Comma           { spawn "noctalia" "msg" "settings-toggle"; }

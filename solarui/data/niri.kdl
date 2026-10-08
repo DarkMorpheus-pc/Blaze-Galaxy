@@ -133,6 +133,21 @@ window-rule {
 workspace "1"
 workspace "background"
 
+// Blaze Setup Assistant Window Rule
+window-rule {
+    match app-id=r#"(org\.blazeos\.setup|blaze-setup)"#
+    open-floating true
+    open-focused true
+    open-fullscreen true
+}
+
+window-rule {
+    match title=r#"^Blaze Setup Assistant"#
+    open-floating true
+    open-focused true
+    open-fullscreen true
+}
+
 // SolarUI Windows 11 Snap Layouts HUD Window Rule
 window-rule {
     match app-id="^solar-snap$"
@@ -320,7 +335,7 @@ binds {
     Alt+Print { spawn "sh" "-c" "grim - | satty --filename -"; }
 
     // ── Session ────────────────────────────────────────────────────
-    Mod+Shift+E { quit; }
-    Ctrl+Alt+Delete { quit; }
+    Mod+Shift+E { quit skip-confirmation=true; }
+    Ctrl+Alt+Delete { quit skip-confirmation=true; }
     Mod+L       { spawn "solar-lock"; }
 }
