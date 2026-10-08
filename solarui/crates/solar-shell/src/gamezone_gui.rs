@@ -885,22 +885,22 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
             border: 2px solid transparent;
             padding: 0;
             margin-right: 14px;
-            margin-top: 6px;
-            margin-bottom: 6px;
+            margin-top: 8px;
+            margin-bottom: 8px;
             min-width: 156px;
             min-height: 156px;
-            transition: all 120ms cubic-bezier(0.16, 1, 0.3, 1);
+            transition: transform 220ms ease-out, border 220ms ease-out, box-shadow 220ms ease-out;
             box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
         }
 
         .xbox-game-card:hover {
-            border: 2px solid rgba(255, 255, 255, 0.5);
+            border: 2px solid rgba(255, 255, 255, 0.6);
             transform: scale(1.04);
         }
 
         .xbox-game-card:focus, .xbox-game-card.active-focus {
             border: 3px solid #52b7ff;
-            box-shadow: 0 0 24px rgba(82, 183, 255, 0.65), 0 8px 24px rgba(0, 0, 0, 0.7);
+            box-shadow: 0 0 28px rgba(82, 183, 255, 0.75), 0 10px 30px rgba(0, 0, 0, 0.8);
             transform: scale(1.08);
         }
 
@@ -1402,6 +1402,8 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
         let badge_lbl_c = active_badge_clone.clone();
         let s_idx_c = selected_index.clone();
 
+        let pic_fetch = bg_pic_for_events.clone();
+        let game_fetch = game.clone();
         card.connect_has_focus_notify(move |btn| {
             if btn.has_focus() {
                 *s_idx_c.lock().unwrap() = idx;
@@ -1413,6 +1415,7 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
                 };
                 badge_lbl_c.set_text(badge_txt);
                 update_backdrop(Some(&g_clone), &bg_clone);
+                fetch_and_apply_store_screenshot(&game_fetch, &pic_fetch, &pic_fetch);
             }
         });
 
