@@ -271,19 +271,30 @@ binds {
     Mod+Ctrl+Left  { move-column-left; }
     Mod+Ctrl+Right { move-column-right; }
 
-    // ── Window Actions (KDE Habits) ────────────────────────────────
-    Mod+Q     { close-window; }
-    Alt+F4    { close-window; }
-    Mod+Y     { spawn-sh "solar-shell minimize"; }
-    Mod+Ctrl+Down { spawn-sh "solar-shell minimize"; }
-    Mod+T     { toggle-window-floating; }
-    Mod+F     { toggle-window-floating; }
-    Mod+M     { maximize-column; }
-    Mod+Shift+F { fullscreen-window; }
-    Mod+Z     { spawn-sh "solar-shell snap"; }
-    Mod+Shift+V { switch-focus-between-floating-and-tiling; }
-    Mod+Tab   { toggle-overview; }
-    Mod+D     { spawn "solar-shell" "route" "dashboard"; }
+    // ── Window Actions (KDE & Console GameZone Habits) ────────────
+    Mod+Q             { close-window; }
+    Ctrl+Shift+X      { close-window; }
+    Alt+F4            { close-window; }
+    Mod+Y             { spawn-sh "solar-shell minimize"; }
+    Mod+Ctrl+Down     { spawn-sh "solar-shell minimize"; }
+    Mod+T             { toggle-window-floating; }
+    Mod+F             { toggle-window-floating; }
+    Mod+M             { maximize-column; }
+    Mod+Shift+F       { fullscreen-window; }
+    Mod+Z             { spawn-sh "solar-shell snap"; }
+    Mod+Shift+V       { switch-focus-between-floating-and-tiling; }
+    Mod+Tab           { toggle-overview; }
+    Mod+D             { spawn "solar-shell" "route" "dashboard"; }
+
+    // ── Console & Desktop Workspace Switching (Ctrl+Shift+1..4 & Mod+1..4) ──
+    Ctrl+Shift+1      { focus-workspace 1; }
+    Ctrl+Shift+2      { focus-workspace 2; }
+    Ctrl+Shift+3      { focus-workspace 3; }
+    Ctrl+Shift+4      { focus-workspace 4; }
+    Mod+1             { focus-workspace 1; }
+    Mod+2             { focus-workspace 2; }
+    Mod+3             { focus-workspace 3; }
+    Mod+4             { focus-workspace 4; }
 
     // ── SolarUI Panels & Settings (Routed via SolarSurfaceRouter) ──
     Mod+Space           { spawn "solar-shell" "omnibar"; }
