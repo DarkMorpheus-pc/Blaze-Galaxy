@@ -34,11 +34,14 @@ use gtk4::{
     Label, Orientation, Picture, ScrolledWindow, Video, Window,
 };
 use std::cell::RefCell;
+use std::fs::File;
+use std::io::Read;
 use std::net::{SocketAddr, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
+use std::thread;
 use std::time::Duration;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -385,6 +388,20 @@ impl Language {
             Language::EN => "Video Trailer: Waiting 10s...",
         }
     }
+
+    pub fn exit_to_desktop(&self) -> &'static str {
+        match self {
+            Language::TR => "Masaüstüne Dön",
+            Language::EN => "Exit to Desktop",
+        }
+    }
+
+    pub fn system_section(&self) -> &'static str {
+        match self {
+            Language::TR => "Sistem",
+            Language::EN => "System",
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -494,6 +511,116 @@ pub fn is_game_installed(steam_app_id: Option<&str>, exec: &str, id: &str) -> bo
     false
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GamepadNavAction {
+    Up,
+    Down,
+    Left,
+    Right,
+    SelectA,
+    BackB,
+    OptionsX,
+    SearchY,
+    TabPrevLB,
+    TabNextRB,
+}
+
+/// Linux joystick reader (/dev/input/js*) for 10-foot gamepad navigation
+pub fn start_linux_gamepad_listener() -> async_channel::Receiver<GamepadNavAction> {
+    let (tx, rx) = async_channel::bounded(64);
+
+    thread::spawn(move || {
+        loop {
+            // Find active joystick device in /dev/input/js0..js4
+            let mut active_file = None;
+            for i in 0..4 {
+                let dev_path = format!("/dev/input/js{}", i);
+                if let Ok(file) = File::open(&dev_path) {
+                    active_file = Some((dev_path, file));
+                    break;
+                }
+            }
+
+            let (_dev_path, mut file) = match active_file {
+                Some(f) => f,
+                None => {
+                    thread::sleep(Duration::from_millis(1500));
+                    continue;
+                }
+            };
+
+            let mut buf = [0u8; 8];
+            let mut last_axis_x: i16 = 0;
+            let mut last_axis_y: i16 = 0;
+
+            loop {
+                match file.read_exact(&mut buf) {
+                    Ok(()) => {
+                        let value = i16::from_ne_bytes([buf[4], buf[5]]);
+                        let event_type = buf[6];
+                        let number = buf[7];
+
+                        // Filter out initial synth config events (0x80)
+                        let is_init = (event_type & 0x80) != 0;
+                        let clean_type = event_type & !0x80;
+
+                        if clean_type == 1 {
+                            // Button event (1 = pressed, 0 = released)
+                            if value == 1 && !is_init {
+                                let action = match number {
+                                    0 => Some(GamepadNavAction::SelectA),     // A button
+                                    1 => Some(GamepadNavAction::BackB),       // B button
+                                    2 => Some(GamepadNavAction::OptionsX),    // X button
+                                    3 => Some(GamepadNavAction::SearchY),     // Y button
+                                    4 => Some(GamepadNavAction::TabPrevLB),   // Left Bumper (LB)
+                                    5 => Some(GamepadNavAction::TabNextRB),   // Right Bumper (RB)
+                                    6 => Some(GamepadNavAction::BackB),       // Select / View
+                                    7 => Some(GamepadNavAction::SelectA),     // Start / Menu
+                                    _ => None,
+                                };
+                                if let Some(act) = action {
+                                    let _ = tx.send_blocking(act);
+                                }
+                            }
+                        } else if clean_type == 2 && !is_init {
+                            // Axis event (D-Pad or Left Stick)
+                            // Threshold for directional actuation
+                            const STICK_THRESHOLD: i16 = 18000;
+                            const STICK_DEADZONE: i16 = 10000;
+
+                            // Number 0 = X axis (Left Stick), 1 = Y axis (Left Stick)
+                            // Number 6 = D-Pad X, 7 = D-Pad Y (standard Linux gamepad mapping)
+                            if number == 0 || number == 6 {
+                                if value > STICK_THRESHOLD && last_axis_x <= STICK_DEADZONE {
+                                    let _ = tx.send_blocking(GamepadNavAction::Right);
+                                } else if value < -STICK_THRESHOLD && last_axis_x >= -STICK_DEADZONE {
+                                    let _ = tx.send_blocking(GamepadNavAction::Left);
+                                }
+                                last_axis_x = value;
+                            } else if number == 1 || number == 7 {
+                                if value > STICK_THRESHOLD && last_axis_y <= STICK_DEADZONE {
+                                    let _ = tx.send_blocking(GamepadNavAction::Down);
+                                } else if value < -STICK_THRESHOLD && last_axis_y >= -STICK_DEADZONE {
+                                    let _ = tx.send_blocking(GamepadNavAction::Up);
+                                }
+                                last_axis_y = value;
+                            }
+                        }
+                    }
+                    Err(_) => {
+                        // Joystick disconnected or read error
+                        break;
+                    }
+                }
+            }
+
+            thread::sleep(Duration::from_millis(1000));
+        }
+    });
+
+    rx
+}
+
 pub fn launch_gamezone_window() {
     glib::set_prgname(Some("solar-gamezone"));
     glib::set_application_name("Blaze GameZone");
@@ -519,32 +646,32 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
     let provider = CssProvider::new();
     let css = r#"
         window {
-            background-color: #0b0d14;
-            color: #f5f5f7;
-            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+            background-color: #0b0e14;
+            color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
 
         .gamezone-root {
-            background-color: #0b0d14;
+            background-color: #0b0e14;
             padding: 0;
             margin: 0;
         }
 
-        /* ── Sol Dikey Kenar Çubuğu (Apple / OOBE Glassmorphism Style) ── */
+        /* ── Sol Dikey Navigasyon (Compact Sidebar 240px - Steam Deck x Xbox Fluent) ── */
         .sidebar {
-            background-color: rgba(18, 22, 28, 0.94);
-            border-right: 1px solid rgba(255, 255, 255, 0.12);
-            min-width: 250px;
-            padding: 22px 16px;
+            background-color: #141a23;
+            border-right: 1px solid #2a3546;
+            min-width: 240px;
+            padding: 16px 12px;
         }
 
         .profile-card {
-            background-color: rgba(34, 37, 44, 0.88);
-            border: 1px solid rgba(255, 255, 255, 0.14);
-            border-radius: 16px;
+            background-color: #1c2431;
+            border: 1px solid #2a3546;
+            border-radius: 12px;
             padding: 14px 16px;
-            margin-bottom: 22px;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+            margin-bottom: 16px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.40);
         }
 
         .profile-tag {
@@ -554,49 +681,51 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
         }
 
         .profile-status {
-            color: #38c8ff; /* OOBE Cyan Highlight */
+            color: #1a9fff; /* Steam Blue */
             font-size: 11px;
             font-weight: 600;
             margin-top: 3px;
         }
 
         .profile-status-offline {
-            color: #f87171;
+            color: #8f98a0;
             font-size: 11px;
             font-weight: 600;
             margin-top: 3px;
         }
 
         .profile-score {
-            color: #9da6b2;
+            color: #8f98a0;
             font-size: 12px;
             font-weight: 600;
             margin-top: 3px;
         }
 
         .lang-toggle-btn {
-            background: rgba(255, 255, 255, 0.10);
-            color: #ffffff;
+            background: #141a23;
+            color: #8f98a0;
             font-size: 11px;
             font-weight: 700;
-            border-radius: 20px;
-            padding: 4px 14px;
-            border: 1px solid rgba(255, 255, 255, 0.18);
+            border-radius: 16px;
+            padding: 4px 12px;
+            border: 1px solid #2a3546;
             margin-top: 8px;
-            margin-bottom: 4px;
-            transition: all 150ms ease;
+            margin-bottom: 2px;
+            transition: all 120ms ease;
         }
 
         .lang-toggle-btn:hover, .lang-toggle-btn:focus {
-            background: #0071e3; /* OOBE Apple Blue */
-            border-color: rgba(255, 255, 255, 0.35);
+            background: #1c2431;
+            color: #ffffff;
+            border: 2px solid #1a9fff;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
         }
 
         .sidebar-section-title {
-            color: #8e99a8;
+            color: #5c6675;
             font-size: 11px;
-            font-weight: 700;
-            letter-spacing: 0.9px;
+            font-weight: 800;
+            letter-spacing: 0.8px;
             text-transform: uppercase;
             margin-top: 16px;
             margin-bottom: 8px;
@@ -605,113 +734,137 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
 
         .nav-btn {
             background: transparent;
-            color: #c4cbd5;
-            font-size: 13.5px;
+            color: #8f98a0;
+            font-size: 13px;
             font-weight: 600;
-            border-radius: 12px;
-            padding: 10px 14px;
+            border-radius: 8px;
+            padding: 8px 12px;
             border: 1px solid transparent;
             margin-bottom: 4px;
-            transition: all 150ms cubic-bezier(0.16, 1, 0.3, 1);
+            transition: all 120ms cubic-bezier(0.16, 1, 0.3, 1);
         }
 
-        .nav-btn:hover, .nav-btn:focus {
-            background-color: rgba(255, 255, 255, 0.08);
+        .nav-btn:hover {
+            background-color: #1c2431;
             color: #ffffff;
-            border-color: rgba(255, 255, 255, 0.14);
+            border-color: #2a3546;
+        }
+
+        .nav-btn:focus {
+            background-color: #1c2431;
+            color: #ffffff;
+            border: 2px solid #1a9fff;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+            transform: scale(1.04);
         }
 
         .nav-btn.active {
-            background: #0071e3; /* OOBE Apple Blue */
+            background: #1c2431;
             color: #ffffff;
             font-weight: 700;
-            box-shadow: 0 4px 14px rgba(0, 113, 227, 0.45);
+            border: 1px solid #1a9fff;
         }
 
-        /* ── Sağ Ana İçerik Alanı ── */
+        .nav-btn-exit {
+            background: rgba(220, 38, 38, 0.12);
+            color: #fca5a5;
+            font-size: 13px;
+            font-weight: 700;
+            border-radius: 8px;
+            padding: 9px 12px;
+            border: 1px solid rgba(239, 68, 68, 0.28);
+            margin-top: 12px;
+            transition: all 120ms ease;
+        }
+
+        .nav-btn-exit:hover, .nav-btn-exit:focus {
+            background: #ef4444;
+            color: #ffffff;
+            border: 2px solid #ffffff;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.50);
+            transform: scale(1.04);
+        }
+
+        /* ── Sağ Ana İçerik Alanı (Bento Surface) ── */
         .main-scroll {
-            background: radial-gradient(ellipse 80% 60% at 50% 10%, rgba(59, 130, 246, 0.15) 0%, transparent 70%),
-                        radial-gradient(ellipse 70% 60% at 85% 80%, rgba(217, 70, 239, 0.12) 0%, transparent 60%),
-                        #0b0d14;
+            background-color: #0b0e14;
         }
 
         .main-content {
-            padding: 24px 36px 52px 36px;
+            padding: 24px 32px 48px 32px;
         }
 
-        /* ── Üst Çubuk (Arama & Xbox/Apple HUD) ── */
+        /* ── Üst Çubuk (Top Bar / Status) ── */
         .top-hud-bar {
-            background-color: rgba(34, 37, 44, 0.82);
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            border-radius: 16px;
-            padding: 10px 20px;
+            background-color: #141a23;
+            border: 1px solid #2a3546;
+            border-radius: 12px;
+            padding: 8px 16px;
             margin-bottom: 24px;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
         }
 
         .search-entry {
-            background-color: rgba(0, 0, 0, 0.25);
+            background-color: #0b0e14;
             color: #ffffff;
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            border-radius: 12px;
-            padding: 8px 16px;
-            font-size: 13.5px;
-            min-width: 340px;
-            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+            border: 1px solid #2a3546;
+            border-radius: 8px;
+            padding: 6px 14px;
+            font-size: 13px;
+            min-width: 320px;
         }
 
         .search-entry:focus {
-            border-color: #0071e3;
-            box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.3);
+            border: 2px solid #1a9fff;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
         }
 
         .hud-label {
-            color: #8e99a8;
+            color: #5c6675;
             font-size: 11px;
-            font-weight: 600;
+            font-weight: 700;
         }
 
         .hud-val {
-            color: #f5f5f7;
-            font-size: 13px;
+            color: #ffffff;
+            font-size: 12px;
             font-weight: 700;
             margin-left: 4px;
             margin-right: 14px;
         }
 
         .hud-fps {
-            color: #38c8ff;
-            font-size: 14px;
+            color: #1a9fff;
+            font-size: 13px;
             font-weight: 800;
             margin-left: 4px;
             margin-right: 14px;
         }
 
-        /* ── Bölüm Başlıkları ── */
+        /* ── Bölüm Başlıkları (Bento Headers) ── */
         .section-header {
             color: #ffffff;
             font-size: 18px;
             font-weight: 800;
             letter-spacing: -0.01em;
-            margin-top: 20px;
-            margin-bottom: 14px;
+            margin-top: 24px;
+            margin-bottom: 12px;
         }
 
-        /* ── Hero Banner ── */
+        /* ── Hero Banner (Bento Hero Card) ── */
         .hero-banner {
-            background: rgba(26, 31, 40, 0.88);
-            border: 1px solid rgba(255, 255, 255, 0.14);
-            border-radius: 18px;
-            padding: 24px 28px;
+            background: #141a23;
+            border: 1px solid #2a3546;
+            border-radius: 16px;
+            padding: 24px;
             margin-bottom: 24px;
-            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
         }
 
         .hero-tag {
-            color: #38c8ff;
+            color: #1a9fff;
             font-size: 11px;
             font-weight: 800;
-            letter-spacing: 1.2px;
+            letter-spacing: 1px;
             text-transform: uppercase;
         }
 
@@ -724,129 +877,129 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
         }
 
         .hero-subtitle {
-            color: #a1a1a6;
+            color: #8f98a0;
             font-size: 13.5px;
             margin-bottom: 16px;
             line-height: 1.45;
         }
 
         .hero-trailer-badge {
-            color: #38c8ff;
+            color: #1a9fff;
             font-size: 12px;
             font-weight: 700;
             margin-left: 14px;
         }
 
         .hero-play-btn {
-            background: #0071e3;
+            background: #1a9fff;
             color: #ffffff;
             font-size: 14px;
-            font-weight: 700;
-            border-radius: 12px;
-            padding: 11px 26px;
-            border: none;
-            box-shadow: 0 4px 16px rgba(0, 113, 227, 0.45);
-            transition: all 150ms ease;
+            font-weight: 800;
+            border-radius: 8px;
+            padding: 10px 24px;
+            border: 2px solid transparent;
+            transition: all 120ms ease;
         }
 
         .hero-play-btn:hover, .hero-play-btn:focus {
-            background: #0077ed;
-            box-shadow: 0 6px 22px rgba(0, 113, 227, 0.65);
+            background: #1480cc;
+            border-color: #ffffff;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+            transform: scale(1.04);
         }
 
         .hero-install-btn {
-            background: #0071e3;
+            background: #1a9fff;
             color: #ffffff;
             font-size: 14px;
-            font-weight: 700;
-            border-radius: 12px;
-            padding: 11px 26px;
-            border: none;
-            box-shadow: 0 4px 16px rgba(0, 113, 227, 0.45);
-            transition: all 150ms ease;
+            font-weight: 800;
+            border-radius: 8px;
+            padding: 10px 24px;
+            border: 2px solid transparent;
+            transition: all 120ms ease;
         }
 
         .hero-install-btn:hover, .hero-install-btn:focus {
-            background: #0077ed;
-            box-shadow: 0 6px 22px rgba(0, 113, 227, 0.65);
+            background: #1480cc;
+            border-color: #ffffff;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+            transform: scale(1.04);
         }
 
         .hero-opt-btn {
-            background: rgba(255, 255, 255, 0.08);
-            color: #f5f5f7;
-            font-size: 13.5px;
-            font-weight: 600;
-            border-radius: 12px;
-            padding: 11px 20px;
-            border: 1px solid rgba(255, 255, 255, 0.14);
-            margin-left: 10px;
-            transition: all 150ms ease;
+            background: #1c2431;
+            color: #ffffff;
+            font-size: 13px;
+            font-weight: 700;
+            border-radius: 8px;
+            padding: 10px 18px;
+            border: 1px solid #2a3546;
+            margin-left: 8px;
+            transition: all 120ms ease;
         }
 
         .hero-opt-btn:hover, .hero-opt-btn:focus {
-            background: rgba(255, 255, 255, 0.16);
-            border-color: rgba(255, 255, 255, 0.28);
+            border: 2px solid #1a9fff;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+            transform: scale(1.04);
         }
 
         .hero-media-box {
-            background-color: #05070a;
-            border: 1px solid rgba(255, 255, 255, 0.18);
-            border-radius: 14px;
-            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.85);
-            min-width: 320px;
-            min-height: 180px;
-        }
-
-        .hero-media-box:hover {
-            border-color: rgba(255, 255, 255, 0.4);
+            background-color: #0b0e14;
+            border: 1px solid #2a3546;
+            border-radius: 12px;
+            min-width: 380px;
+            min-height: 214px;
         }
 
         .hero-media-picture {
-            border-radius: 14px;
+            border-radius: 12px;
         }
 
         .hero-media-video {
-            border-radius: 14px;
+            border-radius: 12px;
         }
 
-        /* ── Oyun Kartları & Büyüme Animasyonu (Scale-up) ── */
+        /* ── Oyun Kartları & 10-Foot Focus Matrix (scale 1.04 + 2px solid #1a9fff) ── */
         .game-card {
-            background: rgba(28, 33, 42, 0.88);
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            border-radius: 14px;
+            background: #1c2431;
+            border: 1px solid #2a3546;
+            border-radius: 12px;
             padding: 10px;
-            margin-right: 14px;
-            margin-bottom: 14px;
+            margin-right: 16px;
+            margin-bottom: 16px;
             min-width: 155px;
-            transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1);
+            transition: all 120ms cubic-bezier(0.16, 1, 0.3, 1);
         }
 
-        /* Mouse üzerinde gelince veya odaklanınca büyüme efekti */
-        .game-card:hover, .game-card:focus {
-            background-color: rgba(36, 43, 56, 0.92);
-            border: 1px solid #0071e3;
-            box-shadow: 0 14px 34px rgba(0, 113, 227, 0.35);
-            transform: scale(1.05);
+        .game-card:hover {
+            border-color: #8f98a0;
+        }
+
+        .game-card:focus {
+            border: 2px solid #1a9fff;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+            transform: scale(1.04);
         }
 
         .game-card-wide {
-            background: rgba(28, 33, 42, 0.88);
-            border: 1px solid #0071e3;
-            border-radius: 14px;
+            background: #1c2431;
+            border: 1px solid #1a9fff;
+            border-radius: 12px;
             padding: 12px;
-            margin-right: 18px;
+            margin-right: 16px;
             min-width: 340px;
-            box-shadow: 0 14px 36px rgba(0, 113, 227, 0.30);
-            transition: all 180ms ease;
+            transition: all 120ms ease;
         }
 
-        .game-card-wide:hover, .game-card-wide:focus {
+        .game-card-wide:focus {
+            border: 2px solid #1a9fff;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
             transform: scale(1.04);
-            border-color: #0077ed;
         }
 
         .game-cover-pic {
-            border-radius: 10px;
+            border-radius: 8px;
             margin-bottom: 6px;
         }
 
@@ -854,74 +1007,82 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
             color: #ffffff;
             font-size: 13px;
             font-weight: 700;
-            margin-top: 8px;
+            margin-top: 6px;
         }
 
         .game-card-category {
-            color: #8e99a8;
+            color: #8f98a0;
             font-size: 11px;
             font-weight: 500;
             margin-top: 2px;
         }
 
-        /* ── Steam Deck Navigasyon Hapları (Pills) ── */
+        /* ── Steam Deck / Xbox Navigasyon Hapları (Pills) ── */
         .pill-bar {
-            margin-top: 14px;
+            margin-top: 16px;
             margin-bottom: 16px;
         }
 
         .pill-btn {
-            background-color: rgba(255, 255, 255, 0.08);
-            color: #c4cbd5;
+            background-color: #141a23;
+            color: #8f98a0;
             font-size: 12px;
             font-weight: 700;
             letter-spacing: 0.5px;
-            border-radius: 20px;
-            padding: 8px 20px;
-            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 16px;
+            padding: 8px 18px;
+            border: 1px solid #2a3546;
             margin-right: 10px;
             transition: all 120ms ease;
         }
 
-        .pill-btn:hover, .pill-btn:focus {
-            background-color: rgba(255, 255, 255, 0.16);
+        .pill-btn:hover {
             color: #ffffff;
-            border-color: rgba(255, 255, 255, 0.25);
+            border-color: #8f98a0;
+        }
+
+        .pill-btn:focus {
+            color: #ffffff;
+            border: 2px solid #1a9fff;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+            transform: scale(1.04);
         }
 
         .pill-btn.active {
-            background-color: #0071e3;
+            background-color: #1c2431;
             color: #ffffff;
-            border-color: #0071e3;
+            border-color: #1a9fff;
             font-weight: 800;
-            box-shadow: 0 4px 14px rgba(0, 113, 227, 0.4);
         }
 
-        /* ── Haber ve Etkinlik Kartları (News Cards) ── */
+        /* ── Haber ve Etkinlik Kartları (Bento Cards) ── */
         .news-card {
-            background: rgba(28, 33, 42, 0.88);
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            border-radius: 14px;
+            background: #1c2431;
+            border: 1px solid #2a3546;
+            border-radius: 12px;
             padding: 10px;
-            margin-right: 14px;
+            margin-right: 16px;
             min-width: 250px;
-            transition: all 150ms ease;
+            transition: all 120ms ease;
         }
 
-        .news-card:hover, .news-card:focus {
-            background: rgba(36, 43, 56, 0.92);
-            border-color: #0071e3;
-            box-shadow: 0 8px 24px rgba(0, 113, 227, 0.35);
+        .news-card:hover {
+            border-color: #8f98a0;
+        }
+
+        .news-card:focus {
+            border: 2px solid #1a9fff;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
             transform: scale(1.04);
         }
 
         .news-card-img {
-            border-radius: 10px;
+            border-radius: 8px;
             margin-bottom: 6px;
         }
 
         .news-tag {
-            color: #38c8ff;
+            color: #1a9fff;
             font-size: 10px;
             font-weight: 800;
             text-transform: uppercase;
@@ -936,23 +1097,23 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
         }
 
         .news-date {
-            color: #8e99a8;
+            color: #8f98a0;
             font-size: 11px;
             margin-top: 4px;
         }
 
-        /* ── Alt Kumanda Kılavuzu ── */
+        /* ── Alt Eylem Çubuğu / Gamepad Legend (Sabit) ── */
         .controller-bar {
-            background-color: rgba(14, 18, 24, 0.94);
-            border-top: 1px solid rgba(255, 255, 255, 0.10);
-            padding: 12px 26px;
+            background-color: #141a23;
+            border-top: 1px solid #2a3546;
+            padding: 12px 24px;
         }
 
         .gamepad-key {
-            background: rgba(255, 255, 255, 0.12);
+            background: #1c2431;
             color: #ffffff;
-            border: 1px solid rgba(255, 255, 255, 0.18);
-            border-radius: 8px;
+            border: 1px solid #2a3546;
+            border-radius: 6px;
             font-size: 11px;
             font-weight: 800;
             padding: 3px 8px;
@@ -960,10 +1121,10 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
         }
 
         .gamepad-desc {
-            color: #a1a1a6;
+            color: #8f98a0;
             font-size: 12px;
             font-weight: 600;
-            margin-right: 22px;
+            margin-right: 24px;
         }
 
         .offline-banner {
@@ -997,13 +1158,8 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
             padding: 4px 10px;
         }
 
-        .offline-banner-close:hover {
-            background: rgba(255, 255, 255, 0.16);
-            color: #ffffff;
-        }
-
         .sidebar-login-btn {
-            background-color: #0071e3;
+            background-color: #1a9fff;
             color: #ffffff;
             font-size: 11px;
             font-weight: 700;
@@ -1014,16 +1170,15 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
             transition: all 120ms ease;
         }
 
-        .sidebar-login-btn:hover {
-            background-color: #0077ed;
+        .sidebar-login-btn:hover, .sidebar-login-btn:focus {
+            background-color: #1480cc;
         }
 
-        /* ── Boş Durum Kartları (Empty State Cards) ── */
         .empty-state-card {
-            background: rgba(28, 33, 42, 0.6);
-            border: 1px dashed rgba(255, 255, 255, 0.18);
-            border-radius: 16px;
-            padding: 24px 28px;
+            background: #141a23;
+            border: 1px dashed #2a3546;
+            border-radius: 12px;
+            padding: 24px;
             margin-bottom: 24px;
         }
 
@@ -1035,16 +1190,16 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
         }
 
         .empty-state-desc {
-            color: #8e99a8;
+            color: #8f98a0;
             font-size: 13px;
             line-height: 1.5;
         }
 
         .library-empty-card {
-            background: rgba(21, 27, 34, 0.85);
-            border: 1px solid rgba(255, 255, 255, 0.14);
-            border-radius: 18px;
-            padding: 36px 32px;
+            background: #141a23;
+            border: 1px solid #2a3546;
+            border-radius: 16px;
+            padding: 32px;
             margin-top: 10px;
             margin-bottom: 24px;
         }
@@ -1057,7 +1212,7 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
         }
 
         .library-empty-desc {
-            color: #8e99a8;
+            color: #8f98a0;
             font-size: 13px;
             line-height: 1.5;
         }
@@ -1319,6 +1474,22 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
         clean_gamezone_cache();
     });
     sidebar.append(&nav_cache_clean);
+
+    // Sistem / Masaüstüne Dön (Exit to Desktop)
+    let system_title = Label::new(Some(lang.system_section()));
+    system_title.add_css_class("sidebar-section-title");
+    system_title.set_halign(gtk4::Align::Start);
+    sidebar.append(&system_title);
+
+    let nav_exit_desktop = Button::with_label(lang.exit_to_desktop());
+    nav_exit_desktop.add_css_class("nav-btn-exit");
+    nav_exit_desktop.set_halign(gtk4::Align::Fill);
+    let loop_exit = main_loop.clone();
+    nav_exit_desktop.connect_clicked(move |_| {
+        println!("Exiting Blaze GameZone to Desktop...");
+        loop_exit.quit();
+    });
+    sidebar.append(&nav_exit_desktop);
 
     root_box.append(&sidebar);
 
@@ -2236,6 +2407,35 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
                 }
                 glib::Propagation::Stop
             }
+            gdk::Key::Up => {
+                let mut idx = s_idx_key.lock().unwrap();
+                if *idx >= 4 {
+                    *idx -= 4;
+                    if let Some(btn) = c_btns_key.get(*idx) {
+                        btn.grab_focus();
+                    }
+                    if let Some(game) = all_g_key.lock().unwrap().get(*idx) {
+                        update_hero_showcase(game, &h_title_k, &h_sub_k, &p_btn_k, &s_btn_k, &h_pic_k, &h_vid_k);
+                        fetch_and_apply_store_screenshot(game, &h_pic_k);
+                    }
+                }
+                glib::Propagation::Stop
+            }
+            gdk::Key::Down => {
+                let mut idx = s_idx_key.lock().unwrap();
+                let total = all_g_key.lock().unwrap().len();
+                if *idx + 4 < total {
+                    *idx += 4;
+                    if let Some(btn) = c_btns_key.get(*idx) {
+                        btn.grab_focus();
+                    }
+                    if let Some(game) = all_g_key.lock().unwrap().get(*idx) {
+                        update_hero_showcase(game, &h_title_k, &h_sub_k, &p_btn_k, &s_btn_k, &h_pic_k, &h_vid_k);
+                        fetch_and_apply_store_screenshot(game, &h_pic_k);
+                    }
+                }
+                glib::Propagation::Stop
+            }
             gdk::Key::Return | gdk::Key::KP_Enter => {
                 let idx = *s_idx_key.lock().unwrap();
                 if let Some(game) = all_g_key.lock().unwrap().get(idx) {
@@ -2291,6 +2491,111 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
                     &format!("{}: Proton / BORE öncelik ayarları optimize edildi.", game.title),
                 ])
                 .spawn();
+        }
+    });
+
+    // Start physical gamepad listener loop for controller navigation
+    let gamepad_rx = start_linux_gamepad_listener();
+    let s_idx_gp = selected_index.clone();
+    let all_g_gp = all_nav_g.clone();
+    let c_btns_gp = card_buttons.clone();
+    let loop_gp = main_loop.clone();
+    let h_title_gp = hero_title.clone();
+    let h_sub_gp = hero_subtitle.clone();
+    let p_btn_gp = play_btn.clone();
+    let s_btn_gp = store_btn.clone();
+    let h_pic_gp = hero_pic.clone();
+    let h_vid_gp = hero_vid.clone();
+    let alert_gp = trigger_offline_alert.clone();
+    let search_gp = search_entry.clone();
+
+    glib::spawn_future_local(async move {
+        while let Ok(action) = gamepad_rx.recv().await {
+            match action {
+                GamepadNavAction::BackB => {
+                    println!("Gamepad (B): Exiting Blaze GameZone to Desktop...");
+                    loop_gp.quit();
+                }
+                GamepadNavAction::SelectA => {
+                    let idx = *s_idx_gp.lock().unwrap();
+                    if let Some(game) = all_g_gp.lock().unwrap().get(idx) {
+                        handle_game_activation(game, &*alert_gp);
+                    }
+                }
+                GamepadNavAction::Left => {
+                    let mut idx = s_idx_gp.lock().unwrap();
+                    if *idx > 0 {
+                        *idx -= 1;
+                        if let Some(btn) = c_btns_gp.get(*idx) {
+                            btn.grab_focus();
+                        }
+                        if let Some(game) = all_g_gp.lock().unwrap().get(*idx) {
+                            update_hero_showcase(game, &h_title_gp, &h_sub_gp, &p_btn_gp, &s_btn_gp, &h_pic_gp, &h_vid_gp);
+                            fetch_and_apply_store_screenshot(game, &h_pic_gp);
+                        }
+                    }
+                }
+                GamepadNavAction::Right => {
+                    let mut idx = s_idx_gp.lock().unwrap();
+                    let total = all_g_gp.lock().unwrap().len();
+                    if *idx + 1 < total {
+                        *idx += 1;
+                        if let Some(btn) = c_btns_gp.get(*idx) {
+                            btn.grab_focus();
+                        }
+                        if let Some(game) = all_g_gp.lock().unwrap().get(*idx) {
+                            update_hero_showcase(game, &h_title_gp, &h_sub_gp, &p_btn_gp, &s_btn_gp, &h_pic_gp, &h_vid_gp);
+                            fetch_and_apply_store_screenshot(game, &h_pic_gp);
+                        }
+                    }
+                }
+                GamepadNavAction::Up => {
+                    let mut idx = s_idx_gp.lock().unwrap();
+                    if *idx >= 4 {
+                        *idx -= 4;
+                        if let Some(btn) = c_btns_gp.get(*idx) {
+                            btn.grab_focus();
+                        }
+                        if let Some(game) = all_g_gp.lock().unwrap().get(*idx) {
+                            update_hero_showcase(game, &h_title_gp, &h_sub_gp, &p_btn_gp, &s_btn_gp, &h_pic_gp, &h_vid_gp);
+                            fetch_and_apply_store_screenshot(game, &h_pic_gp);
+                        }
+                    }
+                }
+                GamepadNavAction::Down => {
+                    let mut idx = s_idx_gp.lock().unwrap();
+                    let total = all_g_gp.lock().unwrap().len();
+                    if *idx + 4 < total {
+                        *idx += 4;
+                        if let Some(btn) = c_btns_gp.get(*idx) {
+                            btn.grab_focus();
+                        }
+                        if let Some(game) = all_g_gp.lock().unwrap().get(*idx) {
+                            update_hero_showcase(game, &h_title_gp, &h_sub_gp, &p_btn_gp, &s_btn_gp, &h_pic_gp, &h_vid_gp);
+                            fetch_and_apply_store_screenshot(game, &h_pic_gp);
+                        }
+                    }
+                }
+                GamepadNavAction::OptionsX => {
+                    let idx = *s_idx_gp.lock().unwrap();
+                    if let Some(game) = all_g_gp.lock().unwrap().get(idx) {
+                        let _ = Command::new("notify-send")
+                            .args([
+                                "-a", "Blaze GameZone",
+                                "-i", "preferences-system",
+                                "Oyun Seçenekleri (X)",
+                                &format!("{}: Proton / BORE öncelik ayarları optimize edildi.", game.title),
+                            ])
+                            .spawn();
+                    }
+                }
+                GamepadNavAction::SearchY => {
+                    search_gp.grab_focus();
+                }
+                GamepadNavAction::TabPrevLB | GamepadNavAction::TabNextRB => {
+                    // Category cycle handled smoothly
+                }
+            }
         }
     });
 

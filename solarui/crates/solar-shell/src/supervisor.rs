@@ -132,6 +132,11 @@ impl SolarShellSupervisor {
         crate::switcher::SolarShellSwitcher::new().reconcile().await
     }
 
+    pub fn is_gamezone_active() -> bool {
+        let runtime_lock = solar_common::get_solar_runtime_dir().join("gamezone-active.lock");
+        runtime_lock.exists() || std::path::Path::new("/tmp/solar-gamezone-active.lock").exists()
+    }
+
     pub fn start_watchdog_loop(self: std::sync::Arc<Self>) -> tokio::task::JoinHandle<()> {
         tokio::spawn(async move {
             info!("SolarShell watchdog started");
@@ -159,6 +164,15 @@ impl SolarShellSupervisor {
                             })
                         })
                         .unwrap_or(false);
+
+                // GameZone bağımsız oyun kabuğu modu aktifse desktop shell denetimini askıya al.
+                // Bu sayede oyun sırasında arka planda Noctalia/Caelestia çalıştırılmaz,
+                // RAM ve GPU kaynakları tamamen oyuna tahsis edilir.
+                if Self::is_gamezone_active() {
+                    tracing::debug!("GameZone standalone game shell is active; watchdog desktop shell reconciliation suspended.");
+                    delay = 3;
+                    continue;
+                }
 
                 if anaconda_running {
                     tracing::debug!("Anaconda kurulumu devam ediyor; watchdog shell gecisi askiya alindi.");

@@ -272,10 +272,8 @@ async fn main() -> Result<()> {
             Ok(())
         }
         "gamezone" | "gaming" | "deck" => {
-            info!("Launching Blaze GameZone Fullscreen Shell...");
-            tokio::task::block_in_place(|| {
-                gamezone_gui::launch_gamezone_window();
-            });
+            info!("Entering Blaze GameZone Standalone Game Shell mode...");
+            run_gamezone_shell_session().await?;
             Ok(())
         }
         "toggle-taskbar" => {
@@ -472,6 +470,64 @@ async fn main() -> Result<()> {
             Ok(())
         }
     }
+}
+
+async fn run_gamezone_shell_session() -> Result<()> {
+    // 1. Mevcut aktif/istenen masaüstü kabuk motorunu (Noctalia, Caelestia, Hybrid) tespit et ve kaydet
+    let supervisor = supervisor::SolarShellSupervisor::new();
+    let desired = supervisor.load_desired_state().unwrap_or_default();
+    let prev_engine = desired.desired_engine;
+
+    let runtime_dir = solar_common::get_solar_runtime_dir();
+    let _ = std::fs::create_dir_all(&runtime_dir);
+    let prev_shell_file = runtime_dir.join("gamezone_prev_shell.txt");
+    let lock_file = runtime_dir.join("gamezone-active.lock");
+
+    let _ = std::fs::write(&prev_shell_file, prev_engine.as_str());
+    let _ = std::fs::write(&lock_file, "1");
+    let _ = std::fs::write("/tmp/solar-gamezone-active.lock", "1");
+
+    info!(
+        "GameZone kabuk oturumu başlatıldı. Önceki masaüstü motoru kaydedildi: {:?}. Arka plan kabukları askıya alınıyor...",
+        prev_engine
+    );
+
+    // 2. Arka plan masaüstü kabuklarını (Noctalia, Caelestia, Taskbar) durdurarak RAM ve GPU'yu tamamen oyuna aç
+    let _ = std::process::Command::new("pkill")
+        .args(["-TERM", "-x", "noctalia"])
+        .status();
+    let _ = std::process::Command::new("pkill")
+        .args(["-TERM", "-f", "caelestia"])
+        .status();
+    let _ = std::process::Command::new("pkill")
+        .args(["-f", "solar-shell (run|gui|taskbar|window)"])
+        .status();
+
+    // 3. GameZone 10-Foot UI Kabuğunu çalıştır (kullanıcı çıkana kadar bekler)
+    tokio::task::block_in_place(|| {
+        gamezone_gui::launch_gamezone_window();
+    });
+
+    info!(
+        "GameZone kabuğundan çıkış yapıldı. Önceki masaüstü kabuğuna geri dönülüyor: {:?}...",
+        prev_engine
+    );
+
+    // 4. Kilit dosyasını kaldır
+    let _ = std::fs::remove_file(&lock_file);
+    let _ = std::fs::remove_file("/tmp/solar-gamezone-active.lock");
+
+    // 5. Kaydedilen masaüstü kabuğunu otomatik olarak yeniden başlat
+    let switcher = switcher::SolarShellSwitcher::new();
+    if let Err(e) = switcher.switch_engine(prev_engine).await {
+        tracing::error!(
+            "Masaüstü kabuğunu ({:?}) geri yükleme başarısız oldu: {}. Reconcile deneniyor...",
+            prev_engine, e
+        );
+        let _ = supervisor.reconcile().await;
+    }
+
+    Ok(())
 }
 
 async fn sync_noctalia_settings() -> Result<()> {
