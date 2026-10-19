@@ -14,7 +14,9 @@ pub struct NoctaliaProvider {
 
 impl Default for NoctaliaProvider {
     fn default() -> Self {
-        let home = std::env::var("HOME").unwrap_or_else(|_| "/home/darkmorpheus".to_string());
+        let home = std::env::var("HOME").unwrap_or_else(|_| {
+            std::env::var("USER").map(|u| format!("/home/{}", u)).unwrap_or_else(|_| "/tmp".to_string())
+        });
         let usr_bin = PathBuf::from("/usr/bin/noctalia");
         let local_bin = PathBuf::from(&home).join(".local/bin/noctalia");
         let bin = if usr_bin.exists() {

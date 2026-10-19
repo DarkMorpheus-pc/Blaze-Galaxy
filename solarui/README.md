@@ -1,8 +1,8 @@
 # SolarUI
 
-Next-Generation Hybrid Desktop Environment for Linux.
+Next-Generation Modular Desktop Environment for Linux.
 
-SolarUI is a high-performance, modular desktop ecosystem designed to combine the fluidity and infinite-scrolling ergonomics of the Niri Wayland compositor with a modern, dual-engine shell architecture (Noctalia and Caelestia) managed by a unified Rust supervisor.
+SolarUI is a high-performance, modular desktop ecosystem designed to combine the fluidity and infinite-scrolling ergonomics of the Niri Wayland compositor with independently managed shell engines. Noctalia and Caelestia are currently available; end4-pC integration is in progress. A unified Rust supervisor enforces single-shell ownership, health checks and crash rollback.
 
 ---
 
@@ -13,7 +13,7 @@ SolarUI operates on a multi-layer decoupled architecture:
 1. Compositor Layer: Niri scrollable-tiling Wayland compositor providing hardware-accelerated animations, spring physics, dynamic column tiling, and layer-shell integration.
 2. Core Supervisor Layer (Rust):
    - solar-core: Manages window registration, session tracking, IPC dispatching, and state caching.
-   - solar-shell: Acts as the desktop shell runtime supervisor. Controls live switching between Noctalia and Caelestia shell backends with automatic health check and crash rollback protection.
+   - solar-shell: Acts as the desktop shell runtime supervisor. Controls live switching between complete shell backends with single-shell ownership, automatic health checks and crash rollback protection.
    - solar-session: Wayland session bootstrap executable. Prepares runtime environment variables, enforces desktop branding, and launches the compositor with SolarUI configurations.
    - solar-niri: Asynchronous client implementation of Niri IPC protocol.
    - solar-common: Shared data structures, configuration parsing, IPC event definitions, and hardware performance profiling.
@@ -21,6 +21,7 @@ SolarUI operates on a multi-layer decoupled architecture:
 3. Shell Engine Backends:
    - Noctalia: Native C++ Wayland desktop shell providing unified top status bars, taskbars, application launchers, volume/brightness OSDs, and system tray integration.
    - Caelestia: High-fidelity QML/Qt6 desktop shell offering collapsible sidebars, media drawers, system status monitors, and extensive localization support.
+   - end4-pC: Material 3 Expressive Quickshell desktop shell currently being adapted to SolarUI's Niri and supervisor contracts.
 4. Branding and Interception:
    - libsolar_brand.so: Lightweight LD_PRELOAD interceptor that harmonizes toolkit strings and system labels under the SolarUI desktop identity.
 
@@ -229,7 +230,7 @@ SolarUI CLI provides unified actions mapped across whichever shell engine is cur
   - User override: `~/.config/solarui/niri.kdl` or `~/.config/niri/config.kdl`
 - Shell Engine State & Supervisor Config:
   - Configuration: `~/.config/solarui/config.toml`
-  - Engine Selection: `desired_engine = "caelestia"` or `desired_engine = "noctalia"`
+- Engine Selection: `desired_engine = "caelestia"` or `desired_engine = "noctalia"`
 - Noctalia Settings:
   - `~/.local/state/noctalia/settings.toml`
 - Caelestia Shell Settings:
@@ -240,3 +241,12 @@ SolarUI CLI provides unified actions mapped across whichever shell engine is cur
 ## License
 
 SolarUI is free software licensed under the GNU General Public License v3.0 or later (GPL-3.0-or-later). See the LICENSE file for details.
+
+## Thanks and Contributions
+
+SolarUI builds on and learns from the work of these open-source projects. Their names, licenses and upstream identities are preserved:
+
+- [Noctalia](https://github.com/noctalia-dev/noctalia)
+- [Caelestia Shell](https://github.com/caelestia-dots/shell)
+- [end4-pC](https://github.com/pctrade/end4-pC)
+- [illogical-impulse / dots-hyprland](https://github.com/end-4/dots-hyprland)

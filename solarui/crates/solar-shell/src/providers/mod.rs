@@ -1,4 +1,5 @@
 pub mod caelestia;
+pub mod end4_pc;
 pub mod noctalia;
 
 use crate::actions::ShellAction;
@@ -6,6 +7,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 
 pub use caelestia::CaelestiaProvider;
+pub use end4_pc::End4PcProvider;
 pub use noctalia::NoctaliaProvider;
 
 #[async_trait]

@@ -3,6 +3,10 @@ enable sddm.service
 enable blaze-sentinel.service
 enable blaze-boot-success.service
 enable blazeos-postinstall.service
+enable blazeos-apply-install-choices.service
+enable blazeos-desktop-provision.service
+enable blazeos-plymouth-failsafe.service
+enable polkit.service
 disable gdm.service
 disable systemd-report-basic.socket
 disable systemd-report-cgroup.socket
@@ -18,5 +22,12 @@ disable mcelog.service
 disable rsyslog.service
 disable ModemManager.service
 disable dnf-makecache.timer
+disable NetworkManager-wait-online.service
+disable avahi-daemon.service
+disable avahi-daemon.socket
+disable systemd-homed.service
+disable iscsi-onboot.service
+disable iscsi-starter.service
+disable mdmonitor.service
 disable virt*.socket
 disable virt*.service

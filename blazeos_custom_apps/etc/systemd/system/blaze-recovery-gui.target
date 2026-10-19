@@ -2,6 +2,10 @@
 Description=BlazeOS Recovery Environment (BERP Recovery - GUI) Target
 Requires=basic.target dbus.service
 Wants=blaze-recovery-gui.service
-Conflicts=rescue.service rescue.target graphical.target
-After=basic.target dbus.service blaze-recovery-gui.service
+# The recovery target must own tty1 and must prevent the display manager from
+# racing it.  Do not add an After= dependency on the wanted service: that
+# creates a systemd ordering cycle and causes the target to be skipped.
+Conflicts=rescue.service rescue.target graphical.target display-manager.service
+Before=graphical.target display-manager.service
+After=basic.target dbus.service
 AllowIsolate=yes

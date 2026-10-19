@@ -1,0 +1,24 @@
+#!/bin/bash
+# Fixed-command privilege boundary used by Blaze House.
+set -euo pipefail
+
+if [ "$(id -u)" -ne 0 ]; then
+    echo "Bu işlem yönetici yetkisi gerektirir." >&2
+    exit 77
+fi
+
+case "${1:-}" in
+    prepare)
+        exec /usr/bin/dnf5 --refresh upgrade --offline -y
+        ;;
+    reboot)
+        exec /usr/bin/dnf5 offline reboot
+        ;;
+    cancel)
+        exec /usr/bin/dnf5 offline clean
+        ;;
+    *)
+        echo "Kullanım: blazeos-update {prepare|reboot|cancel}" >&2
+        exit 64
+        ;;
+esac

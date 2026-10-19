@@ -4,6 +4,7 @@
 // - Center: KDE-style Floating & Tiling Windows with CachyOS Spring Physics & Kawase Blur
 // - Bottom: SolarUI KDE-style Taskbar (Start menu, open window tasks, vector SVGs, zero emojis)
 
+spawn-at-startup "/usr/libexec/blazeos-wayland-session-ready"
 spawn-at-startup "solar-shell" "autostart"
 
 // Suppress unbranded raw compositor hotkey overlay in favor of SolarUI Welcome HUD

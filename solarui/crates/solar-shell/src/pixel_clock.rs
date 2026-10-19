@@ -9,20 +9,15 @@ use std::f64::consts::PI;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub enum PixelClockStyle {
+    #[default]
     BoldHorizontal,
     StackedVertical,
     Outline,
     AnalogBold,
     AnalogOutline,
     AnalogTachymeter,
-}
-
-impl Default for PixelClockStyle {
-    fn default() -> Self {
-        Self::BoldHorizontal
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -58,7 +53,9 @@ impl Default for PixelClockConfig {
 
 impl PixelClockConfig {
     pub fn config_path() -> PathBuf {
-        let home = std::env::var("HOME").unwrap_or_else(|_| "/home/darkmorpheus".to_string());
+        let home = std::env::var("HOME").unwrap_or_else(|_| {
+            std::env::var("USER").map(|u| format!("/home/{}", u)).unwrap_or_else(|_| "/tmp".to_string())
+        });
         PathBuf::from(home).join(".config/solarui/pixel_clock.toml")
     }
 
@@ -233,6 +230,7 @@ fn draw_clock(cfg: &PixelClockConfig, cr: &Context, w: f64, h: f64) {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn draw_bold_horizontal(
     cfg: &PixelClockConfig,
     cr: &Context,
@@ -247,8 +245,8 @@ fn draw_bold_horizontal(
     let time_str = now.format("%H:%M").to_string();
 
     let layout = pangocairo::functions::create_layout(cr);
-    let mut font = FontDescription::from_string("Fredoka Bold 64");
-    layout.set_font_description(Some(&mut font));
+    let font = FontDescription::from_string("Fredoka Bold 64");
+    layout.set_font_description(Some(&font));
     layout.set_text(&time_str);
 
     let (tw, th) = layout.pixel_size();
@@ -282,12 +280,12 @@ fn draw_bold_horizontal(
 
     let mut start_x = x;
     if let Some((cap, charging)) = bat_info {
-        let icon = if charging { "⚡" } else { "🔋" };
+        let icon = if charging { "CHG" } else { "BAT" };
         let pill_text = format!("{} {}%", icon, cap);
 
         let pill_layout = pangocairo::functions::create_layout(cr);
-        let mut pill_font = FontDescription::from_string("Fredoka SemiBold 13");
-        pill_layout.set_font_description(Some(&mut pill_font));
+        let pill_font = FontDescription::from_string("Fredoka SemiBold 13");
+        pill_layout.set_font_description(Some(&pill_font));
         pill_layout.set_text(&pill_text);
 
         let (pw, ph) = pill_layout.pixel_size();
@@ -312,8 +310,8 @@ fn draw_bold_horizontal(
 
     if !date_str.is_empty() {
         let date_layout = pangocairo::functions::create_layout(cr);
-        let mut date_font = FontDescription::from_string("Fredoka Medium 14");
-        date_layout.set_font_description(Some(&mut date_font));
+        let date_font = FontDescription::from_string("Fredoka Medium 14");
+        date_layout.set_font_description(Some(&date_font));
         date_layout.set_text(&date_str);
 
         cr.set_source_rgba(r, g, b, alpha * 0.85);
@@ -322,6 +320,7 @@ fn draw_bold_horizontal(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn draw_stacked_vertical(
     cfg: &PixelClockConfig,
     cr: &Context,
@@ -337,13 +336,13 @@ fn draw_stacked_vertical(
     let min_str = now.format("%M").to_string();
 
     let layout_h = pangocairo::functions::create_layout(cr);
-    let mut font_h = FontDescription::from_string("Fredoka Bold 58");
-    layout_h.set_font_description(Some(&mut font_h));
+    let font_h = FontDescription::from_string("Fredoka Bold 58");
+    layout_h.set_font_description(Some(&font_h));
     layout_h.set_text(&hour_str);
 
     let layout_m = pangocairo::functions::create_layout(cr);
-    let mut font_m = FontDescription::from_string("Fredoka Bold 58");
-    layout_m.set_font_description(Some(&mut font_m));
+    let font_m = FontDescription::from_string("Fredoka Bold 58");
+    layout_m.set_font_description(Some(&font_m));
     layout_m.set_text(&min_str);
 
     let (tw_h, th_h) = layout_h.pixel_size();
@@ -369,12 +368,12 @@ fn draw_stacked_vertical(
     // Battery pill alongside
     if cfg.show_battery_pill {
         if let Some((cap, charging)) = get_battery_info() {
-            let icon = if charging { "⚡" } else { "🔋" };
+            let icon = if charging { "CHG" } else { "BAT" };
             let pill_text = format!("{} {}%", icon, cap);
 
             let pill_layout = pangocairo::functions::create_layout(cr);
-            let mut pill_font = FontDescription::from_string("Fredoka SemiBold 12");
-            pill_layout.set_font_description(Some(&mut pill_font));
+            let pill_font = FontDescription::from_string("Fredoka SemiBold 12");
+            pill_layout.set_font_description(Some(&pill_font));
             pill_layout.set_text(&pill_text);
 
             let (pw, ph) = pill_layout.pixel_size();
@@ -398,6 +397,7 @@ fn draw_stacked_vertical(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn draw_outline(
     _cfg: &PixelClockConfig,
     cr: &Context,
@@ -412,8 +412,8 @@ fn draw_outline(
     let time_str = now.format("%H:%M").to_string();
 
     let layout = pangocairo::functions::create_layout(cr);
-    let mut font = FontDescription::from_string("Fredoka Bold 64");
-    layout.set_font_description(Some(&mut font));
+    let font = FontDescription::from_string("Fredoka Bold 64");
+    layout.set_font_description(Some(&font));
     layout.set_text(&time_str);
 
     let (tw, th) = layout.pixel_size();
@@ -428,6 +428,7 @@ fn draw_outline(
     let _ = cr.stroke();
 }
 
+#[allow(clippy::too_many_arguments)]
 fn draw_analog(
     _cfg: &PixelClockConfig,
     cr: &Context,
@@ -488,8 +489,8 @@ fn draw_analog(
         let ny = cy - num_dist * angle.cos();
 
         let layout = pangocairo::functions::create_layout(cr);
-        let mut font = FontDescription::from_string("Fredoka Bold 22");
-        layout.set_font_description(Some(&mut font));
+        let font = FontDescription::from_string("Fredoka Bold 22");
+        layout.set_font_description(Some(&font));
         layout.set_text(num_str);
 
         let (tw, th) = layout.pixel_size();

@@ -42,6 +42,12 @@ pub struct BerpApp {
     pub preserved_folders: Vec<PreservedFolder>,
 }
 
+impl Default for BerpApp {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BerpApp {
     pub fn new() -> Self {
         let (root_btrfs, root_uuid) = detect_root_fs();
@@ -606,7 +612,7 @@ fn handle_time_machine(app: &mut BerpApp) -> Result<()> {
         if let Event::Key(key) = event::read()? {
             match key.code {
                 KeyCode::Up => {
-                    if sel > 0 { sel -= 1; }
+                    sel = sel.saturating_sub(1);
                 }
                 KeyCode::Down => {
                     if sel + 1 < app.snapshots.len() { sel += 1; }
@@ -736,7 +742,7 @@ fn handle_preserve_and_reset(app: &mut BerpApp) -> Result<()> {
         if let Event::Key(key) = event::read()? {
             match key.code {
                 KeyCode::Up => {
-                    if sel > 0 { sel -= 1; }
+                    sel = sel.saturating_sub(1);
                 }
                 KeyCode::Down => {
                     if sel + 1 < app.preserved_folders.len() { sel += 1; }
@@ -894,6 +900,7 @@ fn handle_factory_reset(_app: &mut BerpApp) -> Result<()> {
                         )?;
                         out.flush()?;
                         std::thread::sleep(std::time::Duration::from_millis(2000));
+                        prepare_oobe_reset()?;
                         clear_boot_triggers();
                         execute!(
                             out,
@@ -922,6 +929,24 @@ fn handle_factory_reset(_app: &mut BerpApp) -> Result<()> {
             }
         }
     }
+}
+
+/// Return the installed system to the first-boot OOBE instead of merely
+/// printing a success message and rebooting into the existing user session.
+/// Recovery binaries and the BERE/BERP boot entries remain untouched.
+fn prepare_oobe_reset() -> Result<()> {
+    let _ = fs::remove_file("/etc/blazeos-setup-completed");
+    let sddm_dir = Path::new("/etc/sddm.conf.d");
+    fs::create_dir_all(sddm_dir)?;
+    fs::write(
+        sddm_dir.join("00-blaze-oobe.conf"),
+        "[Autologin]\nUser=blaze-setup\nSession=blaze-oobe\nRelogin=false\n",
+    )?;
+    if Command::new("id").args(["-u", "blaze-setup"]).status().map(|s| !s.success()).unwrap_or(true) {
+        let _ = Command::new("useradd").args(["--system", "--home-dir", "/var/lib/blaze-setup", "--shell", "/usr/sbin/nologin", "blaze-setup"]).status();
+    }
+    let _ = Command::new("systemctl").args(["enable", "sddm.service"]).status();
+    Ok(())
 }
 
 // -----------------------------------------------------------------------------

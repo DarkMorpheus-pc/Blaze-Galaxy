@@ -138,9 +138,13 @@ class BlazeControlWindow(Adw.PreferencesWindow):
         self.log_queue = queue.Queue(maxsize=256)
         self.build_updates_page()
         self.build_desktop_page()
+        self.build_appearance_page()
         self.build_performance_page()
         self.build_tools_page()
         self.build_info_page()
+        requested_page = os.environ.get("BLAZEOS_CONTROL_PAGE", "")
+        if requested_page in {"updates", "desktop", "appearance", "performance", "tools", "info"}:
+            self.set_visible_page_name(requested_page)
 
     # --------------------------------------------------------------------------
     # 1. UPDATES PAGE
@@ -236,6 +240,89 @@ class BlazeControlWindow(Adw.PreferencesWindow):
         log_group.add(self.expander)
 
         self.add(page)
+
+    # --------------------------------------------------------------------------
+    # APPEARANCE PAGE — integrated, Fedora-native adaptation of the workflow
+    # pioneered by the LGPL-3.0 Pardus GNOME Greeter.
+    # --------------------------------------------------------------------------
+    def build_appearance_page(self):
+        page = Adw.PreferencesPage()
+        page.set_title("Görünüm" if self.is_tr else "Appearance")
+        page.set_icon_name("preferences-desktop-theme-symbolic")
+        page.set_name("appearance")
+
+        intro = Adw.PreferencesGroup(
+            title="Hazır Masaüstü Düzenleri" if self.is_tr else "Desktop Presets",
+            description=("GNOME ve KDE Plasma için geri alınabilir hazır düzenler. İlk uygulamada mevcut ayarlarınız yedeklenir."
+                         if self.is_tr else "Reversible GNOME and KDE Plasma presets. Your current settings are backed up on first use.")
+        )
+        page.add(intro)
+
+        current = os.environ.get("XDG_CURRENT_DESKTOP", "").lower()
+        kind = "kde" if "kde" in current or "plasma" in current else "gnome" if "gnome" in current else None
+        presets = {
+            "gnome": [
+                ("gnome", "Saf GNOME", "GNOME'un sade varsayılan düzeni"),
+                ("mac", "Alt Dock", "Ortalanmış, otomatik gizlenen alt dock"),
+                ("ubuntu", "Sol Dock", "Sabit sol uygulama çubuğu"),
+                ("windows", "Klasik Panel", "Alt panel ve uygulamalar menüsü"),
+                ("focus", "Odak", "Küçük, koyu ve gerektiğinde görünen dock"),
+                ("blaze", "Blaze", "Blaze renkleri ve Papirus simgeleri"),
+            ],
+            "kde": [
+                ("org.fedoraproject.fedora.desktop", "Fedora", "Dengeli Plasma görünümü"),
+                ("org.fedoraproject.fedoradark.desktop", "Fedora Koyu", "Fedora koyu görünümü"),
+                ("org.kde.breeze.desktop", "Breeze", "KDE'nin resmi açık görünümü"),
+                ("org.kde.breezedark.desktop", "Breeze Koyu", "KDE'nin resmi koyu görünümü"),
+                ("com.github.varlesh.arc", "Arc", "Düz ve ferah Plasma görünümü"),
+                ("com.github.varlesh.materia-dark", "Materia Koyu", "Material tabanlı koyu görünüm"),
+            ],
+        }
+        if kind:
+            for preset_id, title, subtitle in presets[kind]:
+                row = Adw.ActionRow(title=title, subtitle=subtitle)
+                button = Gtk.Button(label="Uygula" if self.is_tr else "Apply", valign=Gtk.Align.CENTER)
+                button.connect("clicked", lambda _b, k=kind, p=preset_id, n=title: self.apply_appearance(k, p, n))
+                row.add_suffix(button)
+                intro.add(row)
+        else:
+            intro.add(Adw.ActionRow(
+                title="SolarUI görünümü SolarUI Ayarları'ndan yönetilir." if self.is_tr else "SolarUI appearance is managed in SolarUI Settings.",
+                subtitle="Bu hazır paketler GNOME veya KDE Plasma oturumunda görünür." if self.is_tr else "These presets become available in a GNOME or KDE Plasma session."
+            ))
+
+        actions = Adw.PreferencesGroup(title="Geri Yükleme" if self.is_tr else "Restore")
+        page.add(actions)
+        restore_row = Adw.ActionRow(
+            title="Önceki görünümü geri yükle" if self.is_tr else "Restore previous appearance",
+            subtitle="İlk hazır paket uygulanmadan önce alınan yedeğe döner." if self.is_tr else "Restore the backup made before the first preset was applied."
+        )
+        restore_button = Gtk.Button(label="Geri Yükle" if self.is_tr else "Restore", valign=Gtk.Align.CENTER)
+        restore_button.connect("clicked", lambda _b: self.restore_appearance(kind))
+        restore_button.set_sensitive(kind is not None)
+        restore_row.add_suffix(restore_button)
+        actions.add(restore_row)
+        self.add(page)
+
+    def apply_appearance(self, kind, preset_id, title):
+        result = subprocess.run(
+            ["/usr/bin/blaze-style-center", "--desktop", kind, "--apply", preset_id],
+            capture_output=True, text=True
+        )
+        if result.returncode == 0:
+            self.show_toast((f"{title} uygulandı." if self.is_tr else f"{title} applied."))
+        else:
+            self.show_toast((result.stderr or "Görünüm uygulanamadı.").strip())
+
+    def restore_appearance(self, kind):
+        if not kind:
+            return
+        result = subprocess.run(
+            ["/usr/bin/blaze-style-center", "--desktop", kind, "--restore"],
+            capture_output=True, text=True
+        )
+        self.show_toast(("Görünüm geri yüklendi." if self.is_tr else "Appearance restored.") if result.returncode == 0
+                        else (result.stderr or "Geri yükleme başarısız.").strip())
 
     # --------------------------------------------------------------------------
     # 2. DESKTOP PAGE
@@ -617,9 +704,22 @@ class BlazeControlWindow(Adw.PreferencesWindow):
         self.run_task(f"{de['name']} Kurulumu", cmd)
 
     def toggle_dock(self):
-        cmd = "gnome-extensions enable dash-to-dock@vswitch.com 2>/dev/null || gnome-extensions toggle dash-to-dock@micxgx.gmail.com 2>/dev/null || true"
-        subprocess.run(["sh", "-c", cmd])
-        self.show_toast("Dash to Dock durumu güncellendi." if self.is_tr else "Dash to Dock toggled.")
+        uuid = "dash-to-dock@micxgx.gmail.com"
+        extension_dir = f"/usr/share/gnome-shell/extensions/{uuid}"
+        if not os.path.isdir(extension_dir):
+            self.show_toast("Dash to Dock kurulu değil." if self.is_tr else "Dash to Dock is not installed.")
+            return
+        current = subprocess.run(
+            ["gsettings", "get", "org.gnome.shell", "enabled-extensions"],
+            capture_output=True, text=True
+        ).stdout
+        action = "none" if uuid in current else "dash-to-dock"
+        # The helper updates the real caller's session dconf through PKEXEC_UID,
+        # disables the conflicting panel and handles GNOME version validation.
+        self.run_task(
+            "Dash to Dock",
+            ["pkexec", "/usr/libexec/blazeos-welcome-helper", "set-dock", action]
+        )
 
     def toggle_solar_taskbar(self):
         subprocess.run(["solar-shell", "toggle-taskbar"], stderr=subprocess.DEVNULL)

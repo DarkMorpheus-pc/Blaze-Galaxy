@@ -52,7 +52,7 @@ QtObject {
         {
             label: qsTr("SolarUI Engine"),
             icon: "memory",
-            description: qsTr("Switch between Noctalia, Caelestia & Hybrid modes"),
+            description: qsTr("Switch between complete desktop shell engines"),
             category: "system"
         },
         {

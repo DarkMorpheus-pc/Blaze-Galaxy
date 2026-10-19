@@ -1,0 +1,348 @@
+#!/usr/bin/env python3
+"""Blaze Style Center: reversible GNOME and KDE first-login presets."""
+from __future__ import annotations
+
+import json
+import argparse
+import locale
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+
+import gi
+
+gi.require_version("Gtk", "4.0")
+gi.require_version("Adw", "1")
+from gi.repository import Adw, Gio, GLib, Gtk
+
+APP_ID = "org.blazeos.StyleCenter"
+STATE = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local/state")) / "blaze-style-center"
+DONE = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "blazeos/style-center-completed"
+
+LANG = (locale.getlocale()[0] or os.environ.get("LANG", "en")).split("_")[0].lower()
+TEXT = {
+    "en": {"Blaze Görünüm Merkezi": "Blaze Appearance Center", "İlk oturum görünümünü seçin": "Choose your first-session appearance", "Yedeği geri yükle": "Restore backup", "Tamam": "Done", "hazır görünümleri": "presets", "Bir görünüm seçildiğinde önce mevcut ayarlarınız yedeklenir. İstediğiniz zaman geri dönebilirsiniz.": "Your current settings are backed up before applying a preset. You can restore them at any time.", "paket bulunamadı": "package unavailable", "uygulandı": "applied", "Uygulanamadı": "Could not apply", "Kurulum öncesi görünüm geri yüklendi": "The previous appearance was restored", "Bu oturum için görünüm paketi yok": "No appearance pack for this session", "Blaze Görünüm Merkezi şu anda GNOME ve KDE Plasma oturumlarını destekliyor.": "Blaze Appearance Center currently supports GNOME and KDE Plasma sessions.", "Kapat": "Close"},
+    "de": {"Blaze Görünüm Merkezi": "Blaze-Erscheinungsbild", "İlk oturum görünümünü seçin": "Erscheinungsbild für die erste Sitzung wählen", "Yedeği geri yükle": "Sicherung wiederherstellen", "Tamam": "Fertig", "hazır görünümleri": "Vorlagen", "Bir görünüm seçildiğinde önce mevcut ayarlarınız yedeklenir. İstediğiniz zaman geri dönebilirsiniz.": "Vor dem Anwenden werden Ihre Einstellungen gesichert und können jederzeit wiederhergestellt werden.", "paket bulunamadı": "Paket nicht verfügbar", "uygulandı": "angewendet", "Uygulanamadı": "Anwenden fehlgeschlagen", "Kurulum öncesi görünüm geri yüklendi": "Vorheriges Erscheinungsbild wiederhergestellt", "Bu oturum için görünüm paketi yok": "Kein Erscheinungsbildpaket für diese Sitzung", "Blaze Görünüm Merkezi şu anda GNOME ve KDE Plasma oturumlarını destekliyor.": "Blaze-Erscheinungsbild unterstützt derzeit GNOME und KDE Plasma.", "Kapat": "Schließen"},
+    "es": {"Blaze Görünüm Merkezi": "Centro de apariencia Blaze", "İlk oturum görünümünü seçin": "Elija la apariencia de la primera sesión", "Yedeği geri yükle": "Restaurar copia", "Tamam": "Terminar", "hazır görünümleri": "ajustes predefinidos", "Bir görünüm seçildiğinde önce mevcut ayarlarınız yedeklenir. İstediğiniz zaman geri dönebilirsiniz.": "Se guardan sus ajustes antes de aplicar un estilo y puede restaurarlos cuando quiera.", "paket bulunamadı": "paquete no disponible", "uygulandı": "aplicado", "Uygulanamadı": "No se pudo aplicar", "Kurulum öncesi görünüm geri yüklendi": "Se restauró la apariencia anterior", "Bu oturum için görünüm paketi yok": "No hay estilos para esta sesión", "Blaze Görünüm Merkezi şu anda GNOME ve KDE Plasma oturumlarını destekliyor.": "El Centro de apariencia Blaze admite GNOME y KDE Plasma.", "Kapat": "Cerrar"},
+    "ru": {"Blaze Görünüm Merkezi": "Центр оформления Blaze", "İlk oturum görünümünü seçin": "Выберите оформление первого сеанса", "Yedeği geri yükle": "Восстановить копию", "Tamam": "Готово", "hazır görünümleri": "готовые стили", "Bir görünüm seçildiğinde önce mevcut ayarlarınız yedeklenir. İstediğiniz zaman geri dönebilirsiniz.": "Перед применением создаётся резервная копия настроек, которую можно восстановить.", "paket bulunamadı": "пакет недоступен", "uygulandı": "применено", "Uygulanamadı": "Не удалось применить", "Kurulum öncesi görünüm geri yüklendi": "Предыдущее оформление восстановлено", "Bu oturum için görünüm paketi yok": "Для этого сеанса нет пакета оформления", "Blaze Görünüm Merkezi şu anda GNOME ve KDE Plasma oturumlarını destekliyor.": "Центр оформления Blaze поддерживает GNOME и KDE Plasma.", "Kapat": "Закрыть"},
+}
+
+
+def tr(text: str) -> str:
+    return TEXT.get(LANG, {}).get(text, text)
+
+
+PRESET_NAMES = {
+    "en": {"gnome": "Pure GNOME", "mac": "Bottom Dock", "ubuntu": "Left Dock", "windows": "Classic Panel", "focus": "Focus", "blaze": "Blaze", "org.fedoraproject.fedora.desktop": "Fedora", "org.fedoraproject.fedoradark.desktop": "Fedora Dark", "org.kde.breeze.desktop": "Breeze", "org.kde.breezedark.desktop": "Breeze Dark", "org.kde.breezetwilight.desktop": "Breeze Twilight", "com.github.varlesh.arc": "Arc", "com.github.varlesh.arc-dark": "Arc Dark", "com.github.varlesh.materia": "Materia", "com.github.varlesh.materia-dark": "Materia Dark"},
+    "de": {"gnome": "Reines GNOME", "mac": "Dock unten", "ubuntu": "Dock links", "windows": "Klassische Leiste", "focus": "Fokus", "blaze": "Blaze"},
+    "es": {"gnome": "GNOME puro", "mac": "Dock inferior", "ubuntu": "Dock izquierdo", "windows": "Panel clásico", "focus": "Enfoque", "blaze": "Blaze"},
+    "ru": {"gnome": "Чистый GNOME", "mac": "Нижняя панель", "ubuntu": "Левая панель", "windows": "Классическая панель", "focus": "Фокус", "blaze": "Blaze"},
+}
+
+
+def preset_name(preset: dict) -> str:
+    return PRESET_NAMES.get(LANG, {}).get(preset["id"], PRESET_NAMES.get("en", {}).get(preset["id"], preset["name"]))
+
+
+def preset_desc(preset: dict) -> str:
+    if LANG == "tr":
+        return preset["desc"]
+    generic = {"en": "Stable, reversible desktop preset", "de": "Stabile, rückgängig machbare Desktop-Vorlage", "es": "Estilo de escritorio estable y reversible", "ru": "Стабильный обратимый стиль рабочего стола"}
+    return generic.get(LANG, preset["desc"])
+
+
+def run(args: list[str], *, input_text: str | None = None, check: bool = True) -> subprocess.CompletedProcess:
+    return subprocess.run(args, input=input_text, text=True, capture_output=True, check=check)
+
+
+def desktop() -> str:
+    value = " ".join((os.environ.get("XDG_CURRENT_DESKTOP", ""), os.environ.get("DESKTOP_SESSION", ""))).lower()
+    if "gnome" in value:
+        return "gnome"
+    if "kde" in value or "plasma" in value:
+        return "kde"
+    selected = Path("/etc/blazeos-selected-session")
+    if selected.exists():
+        value = selected.read_text(errors="replace").lower()
+        if "gnome" in value:
+            return "gnome"
+        if "plasma" in value or "kde" in value:
+            return "kde"
+    return "unsupported"
+
+
+GNOME_PRESETS = [
+    {"id": "gnome", "name": "Saf GNOME", "desc": "GNOME'un sade ve güvenilir varsayılan düzeni", "layout": "top", "dark": False},
+    {"id": "mac", "name": "Alt Dock", "desc": "Ortalanmış alt dock ve otomatik gizleme", "layout": "dock", "dark": False},
+    {"id": "ubuntu", "name": "Sol Dock", "desc": "Geniş, sabit sol uygulama çubuğu", "layout": "left", "dark": True},
+    {"id": "windows", "name": "Klasik Panel", "desc": "Alt görev çubuğu ve uygulamalar menüsü", "layout": "bottom", "dark": False},
+    {"id": "focus", "name": "Odak", "desc": "Koyu, küçük ve gerektiğinde görünen dock", "layout": "dock", "dark": True},
+    {"id": "blaze", "name": "Blaze", "desc": "Koyu panel, sıcak vurgu ve Papirus simgeler", "layout": "bottom", "dark": True},
+]
+
+KDE_PRESETS = [
+    {"id": "org.fedoraproject.fedora.desktop", "name": "Fedora", "desc": "Fedora'nın dengeli Plasma görünümü", "layout": "bottom", "dark": False},
+    {"id": "org.fedoraproject.fedoradark.desktop", "name": "Fedora Koyu", "desc": "Fedora teması, koyu renk düzeni", "layout": "bottom", "dark": True},
+    {"id": "org.kde.breeze.desktop", "name": "Breeze", "desc": "KDE'nin en kararlı açık teması", "layout": "bottom", "dark": False},
+    {"id": "org.kde.breezedark.desktop", "name": "Breeze Koyu", "desc": "KDE'nin resmi koyu teması", "layout": "bottom", "dark": True},
+    {"id": "org.kde.breezetwilight.desktop", "name": "Breeze Alacakaranlık", "desc": "Açık uygulamalar ve koyu masaüstü", "layout": "bottom", "dark": True},
+    {"id": "com.github.varlesh.arc", "name": "Arc", "desc": "Düz, şeffaf ve açık Plasma paketi", "layout": "dock", "dark": False},
+    {"id": "com.github.varlesh.arc-dark", "name": "Arc Koyu", "desc": "Arc ailesinin koyu görünümü", "layout": "dock", "dark": True},
+    {"id": "com.github.varlesh.materia", "name": "Materia", "desc": "Material tasarımlı Plasma görünümü", "layout": "dock", "dark": False},
+    {"id": "com.github.varlesh.materia-dark", "name": "Materia Koyu", "desc": "Material tasarımın koyu sürümü", "layout": "dock", "dark": True},
+]
+
+
+def backup_once(kind: str) -> None:
+    target = STATE / kind
+    if target.exists():
+        return
+    target.mkdir(parents=True, exist_ok=True)
+    if kind == "gnome":
+        result = run(["dconf", "dump", "/org/gnome/"], check=False)
+        (target / "dconf.ini").write_text(result.stdout)
+    else:
+        config = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
+        for name in ("kdeglobals", "kwinrc", "plasmashellrc", "plasma-org.kde.plasma.desktop-appletsrc"):
+            source = config / name
+            if source.is_file():
+                shutil.copy2(source, target / name)
+    (target / "metadata.json").write_text(json.dumps({"desktop": kind, "version": 1}, indent=2))
+
+
+def schema_has(schema: str, key: str) -> bool:
+    result = run(["gsettings", "list-keys", schema], check=False)
+    return result.returncode == 0 and key in result.stdout.splitlines()
+
+
+def gset(schema: str, key: str, value: str) -> None:
+    if schema_has(schema, key):
+        run(["gsettings", "set", schema, key, value])
+
+
+def extension(uuid: str, enabled: bool) -> None:
+    run(["gnome-extensions", "enable" if enabled else "disable", uuid], check=False)
+
+
+def apply_gnome(preset: dict) -> None:
+    backup_once("gnome")
+    dock = "dash-to-dock@micxgx.gmail.com"
+    panel = "dash-to-panel@jderose9.github.com"
+    menu = "apps-menu@gnome-shell-extensions.gcampax.github.com"
+    layout = preset["layout"]
+    extension(dock, layout in {"dock", "left"})
+    extension(panel, layout == "bottom")
+    extension(menu, layout == "bottom")
+    gset("org.gnome.desktop.interface", "color-scheme", "'prefer-dark'" if preset["dark"] else "'default'")
+    gset("org.gnome.desktop.interface", "gtk-theme", "'Adwaita-dark'" if preset["dark"] else "'Adwaita'")
+    gset("org.gnome.desktop.wm.preferences", "button-layout", "'appmenu:minimize,maximize,close'")
+    if layout in {"dock", "left"}:
+        gset("org.gnome.shell.extensions.dash-to-dock", "dock-position", "'LEFT'" if layout == "left" else "'BOTTOM'")
+        gset("org.gnome.shell.extensions.dash-to-dock", "extend-height", "true" if layout == "left" else "false")
+        gset("org.gnome.shell.extensions.dash-to-dock", "dock-fixed", "true" if layout == "left" else "false")
+        gset("org.gnome.shell.extensions.dash-to-dock", "intellihide", "false" if layout == "left" else "true")
+        gset("org.gnome.shell.extensions.dash-to-dock", "dash-max-icon-size", "48" if preset["id"] != "focus" else "36")
+    if preset["id"] == "blaze":
+        gset("org.gnome.desktop.interface", "icon-theme", "'Papirus-Dark'")
+        gset("org.gnome.desktop.interface", "accent-color", "'red'")
+
+
+def installed_kde_themes() -> set[str]:
+    command = shutil.which("plasma-apply-lookandfeel") or shutil.which("lookandfeeltool")
+    if not command:
+        return set()
+    result = run([command, "--list"], check=False)
+    return {line.strip().split()[0] for line in result.stdout.splitlines() if line.strip()}
+
+
+def apply_kde(preset: dict) -> None:
+    backup_once("kde")
+    command = shutil.which("plasma-apply-lookandfeel") or shutil.which("lookandfeeltool")
+    if not command:
+        raise RuntimeError("Plasma görünüm aracı bulunamadı.")
+    result = run([command, "--apply", preset["id"]], check=False)
+    if result.returncode != 0:
+        result = run([command, "-a", preset["id"]], check=False)
+    if result.returncode != 0:
+        raise RuntimeError((result.stderr or result.stdout).strip() or "Tema uygulanamadı.")
+
+
+def restore(kind: str) -> None:
+    target = STATE / kind
+    if not target.exists():
+        raise RuntimeError("Geri yüklenecek bir ayar yedeği bulunamadı.")
+    if kind == "gnome":
+        backup = target / "dconf.ini"
+        run(["dconf", "load", "/org/gnome/"], input_text=backup.read_text())
+    else:
+        config = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
+        for source in target.iterdir():
+            if source.name != "metadata.json" and source.is_file():
+                shutil.copy2(source, config / source.name)
+        run(["systemctl", "--user", "restart", "plasma-plasmashell.service"], check=False)
+
+
+def find_preset(kind: str, preset_id: str) -> dict:
+    presets = GNOME_PRESETS if kind == "gnome" else KDE_PRESETS
+    for preset in presets:
+        if preset["id"] == preset_id:
+            return preset
+    raise RuntimeError(f"Bilinmeyen görünüm: {preset_id}")
+
+
+def command_line(argv: list[str]) -> int | None:
+    """Headless API used by BlazeOS Merkezi.
+
+    Keeping the setting engine here gives the first-login helper and the
+    integrated control-centre page exactly the same backup/restore semantics.
+    """
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--apply")
+    parser.add_argument("--restore", action="store_true")
+    parser.add_argument("--desktop", choices=("gnome", "kde"))
+    args, unknown = parser.parse_known_args(argv[1:])
+    if unknown or (not args.apply and not args.restore):
+        return None
+    kind = args.desktop or desktop()
+    if kind not in {"gnome", "kde"}:
+        print("Bu oturum için görünüm paketi yok.", file=sys.stderr)
+        return 2
+    try:
+        if args.restore:
+            restore(kind)
+        else:
+            apply_gnome(find_preset(kind, args.apply)) if kind == "gnome" else apply_kde(find_preset(kind, args.apply))
+        return 0
+    except Exception as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+
+
+class Preview(Gtk.DrawingArea):
+    def __init__(self, preset: dict):
+        super().__init__()
+        self.preset = preset
+        self.set_content_width(250)
+        self.set_content_height(135)
+        self.set_draw_func(self.draw)
+
+    def draw(self, _area, cr, width, height):
+        dark = self.preset["dark"]
+        cr.set_source_rgb(*(0.08, 0.09, 0.12) if dark else (0.82, 0.86, 0.91))
+        cr.rectangle(0, 0, width, height)
+        cr.fill()
+        cr.set_source_rgba(0.18, 0.22, 0.30, 0.96) if dark else cr.set_source_rgba(0.97, 0.98, 1.0, 0.96)
+        cr.rectangle(width * .18, height * .18, width * .64, height * .58)
+        cr.fill()
+        cr.set_source_rgb(0.95, 0.22, 0.18)
+        layout = self.preset["layout"]
+        if layout == "top": cr.rectangle(0, 0, width, 10)
+        elif layout == "left": cr.rectangle(0, 0, 16, height)
+        elif layout == "bottom": cr.rectangle(0, height - 14, width, 14)
+        else: cr.rectangle(width * .25, height - 18, width * .5, 12)
+        cr.fill()
+        cr.set_source_rgba(1, 1, 1, .78)
+        for i in range(6):
+            x = (width * .34 + i * 18) if layout == "dock" else (12 + i * 18)
+            y = height - 15 if layout in {"dock", "bottom"} else (4 if layout == "top" else 12 + i * 18)
+            cr.rectangle(x, y, 7, 7)
+            cr.fill()
+
+
+class StyleWindow(Adw.ApplicationWindow):
+    def __init__(self, app: Adw.Application):
+        super().__init__(application=app, title=tr("Blaze Görünüm Merkezi"))
+        self.kind = desktop()
+        self.set_default_size(1040, 760)
+        self.toast = Adw.ToastOverlay()
+        toolbar = Adw.ToolbarView()
+        header = Adw.HeaderBar()
+        header.set_title_widget(Adw.WindowTitle(title=tr("Blaze Görünüm Merkezi"), subtitle=tr("İlk oturum görünümünü seçin")))
+        restore_button = Gtk.Button(label=tr("Yedeği geri yükle"))
+        restore_button.connect("clicked", self.on_restore)
+        header.pack_start(restore_button)
+        finish = Gtk.Button(label=tr("Tamam"))
+        finish.add_css_class("suggested-action")
+        finish.connect("clicked", self.on_finish)
+        header.pack_end(finish)
+        toolbar.add_top_bar(header)
+
+        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18)
+        content.set_margin_top(24); content.set_margin_bottom(24)
+        content.set_margin_start(28); content.set_margin_end(28)
+        title = Gtk.Label(xalign=0)
+        title.set_markup(f"<span size='xx-large' weight='bold'>{'GNOME' if self.kind == 'gnome' else 'KDE Plasma'} {tr('hazır görünümleri')}</span>")
+        content.append(title)
+        info = Gtk.Label(label=tr("Bir görünüm seçildiğinde önce mevcut ayarlarınız yedeklenir. İstediğiniz zaman geri dönebilirsiniz."), xalign=0, wrap=True)
+        info.add_css_class("dim-label")
+        content.append(info)
+        flow = Gtk.FlowBox(column_spacing=16, row_spacing=16, min_children_per_line=2, max_children_per_line=3, selection_mode=Gtk.SelectionMode.NONE)
+        available = installed_kde_themes() if self.kind == "kde" else set()
+        presets = KDE_PRESETS if self.kind == "kde" else GNOME_PRESETS
+        for preset in presets:
+            button = Gtk.Button()
+            button.add_css_class("card")
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+            box.set_margin_top(12); box.set_margin_bottom(14); box.set_margin_start(12); box.set_margin_end(12)
+            box.append(Preview(preset))
+            name = Gtk.Label(xalign=0); name.set_markup(f"<b>{GLib.markup_escape_text(preset_name(preset))}</b>")
+            box.append(name)
+            desc = Gtk.Label(label=preset_desc(preset), xalign=0, wrap=True)
+            desc.add_css_class("dim-label"); box.append(desc)
+            if self.kind == "kde" and available and preset["id"] not in available:
+                button.set_sensitive(False)
+                desc.set_label(preset_desc(preset) + " · " + tr("paket bulunamadı"))
+            button.set_child(box)
+            button.connect("clicked", self.on_apply, preset)
+            flow.insert(button, -1)
+        content.append(flow)
+        scroller = Gtk.ScrolledWindow(child=content, hscrollbar_policy=Gtk.PolicyType.NEVER)
+        toolbar.set_content(scroller)
+        self.toast.set_child(toolbar)
+        self.set_content(self.toast)
+
+    def notify(self, text: str):
+        self.toast.add_toast(Adw.Toast(title=text, timeout=4))
+
+    def on_apply(self, _button, preset):
+        try:
+            apply_gnome(preset) if self.kind == "gnome" else apply_kde(preset)
+            self.notify(f"{preset_name(preset)} {tr('uygulandı')}")
+        except Exception as exc:
+            self.notify(f"{tr('Uygulanamadı')}: {exc}")
+
+    def on_restore(self, _button):
+        try:
+            restore(self.kind)
+            self.notify(tr("Kurulum öncesi görünüm geri yüklendi"))
+        except Exception as exc:
+            self.notify(str(exc))
+
+    def on_finish(self, _button):
+        DONE.parent.mkdir(parents=True, exist_ok=True)
+        DONE.write_text("completed\n")
+        self.close()
+
+
+class StyleApp(Adw.Application):
+    def __init__(self):
+        super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.DEFAULT_FLAGS)
+
+    def do_activate(self):
+        if desktop() == "unsupported":
+            dialog = Adw.AlertDialog(heading=tr("Bu oturum için görünüm paketi yok"), body=tr("Blaze Görünüm Merkezi şu anda GNOME ve KDE Plasma oturumlarını destekliyor."))
+            dialog.add_response("close", tr("Kapat"))
+            dialog.present(self.props.active_window)
+            return
+        window = self.props.active_window or StyleWindow(self)
+        window.present()
+
+
+if __name__ == "__main__":
+    cli_result = command_line(sys.argv)
+    if cli_result is not None:
+        raise SystemExit(cli_result)
+    Adw.init()
+    raise SystemExit(StyleApp().run(sys.argv))

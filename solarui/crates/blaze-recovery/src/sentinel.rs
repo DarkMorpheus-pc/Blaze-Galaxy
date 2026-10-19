@@ -43,6 +43,12 @@ pub struct SentinelEngine {
     config: SentinelConfig,
 }
 
+impl Default for SentinelEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SentinelEngine {
     pub fn new() -> Self {
         let engine = Self {

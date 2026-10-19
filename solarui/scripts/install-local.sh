@@ -57,6 +57,19 @@ $SUDO install -m 644 "${ROOT_DIR}/data/fastfetch/config.jsonc" "${SYSCONFDIR}/fa
 $SUDO rm -rf "${PREFIX}/share/solarui/noctalia-assets"
 $SUDO cp -r "${ROOT_DIR}/data/noctalia-assets" "${PREFIX}/share/solarui/noctalia-assets"
 
+# Install the pinned end4-pC source read-only. It is not selected until the
+# SolarUI supervisor's compatibility preflight succeeds.
+$SUDO rm -rf "${PREFIX}/share/quickshell/end4-pC"
+$SUDO install -d "${PREFIX}/share/quickshell"
+$SUDO cp -a "${ROOT_DIR}/vendor/end4-pC" "${PREFIX}/share/quickshell/end4-pC"
+$SUDO find "${PREFIX}/share/quickshell/end4-pC" -type d -exec chmod 755 {} +
+$SUDO find "${PREFIX}/share/quickshell/end4-pC" -type f -exec chmod 644 {} +
+$SUDO find "${PREFIX}/share/quickshell/end4-pC/scripts" -type f \( -name '*.sh' -o -name '*.py' \) -exec chmod 755 {} +
+$SUDO install -d "${PREFIX}/share/doc/solarui" "${PREFIX}/share/licenses/solarui/end4-pC"
+$SUDO install -m 644 "${ROOT_DIR}/vendor/end4-pC/UPSTREAM.md" "${PREFIX}/share/doc/solarui/end4-pC-UPSTREAM"
+$SUDO install -m 644 "${ROOT_DIR}/vendor/end4-pC/BLAZEOS-CHANGES.md" "${PREFIX}/share/doc/solarui/end4-pC-BLAZEOS-CHANGES"
+$SUDO install -m 644 "${ROOT_DIR}/vendor/end4-pC/LICENSE" "${PREFIX}/share/licenses/solarui/end4-pC/LICENSE"
+
 $SUDO install -m 644 "${ROOT_DIR}/data/systemd/solarui-session.target" "${PREFIX}/lib/systemd/user/solarui-session.target"
 $SUDO install -m 644 "${ROOT_DIR}/data/systemd/solar-core.service" "${PREFIX}/lib/systemd/user/solar-core.service"
 $SUDO install -m 644 "${ROOT_DIR}/data/systemd/solar-shell.service" "${PREFIX}/lib/systemd/user/solar-shell.service"

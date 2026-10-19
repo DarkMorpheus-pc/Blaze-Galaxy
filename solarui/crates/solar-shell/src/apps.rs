@@ -56,7 +56,7 @@ pub fn scan_desktop_applications() -> Vec<AppInfo> {
     }
 
     let mut list: Vec<AppInfo> = apps.into_values().collect();
-    list.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    list.sort_by_key(|a| a.name.to_lowercase());
     debug!("Discovered {} desktop applications.", list.len());
     list
 }

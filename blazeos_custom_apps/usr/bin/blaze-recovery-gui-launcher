@@ -11,7 +11,9 @@ export HOME=/root
 export XDG_RUNTIME_DIR=/run/user/0
 export TERM=linux
 export XDG_SESSION_TYPE=wayland
-# Direct seat yonetimi: root olarak DRM aygitina dogrudan erisim
+# The recovery target starts before a graphical login session exists.  logind
+# is therefore not guaranteed to own tty1; direct DRM access is the reliable
+# path for this root-only rescue compositor.
 export LIBSEAT_BACKEND=direct
 # WebKit sandbox ve dmabuf render: recovery ortaminda gereksiz
 export WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1
@@ -52,13 +54,36 @@ for path in /usr/bin/niri /usr/local/bin/niri; do
     fi
 done
 
-# 1. Asil girisim: Niri + LIBSEAT_BACKEND=direct
+# 1. Asil girisim: Niri + LIBSEAT_BACKEND=direct.  The GUI is started as a
+# client after the Wayland socket appears; relying only on config spawn made a
+# compositor-only black screen when GTK/WebKit was slow to initialize.
 if [ -n "$NIRI_BIN" ]; then
     log "Niri baslatiliyor (LIBSEAT_BACKEND=direct)..."
-    if "$NIRI_BIN" --config /usr/share/berp-recovery/niri-recovery.kdl; then
-        exit 0
+    "$NIRI_BIN" --session --config /usr/share/berp-recovery/niri-recovery.kdl \
+        >/tmp/bere-niri.log 2>&1 &
+    NIRI_PID=$!
+    GUI_READY=0
+    for _ in $(seq 1 100); do
+        if [ -S "/run/user/0/wayland-0" ] || [ -S "/run/user/0/wayland-1" ]; then
+            GUI_READY=1
+            break
+        fi
+        kill -0 "$NIRI_PID" 2>/dev/null || break
+        sleep 0.1
+    done
+    if [ "$GUI_READY" -eq 1 ]; then
+        log "BERE GTK/WebKit arayuzu baslatiliyor..."
+        if /usr/bin/berp-recovery-gui; then
+            rc=0
+        else
+            rc=$?
+        fi
+        kill "$NIRI_PID" 2>/dev/null || true
+        wait "$NIRI_PID" 2>/dev/null || true
+        exit "$rc"
     fi
-    log "Niri cikis kodu: $? -- fallback deneniyor..."
+    log "Niri GUI soketi olusmadi; fallback deneniyor..."
+    kill "$NIRI_PID" 2>/dev/null || true
 fi
 
 # 2. Fallback: Weston kiosk modu

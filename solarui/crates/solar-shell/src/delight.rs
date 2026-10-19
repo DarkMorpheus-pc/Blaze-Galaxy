@@ -66,12 +66,11 @@ pub fn play_acoustic_feedback(event: &str) -> Result<()> {
     };
 
     for snd in sound_candidates {
-        if std::path::Path::new(snd).exists() {
-            if Command::new("pw-play").arg(snd).spawn().is_ok() {
-                return Ok(());
-            } else if Command::new("paplay").arg(snd).spawn().is_ok() {
-                return Ok(());
-            }
+        if std::path::Path::new(snd).exists()
+            && (Command::new("pw-play").arg(snd).spawn().is_ok()
+                || Command::new("paplay").arg(snd).spawn().is_ok())
+        {
+            return Ok(());
         }
     }
 
@@ -84,19 +83,19 @@ pub fn get_seasonal_atmosphere() -> (&'static str, &'static str) {
     let day = now.day();
 
     // Check specific astronomical events
-    if month == 3 && (day >= 20 && day <= 22) {
+    if month == 3 && (20..=22).contains(&day) {
         ("Bahar Ekinoksu (Spring Equinox)", "#00e676") // Emerald warmth
-    } else if month == 6 && (day >= 20 && day <= 22) {
+    } else if month == 6 && (20..=22).contains(&day) {
         ("Yaz Gündönümü (Summer Solstice)", "#ffab00") // Solar Gold
-    } else if month == 9 && (day >= 22 && day <= 24) {
+    } else if month == 9 && (22..=24).contains(&day) {
         ("Sonbahar Ekinoksu (Autumn Equinox)", "#ff6d00") // Amber Sunset
-    } else if month == 12 && (day >= 21 && day <= 23) {
+    } else if month == 12 && (21..=23).contains(&day) {
         ("Kış Gündönümü (Winter Solstice)", "#00b0ff") // Arctic Blue
     } else {
         match month {
             12 | 1 | 2 => ("Solar Kış Atmosferi", "#29b6f6"),
-            3 | 4 | 5 => ("Solar Bahar Tazeliği", "#66bb6a"),
-            6 | 7 | 8 => ("Solar Yaz Sıcaklığı", "#ffa726"),
+            3..=5 => ("Solar Bahar Tazeliği", "#66bb6a"),
+            6..=8 => ("Solar Yaz Sıcaklığı", "#ffa726"),
             _ => ("Solar Sonbahar Zarafeti", "#ab47bc"),
         }
     }

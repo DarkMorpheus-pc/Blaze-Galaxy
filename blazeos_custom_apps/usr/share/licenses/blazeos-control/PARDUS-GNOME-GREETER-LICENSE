@@ -1,0 +1,9 @@
+BlazeOS Merkezi'nin görünüm iş akışı Pardus GNOME Greeter projesinden
+esinlenmiş ve Fedora/BlazeOS için yeniden uygulanmıştır.
+
+Kaynak: https://github.com/pardus/pardus-gnome-greeter
+Lisans: GNU Lesser General Public License, version 3 (LGPL-3.0)
+
+Pardus GNOME Greeter telif ve lisans metninin tam kopyası kaynak depoda
+LICENSE dosyasında ve yukarıdaki adreste bulunur. BlazeOS uyarlamasının
+kaynak kodu BlazeOS kaynak dağıtımının parçasıdır.

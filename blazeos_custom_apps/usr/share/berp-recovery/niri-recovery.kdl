@@ -1,8 +1,6 @@
 // BlazeOS BERP Recovery GUI - Dedicated Niri Kiosk Configuration
 // OrangeFox-inspired recovery compositor configuration
 
-spawn-at-startup "/usr/bin/berp-recovery-gui"
-
 hotkey-overlay {
     skip-at-startup
 }

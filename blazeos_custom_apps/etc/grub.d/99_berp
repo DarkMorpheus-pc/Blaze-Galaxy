@@ -110,7 +110,7 @@ menuentry "BlazeOS Recovery Environment (BERE - Powered by BERP)" --hotkey space
 	set gfxpayload=keep
 	insmod gzio
 ${boot_device_access}
-	linux ${rel_kernel} root=${LINUX_ROOT_DEVICE} ${rootsubvol} ro quiet rhgb systemd.unit=blaze-recovery-gui.target
+	linux ${rel_kernel} root=${LINUX_ROOT_DEVICE} ${rootsubvol} ro quiet rhgb systemd.unit=blaze-recovery-gui.target systemd.mask=sddm.service systemd.mask=display-manager.service
 	initrd ${rel_initrd}
 }
 

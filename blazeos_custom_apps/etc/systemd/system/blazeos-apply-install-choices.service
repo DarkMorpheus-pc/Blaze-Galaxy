@@ -1,0 +1,15 @@
+[Unit]
+Description=Apply BlazeOS boot-critical installer choices
+After=local-fs.target
+Before=display-manager.service sddm.service blazeos-postinstall.service
+ConditionKernelCommandLine=!rd.live.image
+ConditionPathExists=!/run/initramfs/live
+ConditionPathExists=!/var/lib/blazeos/install-choices-applied
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/blazeos-apply-install-choices
+TimeoutStartSec=2min
+
+[Install]
+WantedBy=graphical.target

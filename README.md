@@ -31,7 +31,9 @@ Bu sürüm (`5.04`), 5.03 masaüstü ve Türkçe dil altyapısının üzerine g�
 ### 🏠 3. Blaze House Arayüz Sadeleştirmesi ve İşlev Tamamlama
 - Blaze House penceresinin sol üstündeki `V5` etiketi ve sağ üstündeki `Arch/Cachy` rozeti kaldırıldı.
 - Uygulama içi tüm butonlar tek tek incelenerek eksik/işlevsiz olanlar tespit edildi ve doğrudan Fedora sistem araçlarına bağlanan kodları inşa edildi.
-- Sistem güncelleme mekanizması tamamen Fedora / DNF5 altyapısına uyarlandı.
+- Sistem güncelleme mekanizması Fedora / DNF5'in çevrimdışı işlem altyapısına uyarlandı. Paketler masaüstü açıkken değiştirilmez; Blaze House önce indirip hazırlar, ardından yeniden başlatma ekranında gerçek ilerleme yüzdesiyle kurar.
+- SolarUI oturumuna grafiksel polkit aracısı eklendi; Blaze House yönetici işlemlerinin `/dev/tty` hatasıyla düşmesi giderildi.
+- Güncelleme Plymouth ekranına **“Evren güncelleniyor, daha da genişliyor…”**, gerçek paket ilerlemesi ve **Secured by Blaze** doğrulaması eklendi. Ayrıntılı mimari [UPDATE-SYSTEM-5.04.md](UPDATE-SYSTEM-5.04.md) dosyasındadır.
 
 ### 🎨 4. Tema, Görsel ve Duvar Kağıdı Düzeltmeleri
 - **Aydınlık Mod Entegrasyonu:** Caelestia çubuğu, paneller ve bileşenlerin aydınlık modda kusursuz açık renge geçmesi sağlandı.
@@ -79,6 +81,11 @@ Bu sürüm (`5.04`), 5.03 masaüstü ve Türkçe dil altyapısının üzerine g�
 - **Güvenli Hesap Oluşturma:** Parola alanları boş başlıyor; ISO içinde tahmin edilebilir hazır parola bulunmuyor. Otomatik giriş yalnız kullanıcı açıkça seçerse etkinleşiyor.
 - **İkinci Açılış Siyah Ekran Düzeltmesi:** Kurulu sistemi Weston kiosk greeter yoluna zorlayan SDDM ayarı kaldırıldı. Donanımla uyumlu paket varsayılanı korunuyor ve oturum listesinde stok olarak yalnız SolarUI gösteriliyor.
 - **Derleme Güvenlik Kapıları:** ISO üretimi; derleme makinesi yolu taşıyan GRUB dosyasını, hazır OOBE parolasını, bozuk OOBE servis bağlantısını veya sorunlu SDDM greeter zorlamasını algılarsa duruyor.
+- **Bloklamayan İsteğe Bağlı Masaüstü Kurulumu:** İnternetten indirilen KDE, GNOME, COSMIC, Cinnamon, XFCE ve Sway paketleri artık SDDM başlamadan önce kurulup siyah ekran oluşturmuyor. SolarUI/OOBE hemen açılıyor; seçilen ortam düşük G/Ç önceliğiyle arka planda hazırlanıyor.
+- **Minimal veya Tam Profil:** Kurulum sihirbazı, temel masaüstü + dosya yöneticisi + terminal + ayarlar içeren **Yalnızca masaüstü ortamı** profilini varsayılan sunuyor. **Tüm uygulamalar dahil** profili Fedora'nın eksiksiz ortam grubunu kuruyor.
+- **Güvenli SolarUI Kaldırma:** SolarUI'ı kaldırma seçeneği yalnızca alternatif oturum gerçekten kurulup doğrulandıktan sonra çalışıyor; başarısız indirmede SolarUI ve Blaze Recovery korunuyor.
+- **BlazeOS Merkezi ile Birleşik Görünüm Merkezi:** Pardus GNOME Greeter'ın açık kaynaklı, kullanıcı dostu görünüm akışından esinlenen GNOME/KDE hazır düzenleri artık ayrı bir menü uygulaması yerine BlazeOS Merkezi > Görünüm sayfasında bulunuyor. GNOME için Saf, Alt Dock, Sol Dock, Klasik Panel, Odak ve Blaze; KDE için Fedora, Breeze, Arc ve Materia aileleri sunuluyor. Her değişiklikten önce kullanıcı ayarları yedekleniyor ve tek düğmeyle geri yüklenebiliyor.
+- **Daha Hafif Çekirdek İmaj:** Fedora Workstation tabanından kalan LibreOffice ve QEMU/libvirt host yığını stok SolarUI imajından ayrıldı. Ofis araçları yalnız Ofis/İş profilinde kurulur; VM misafir entegrasyonları korunur. Çekirdek imaj 1875 RPM'e ve yaklaşık 3.5 GB ISO boyutuna indirildi.
 
 ---
 
@@ -86,7 +93,7 @@ Bu sürüm (`5.04`), 5.03 masaüstü ve Türkçe dil altyapısının üzerine g�
 
 **Blaze SolarEvolution 5.04** is a high-performance Linux operating system ecosystem built on Fedora Workstation, specifically optimized for gamers, developers, and content creators.
 
-The system ships **SolarUI (Niri Wayland + Noctalia + Caelestia)** as its only offline stock desktop. Eight optional sessions can be selected when the installer verifies access to the official Fedora repositories. GRUB2 and the bundled upstream Limine release are available as bootloader choices on supported firmware.
+The system ships **SolarUI (Niri Wayland + Noctalia + Caelestia)** as its only offline stock desktop. Six downloadable desktop environments and the bundled standalone Niri session can be selected when the installer verifies access to the official Fedora repositories. Each downloadable desktop offers a minimal or full application profile. GRUB2 and the bundled upstream Limine release are available as bootloader choices on supported firmware.
 
 ---
 
@@ -97,13 +104,12 @@ The system ships **SolarUI (Niri Wayland + Noctalia + Caelestia)** as its only o
   <img width="1205" height="753" alt="image" src="https://github.com/user-attachments/assets/beac43d9-0943-44c9-b951-712629f23456" />
 </p>
 
-- **SolarUI plus 8 Online Desktop Options:**
-  - **SolarUI:** The default fluid Hybrid desktop (Noctalia + Caelestia, Available Offline)
+- **SolarUI plus 7 Optional Desktop Sessions:**
+  - **SolarUI:** The default fluid Niri desktop with independently selectable complete shell engines (Available Offline)
   - **GNOME:** Installed on demand from the official Fedora repositories
   - **Niri (Standalone):** An optional standalone session using SolarUI's bundled Niri compositor
   - **KDE Plasma:** Highly customizable Plasma 6 on Wayland
   - **COSMIC:** An independent, modern, Rust-based desktop by System76
-  - **Hyprland:** A dynamic tiling Wayland environment with fluid animations
   - **Cinnamon:** A classic and practical desktop layout
   - **XFCE:** An extremely lightweight and fast X11 environment
   - **Sway:** An i3-compatible, keyboard-driven tiling environment
@@ -202,5 +208,15 @@ Once the build is complete, your ISO image will be available in the repository r
 ## 📄 License & Contributing (Lisans ve Katkı)
 
 This project is released under the **GPL-3.0** license. You can contribute by opening a pull request or reporting an issue.
+
+### 🙏 Teşekkürler ve Katkılar
+
+SolarUI ve Blaze SolarEvolution aşağıdaki açık kaynak projelerin çalışmalarından faydalanır. Proje adları, lisansları ve upstream kimlikleri korunur:
+
+- [Noctalia](https://github.com/noctalia-dev/noctalia)
+- [Caelestia Shell](https://github.com/caelestia-dots/shell)
+- [end4-pC](https://github.com/pctrade/end4-pC)
+- [illogical-impulse / dots-hyprland](https://github.com/end-4/dots-hyprland)
+- [Pardus GNOME Greeter](https://github.com/pardus/pardus-gnome-greeter) — LGPL-3.0 görünüm ve ilk oturum deneyimi ilhamı
 
 Designed & Crafted for **BlazeOS & CachyOS** by **DarkMorpheus**.

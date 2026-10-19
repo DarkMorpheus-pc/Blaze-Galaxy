@@ -56,6 +56,11 @@ document.addEventListener("DOMContentLoaded", () => {
             hint_pass_match: "Parolalar eşleşiyor.",
             hint_pass_mismatch: "Parolalar eşleşmiyor!",
             hint_pass_set: "Parola belirleyin.",
+            field_root_password: "Root parolası:",
+            ph_root_password: "isteğe bağlı",
+            ph_root_password_confirm: "doğrula",
+            hint_root_password: "Boş bırakırsanız otomatik olarak blazeroot atanır.",
+            alert_root_pass_mismatch: "Root parolaları eşleşmiyor.",
             field_hint: "İpucu:",
             ph_hint: "isteğe bağlı",
             avatar_label: "Profil Resmi",
@@ -67,6 +72,7 @@ document.addEventListener("DOMContentLoaded", () => {
             badge_recommended: "ÖNERİLEN",
             shell_noctalia_desc: "Hafif, ultra akıcı ve modern stok Wayland masaüstü deneyimi. Kararlı performans ve düşük bellek tüketimi.",
             shell_caelestia_desc: "Zengin animasyonlar, widget'lar ve derin özelleştirilebilir QML arayüz bileşenleri.",
+            shell_end4_desc: "Material 3 Expressive tasarımı, güçlü kenar panelleri ve üretkenlik araçlarıyla kapsamlı bir Niri deneyimi.",
             color_mode_label: "Renk Modu:",
             mode_light: "Açık",
             mode_dark: "Koyu",
@@ -133,6 +139,11 @@ document.addEventListener("DOMContentLoaded", () => {
             hint_pass_match: "Passwords match.",
             hint_pass_mismatch: "Passwords do not match!",
             hint_pass_set: "Set a password.",
+            field_root_password: "Root password:",
+            ph_root_password: "optional",
+            ph_root_password_confirm: "verify",
+            hint_root_password: "If left blank, the default blazeroot password is assigned.",
+            alert_root_pass_mismatch: "Root passwords do not match.",
             field_hint: "Hint:",
             ph_hint: "optional",
             avatar_label: "Profile Picture",
@@ -144,6 +155,7 @@ document.addEventListener("DOMContentLoaded", () => {
             badge_recommended: "RECOMMENDED",
             shell_noctalia_desc: "Lightweight, ultra-smooth modern stock Wayland shell. Stable performance and low memory consumption.",
             shell_caelestia_desc: "Rich animations, interactive widgets, and deep customizable QML interface components.",
+            shell_end4_desc: "A complete Niri experience with Material 3 Expressive design, powerful sidebars, and productivity tools.",
             color_mode_label: "Color Mode:",
             mode_light: "Light",
             mode_dark: "Dark",
@@ -221,6 +233,7 @@ document.addEventListener("DOMContentLoaded", () => {
             badge_recommended: "EMPFOHLEN",
             shell_noctalia_desc: "Leichte, extrem flüssige moderne Wayland-Oberfläche.",
             shell_caelestia_desc: "Reichhaltige Animationen und QML-Komponenten.",
+            shell_end4_desc: "Ein vollständiges Niri-Erlebnis mit Material 3 Expressive, leistungsfähigen Seitenleisten und Produktivitätswerkzeugen.",
             color_mode_label: "Farbmodus:",
             mode_light: "Hell",
             mode_dark: "Dunkel",
@@ -298,6 +311,7 @@ document.addEventListener("DOMContentLoaded", () => {
             badge_recommended: "RECOMMANDÉ",
             shell_noctalia_desc: "Léger, ultra fluide et moderne sous Wayland.",
             shell_caelestia_desc: "Animations riches, widgets et composants QML personnalisables.",
+            shell_end4_desc: "Une expérience Niri complète avec Material 3 Expressive, des panneaux puissants et des outils de productivité.",
             color_mode_label: "Mode Couleur :",
             mode_light: "Clair",
             mode_dark: "Sombre",
@@ -356,6 +370,8 @@ document.addEventListener("DOMContentLoaded", () => {
         username: "",
         hostname: "blazeos",
         password: "",
+        rootPassword: "",
+        rootPasswordConfirm: "",
         isAdmin: true,
         autologin: false,
         appearance: "dark",
@@ -599,6 +615,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const inHostname = document.getElementById("input-hostname");
     const inPass = document.getElementById("input-password");
     const inPassConfirm = document.getElementById("input-password-confirm");
+    const inRootPass = document.getElementById("input-root-password");
+    const inRootPassConfirm = document.getElementById("input-root-password-confirm");
     const passHint = document.getElementById("password-match-hint");
     const chkAdmin = document.getElementById("chk-admin");
     const chkAutologin = document.getElementById("chk-autologin");
@@ -720,6 +738,8 @@ document.addEventListener("DOMContentLoaded", () => {
             const hn = (inHostname ? inHostname.value.trim().toLowerCase() : "blazeos") || "blazeos";
             const p = inPass.value;
             const pc = inPassConfirm.value;
+            const rp = inRootPass ? inRootPass.value : "";
+            const rpc = inRootPassConfirm ? inRootPassConfirm.value : "";
 
             if (!/^[a-z_][a-z0-9_-]{0,31}$/.test(u)) {
                 alert(dict.alert_invalid_user || "Lütfen geçerli bir hesap adı girin.");
@@ -741,11 +761,18 @@ document.addEventListener("DOMContentLoaded", () => {
                 inPassConfirm.focus();
                 return;
             }
+            if (rp !== rpc) {
+                alert(dict.alert_root_pass_mismatch || "Root parolaları eşleşmiyor.");
+                inRootPassConfirm.focus();
+                return;
+            }
 
             setupData.fullname = fn;
             setupData.username = u;
             setupData.hostname = hn;
             setupData.password = p;
+            setupData.rootPassword = rp;
+            setupData.rootPasswordConfirm = rpc;
             setupData.isAdmin = chkAdmin.checked;
             setupData.autologin = chkAutologin.checked;
         }
@@ -833,6 +860,8 @@ document.addEventListener("DOMContentLoaded", () => {
             fullname: setupData.fullname,
             hostname: setupData.hostname,
             password: setupData.password,
+            rootPassword: setupData.rootPassword,
+            rootPasswordConfirm: setupData.rootPasswordConfirm,
             isAdmin: setupData.isAdmin
         });
 
@@ -846,7 +875,9 @@ document.addEventListener("DOMContentLoaded", () => {
         await new Promise((r) => setTimeout(r, 400));
 
         // 4. Task: Appearance & Desktop Config (Engine: Noctalia or Caelestia)
-        const engineLabel = setupData.layout === "caelestia" ? "Caelestia" : "Noctalia";
+        const engineLabel = setupData.layout === "caelestia"
+            ? "Caelestia"
+            : (setupData.layout === "end4-pc" ? "end4-pC" : "Noctalia");
         setTaskStatus("task-appearance", "active", dict.task_appearance ? `${dict.task_appearance}...` : "Masaüstü kabuğu yapılandırılıyor...");
         const appearanceRes = await callBackend("save_desktop_config", {
             username: setupData.username,

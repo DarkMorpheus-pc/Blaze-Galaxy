@@ -1,0 +1,28 @@
+#!/bin/bash
+# Preserve DNF5's offline transaction semantics while publishing real package
+# transaction progress to Plymouth.
+set -uo pipefail
+
+plymouth_call() {
+    /usr/bin/plymouth "$@" >/dev/null 2>&1 || :
+}
+
+plymouth_call change-mode --updates
+plymouth_call display-message --text="Evren güncelleniyor, daha da genişliyor…"
+plymouth_call system-update --progress=0
+
+set +e
+/usr/bin/stdbuf -oL -eL /usr/bin/dnf5 offline _execute 2>&1 | \
+    /usr/libexec/blazeos-offline-progress-filter
+dnf_status=${PIPESTATUS[0]}
+set -e
+
+if [ "$dnf_status" -eq 0 ]; then
+    plymouth_call system-update --progress=100
+    plymouth_call display-message --text="Güncelleme tamamlandı. Sistem yeniden başlatılıyor…"
+else
+    plymouth_call display-message --text="Güncelleme tamamlanamadı. Önceki sistem korunuyor."
+    plymouth_call details
+fi
+
+exit "$dnf_status"

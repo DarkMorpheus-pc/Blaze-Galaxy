@@ -1467,7 +1467,7 @@
         "shell-engine": {
           "noctalia": "Noctalia v5 (C++23 Native)",
           "caelestia": "Caelestia (Quickshell QML)",
-          "hybrid": "SolarUI Hibrit (Yüzey Sağlayıcı)"
+          "hybrid": "Kaldırıldı (Noctalia'ya geçirilecek)"
         },
         "launcher-provider": {
           "noctalia": "Noctalia Başlatıcı",

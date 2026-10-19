@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Blaze Görünüm Merkezi İlk Oturum
+Comment=Seçilen masaüstüne uygun hazır görünüm paketlerini sunar
+Exec=/usr/libexec/blaze-style-center-first-run
+TryExec=/usr/bin/blaze-style-center
+NoDisplay=true
+X-GNOME-Autostart-Delay=4
+X-GNOME-Autostart-enabled=true
+X-KDE-autostart-after=panel

@@ -15,6 +15,12 @@ pub struct SolarPlatformDaemon {
     event_tx: broadcast::Sender<SolarEvent>,
 }
 
+impl Default for SolarPlatformDaemon {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SolarPlatformDaemon {
     pub fn new() -> Self {
         let (event_tx, _) = broadcast::channel(128);

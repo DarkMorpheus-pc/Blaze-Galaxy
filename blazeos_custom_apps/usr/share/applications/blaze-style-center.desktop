@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Blaze Görünüm Merkezi
+GenericName=Masaüstü Görünümü
+Comment=GNOME ve KDE için güvenli, geri alınabilir hazır görünüm paketleri
+Exec=blaze-style-center
+Icon=preferences-desktop-theme
+Categories=Settings;DesktopSettings;
+StartupNotify=true
+NoDisplay=true

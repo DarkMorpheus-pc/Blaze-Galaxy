@@ -34,7 +34,6 @@ use gtk4::{
     Label, Orientation, Overlay, Picture, ScrolledWindow, Video, Window,
 };
 use crate::apps::scan_desktop_applications;
-use std::cell::RefCell;
 use std::fs::File;
 use std::io::Read;
 use std::net::{SocketAddr, TcpStream};
@@ -45,6 +44,21 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
+pub fn get_user_home() -> PathBuf {
+    if let Ok(home) = std::env::var("HOME") {
+        if !home.trim().is_empty() {
+            return PathBuf::from(home);
+        }
+    }
+    if let Ok(user) = std::env::var("USER") {
+        let p = PathBuf::from(format!("/home/{}", user));
+        if p.exists() {
+            return p;
+        }
+    }
+    PathBuf::from("/tmp")
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Language {
     TR,
@@ -53,8 +67,8 @@ pub enum Language {
 
 impl Language {
     pub fn detect() -> Self {
-        let home = std::env::var("HOME").unwrap_or_else(|_| "/home/darkmorpheus".to_string());
-        let cfg_path = PathBuf::from(home).join(".config/solarui/gamezone/config.json");
+        let home = get_user_home();
+        let cfg_path = home.join(".config/solarui/gamezone/config.json");
         if let Ok(content) = std::fs::read_to_string(&cfg_path) {
             if content.contains("\"en\"") {
                 return Language::EN;
@@ -71,8 +85,8 @@ impl Language {
     }
 
     pub fn save(&self) {
-        let home = std::env::var("HOME").unwrap_or_else(|_| "/home/darkmorpheus".to_string());
-        let cfg_path = PathBuf::from(home).join(".config/solarui/gamezone/config.json");
+        let home = get_user_home();
+        let cfg_path = home.join(".config/solarui/gamezone/config.json");
         if let Some(parent) = cfg_path.parent() {
             let _ = std::fs::create_dir_all(parent);
         }
@@ -496,26 +510,50 @@ pub fn is_system_online() -> bool {
 }
 
 pub fn open_browser_url(url: &str) {
-    if Command::new("xdg-open").arg(url).spawn().is_err() {
-        if Command::new("firefox").arg(url).spawn().is_err() {
-            let _ = Command::new("chromium").arg(url).spawn();
-        }
+    if Command::new("xdg-open").arg(url).spawn().is_err()
+        && Command::new("firefox").arg(url).spawn().is_err() {
+        let _ = Command::new("chromium").arg(url).spawn();
     }
 }
 
 pub fn is_game_installed(steam_app_id: Option<&str>, exec: &str, id: &str) -> bool {
     // 1. Steam App ID check
     if let Some(app_id) = steam_app_id {
-        let home = std::env::var("HOME").unwrap_or_else(|_| "/home/darkmorpheus".to_string());
+        let home = get_user_home();
         let steam_dirs = [
-            PathBuf::from(&home).join(".steam/steam/steamapps"),
-            PathBuf::from(&home).join(".local/share/Steam/steamapps"),
+            home.join(".steam/steam/steamapps"),
+            home.join(".local/share/Steam/steamapps"),
+            home.join(".var/app/com.valvesoftware.Steam/.local/share/Steam/steamapps"),
+            home.join(".var/app/com.valvesoftware.Steam/.steam/steam/steamapps"),
             PathBuf::from("/var/lib/flatpak/app/com.valvesoftware.Steam/x86_64/stable/active/files/share/steamapps"),
         ];
-        for s_dir in steam_dirs {
+        for s_dir in &steam_dirs {
             let manifest = s_dir.join(format!("appmanifest_{}.acf", app_id));
             if manifest.exists() {
                 return true;
+            }
+        }
+
+        // Check secondary steam libraries from libraryfolders.vdf
+        let vdf_paths = [
+            home.join(".steam/steam/steamapps/libraryfolders.vdf"),
+            home.join(".local/share/Steam/steamapps/libraryfolders.vdf"),
+            home.join(".var/app/com.valvesoftware.Steam/.local/share/Steam/steamapps/libraryfolders.vdf"),
+        ];
+        for vdf_path in &vdf_paths {
+            if let Ok(content) = std::fs::read_to_string(vdf_path) {
+                for line in content.lines() {
+                    let trimmed = line.trim();
+                    if trimmed.starts_with("\"path\"") {
+                        let parts: Vec<&str> = trimmed.split('"').filter(|s| !s.trim().is_empty()).collect();
+                        if parts.len() >= 2 {
+                            let custom_manifest = Path::new(parts[1]).join("steamapps").join(format!("appmanifest_{}.acf", app_id));
+                            if custom_manifest.exists() {
+                                return true;
+                            }
+                        }
+                    }
+                }
             }
         }
         return false;
@@ -528,7 +566,7 @@ pub fn is_game_installed(steam_app_id: Option<&str>, exec: &str, id: &str) -> bo
 
     // 3. Executable check
     let parts: Vec<&str> = exec.split_whitespace().collect();
-    if let Some(cmd) = parts.get(0) {
+    if let Some(cmd) = parts.first() {
         if Path::new(cmd).is_absolute() {
             return Path::new(cmd).exists();
         }
@@ -596,63 +634,55 @@ pub fn start_linux_gamepad_listener() -> async_channel::Receiver<GamepadNavActio
             let mut last_axis_x: i16 = 0;
             let mut last_axis_y: i16 = 0;
 
-            loop {
-                match file.read_exact(&mut buf) {
-                    Ok(()) => {
-                        let value = i16::from_ne_bytes([buf[4], buf[5]]);
-                        let event_type = buf[6];
-                        let number = buf[7];
+            while let Ok(()) = file.read_exact(&mut buf) {
+                let value = i16::from_ne_bytes([buf[4], buf[5]]);
+                let event_type = buf[6];
+                let number = buf[7];
 
-                        // Filter out initial synth config events (0x80)
-                        let is_init = (event_type & 0x80) != 0;
-                        let clean_type = event_type & !0x80;
+                // Filter out initial synth config events (0x80)
+                let is_init = (event_type & 0x80) != 0;
+                let clean_type = event_type & !0x80;
 
-                        if clean_type == 1 {
-                            // Button event (1 = pressed, 0 = released)
-                            if value == 1 && !is_init {
-                                let action = match number {
-                                    0 => Some(GamepadNavAction::SelectA),     // A button
-                                    1 => Some(GamepadNavAction::BackB),       // B button
-                                    2 => Some(GamepadNavAction::OptionsX),    // X button
-                                    3 => Some(GamepadNavAction::SearchY),     // Y button
-                                    4 => Some(GamepadNavAction::TabPrevLB),   // Left Bumper (LB)
-                                    5 => Some(GamepadNavAction::TabNextRB),   // Right Bumper (RB)
-                                    6 => Some(GamepadNavAction::BackB),       // Select / View
-                                    7 => Some(GamepadNavAction::SelectA),     // Start / Menu
-                                    _ => None,
-                                };
-                                if let Some(act) = action {
-                                    let _ = tx.send_blocking(act);
-                                }
-                            }
-                        } else if clean_type == 2 && !is_init {
-                            // Axis event (D-Pad or Left Stick)
-                            // Threshold for directional actuation
-                            const STICK_THRESHOLD: i16 = 18000;
-                            const STICK_DEADZONE: i16 = 10000;
-
-                            // Number 0 = X axis (Left Stick), 1 = Y axis (Left Stick)
-                            // Number 6 = D-Pad X, 7 = D-Pad Y (standard Linux gamepad mapping)
-                            if number == 0 || number == 6 {
-                                if value > STICK_THRESHOLD && last_axis_x <= STICK_DEADZONE {
-                                    let _ = tx.send_blocking(GamepadNavAction::Right);
-                                } else if value < -STICK_THRESHOLD && last_axis_x >= -STICK_DEADZONE {
-                                    let _ = tx.send_blocking(GamepadNavAction::Left);
-                                }
-                                last_axis_x = value;
-                            } else if number == 1 || number == 7 {
-                                if value > STICK_THRESHOLD && last_axis_y <= STICK_DEADZONE {
-                                    let _ = tx.send_blocking(GamepadNavAction::Down);
-                                } else if value < -STICK_THRESHOLD && last_axis_y >= -STICK_DEADZONE {
-                                    let _ = tx.send_blocking(GamepadNavAction::Up);
-                                }
-                                last_axis_y = value;
-                            }
+                if clean_type == 1 {
+                    // Button event (1 = pressed, 0 = released)
+                    if value == 1 && !is_init {
+                        let action = match number {
+                            0 => Some(GamepadNavAction::SelectA),     // A button
+                            1 => Some(GamepadNavAction::BackB),       // B button
+                            2 => Some(GamepadNavAction::OptionsX),    // X button
+                            3 => Some(GamepadNavAction::SearchY),     // Y button
+                            4 => Some(GamepadNavAction::TabPrevLB),   // Left Bumper (LB)
+                            5 => Some(GamepadNavAction::TabNextRB),   // Right Bumper (RB)
+                            6 => Some(GamepadNavAction::BackB),       // Select / View
+                            7 => Some(GamepadNavAction::SelectA),     // Start / Menu
+                            _ => None,
+                        };
+                        if let Some(act) = action {
+                            let _ = tx.try_send(act);
                         }
                     }
-                    Err(_) => {
-                        // Joystick disconnected or read error
-                        break;
+                } else if clean_type == 2 && !is_init {
+                    // Axis event (D-Pad or Left Stick)
+                    // Threshold for directional actuation
+                    const STICK_THRESHOLD: i16 = 18000;
+                    const STICK_DEADZONE: i16 = 10000;
+
+                    // Number 0 = X axis (Left Stick), 1 = Y axis (Left Stick)
+                    // Number 6 = D-Pad X, 7 = D-Pad Y (standard Linux gamepad mapping)
+                    if number == 0 || number == 6 {
+                        if value > STICK_THRESHOLD && last_axis_x <= STICK_DEADZONE {
+                            let _ = tx.try_send(GamepadNavAction::Right);
+                        } else if value < -STICK_THRESHOLD && last_axis_x >= -STICK_DEADZONE {
+                            let _ = tx.try_send(GamepadNavAction::Left);
+                        }
+                        last_axis_x = value;
+                    } else if number == 1 || number == 7 {
+                        if value > STICK_THRESHOLD && last_axis_y <= STICK_DEADZONE {
+                            let _ = tx.try_send(GamepadNavAction::Down);
+                        } else if value < -STICK_THRESHOLD && last_axis_y >= -STICK_DEADZONE {
+                            let _ = tx.try_send(GamepadNavAction::Up);
+                        }
+                        last_axis_y = value;
                     }
                 }
             }
@@ -692,19 +722,24 @@ fn resolve_desktop_icon_path(icon_name: &str) -> Option<String> {
     if icon_name.starts_with('/') && Path::new(icon_name).exists() {
         return Some(icon_name.to_string());
     }
+    let home = get_user_home();
+    let user_icons = home.join(".local/share/icons");
     let candidate_dirs = [
-        "/home/darkmorpheus/BlazeFedora/blazeos_custom_apps/usr/share/icons/hicolor/128x128/apps",
-        "/usr/share/icons/hicolor/128x128/apps",
-        "/usr/share/icons/hicolor/48x48/apps",
-        "/usr/share/icons/hicolor/64x64/apps",
-        "/usr/share/icons/hicolor/256x256/apps",
-        "/usr/share/icons/breeze/apps/64",
-        "/usr/share/icons/breeze/apps/48",
-        "/usr/share/pixmaps",
+        PathBuf::from("/usr/share/icons/hicolor/128x128/apps"),
+        PathBuf::from("/usr/share/icons/hicolor/scalable/apps"),
+        PathBuf::from("/usr/share/icons/hicolor/48x48/apps"),
+        PathBuf::from("/usr/share/icons/hicolor/64x64/apps"),
+        PathBuf::from("/usr/share/icons/hicolor/256x256/apps"),
+        user_icons.join("hicolor/128x128/apps"),
+        user_icons.join("hicolor/scalable/apps"),
+        PathBuf::from("/usr/share/icons/breeze/apps/64"),
+        PathBuf::from("/usr/share/icons/breeze/apps/48"),
+        PathBuf::from("/usr/share/pixmaps"),
+        PathBuf::from("/usr/share/solarui/icons"),
     ];
-    for d in candidate_dirs {
+    for d in &candidate_dirs {
         for ext in ["png", "svg"] {
-            let p = Path::new(d).join(format!("{}.{}", icon_name, ext));
+            let p = d.join(format!("{}.{}", icon_name, ext));
             if p.exists() {
                 return Some(p.to_string_lossy().to_string());
             }
@@ -722,9 +757,9 @@ fn resolve_desktop_icon_path(icon_name: &str) -> Option<String> {
     ];
     for (alias_key, alias_val) in aliases {
         if icon_name.to_lowercase().contains(alias_key) || icon_name == *alias_key {
-            for d in candidate_dirs {
+            for d in &candidate_dirs {
                 for ext in ["png", "svg"] {
-                    let p = Path::new(d).join(format!("{}.{}", alias_val, ext));
+                    let p = d.join(format!("{}.{}", alias_val, ext));
                     if p.exists() {
                         return Some(p.to_string_lossy().to_string());
                     }
@@ -749,10 +784,10 @@ fn create_nav_button(label_text: &str, icon_name_base: &str) -> Button {
     pic.add_css_class("xbox-nav-btn-icon");
 
     let icon_candidates = [
-        format!("/home/darkmorpheus/BlazeFedora/blazeos_custom_apps/usr/share/solarui/icons/{}.svg", icon_name_base),
-        format!("/home/darkmorpheus/BlazeFedora/blazeos_custom_apps/usr/share/solarui/icons/{}.png", icon_name_base),
         format!("/usr/share/solarui/icons/{}.svg", icon_name_base),
         format!("/usr/share/solarui/icons/{}.png", icon_name_base),
+        format!("{}/.local/share/solarui/icons/{}.svg", get_user_home().to_string_lossy(), icon_name_base),
+        format!("{}/.local/share/solarui/icons/{}.png", get_user_home().to_string_lossy(), icon_name_base),
     ];
     for ic in &icon_candidates {
         if Path::new(ic).exists() {
@@ -792,10 +827,10 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
         }
 
         .xbox-backdrop-scrim {
-            background: linear-gradient(180deg, 
-                rgba(5, 7, 10, 0.25) 0%, 
-                rgba(5, 7, 10, 0.45) 45%, 
-                rgba(5, 7, 10, 0.88) 75%, 
+            background: linear-gradient(180deg,
+                rgba(5, 7, 10, 0.25) 0%,
+                rgba(5, 7, 10, 0.45) 45%,
+                rgba(5, 7, 10, 0.88) 75%,
                 rgba(5, 7, 10, 0.98) 100%
             );
         }
@@ -845,7 +880,7 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
             margin-right: 3px;
         }
 
-        
+
         .xbox-top-nav-group {
             background: rgba(18, 22, 28, 0.75);
             border: 1px solid rgba(255, 255, 255, 0.12);
@@ -1351,12 +1386,16 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
     avatar_pic.set_content_fit(gtk4::ContentFit::Cover);
     avatar_pic.add_css_class("xbox-avatar");
 
+    let home = get_user_home();
+    let user_face = home.join(".face");
+    let user_face_icon = home.join(".face.icon");
     let avatar_candidates = [
-        "/home/darkmorpheus/BlazeFedora/blazeos_custom_apps/usr/share/solarui/covers/user_avatar.png",
-        "/usr/share/solarui/covers/user_avatar.png",
-        "/usr/share/pixmaps/faces/user.png",
+        user_face.to_string_lossy().to_string(),
+        user_face_icon.to_string_lossy().to_string(),
+        "/usr/share/solarui/covers/user_avatar.png".to_string(),
+        "/usr/share/pixmaps/faces/user.png".to_string(),
     ];
-    for ac in avatar_candidates {
+    for ac in &avatar_candidates {
         if Path::new(ac).exists() {
             avatar_pic.set_filename(Some(Path::new(ac)));
             break;
@@ -1932,9 +1971,15 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
             }
         }
         if !icon_found {
-            let def_p = "/home/darkmorpheus/BlazeFedora/blazeos_custom_apps/usr/share/icons/hicolor/128x128/apps/application-generic.png";
-            if Path::new(def_p).exists() {
-                app_img.set_filename(Some(Path::new(def_p)));
+            let def_candidates = [
+                "/usr/share/icons/hicolor/128x128/apps/application-generic.png",
+                "/usr/share/pixmaps/application-default-icon.png",
+            ];
+            for def_p in def_candidates {
+                if Path::new(def_p).exists() {
+                    app_img.set_filename(Some(Path::new(def_p)));
+                    break;
+                }
             }
         }
         t_box.append(&app_img);
@@ -1956,7 +2001,7 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
                 .args(["-a", "Blaze GameZone", "-i", "application-x-executable", "Uygulama Başlatılıyor", &app_name])
                 .spawn();
             let parts: Vec<&str> = app_exec.split_whitespace().collect();
-            if let Some(cmd) = parts.get(0) {
+            if let Some(cmd) = parts.first() {
                 let _ = Command::new(cmd).args(&parts[1..]).spawn();
             }
         });
@@ -1979,6 +2024,19 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
     let bento_row = GtkBox::new(Orientation::Horizontal, 0);
     bento_row.add_css_class("xbox-bento-row");
 
+    let get_cover_asset_path = |filename: &str| -> Option<String> {
+        let candidates = [
+            format!("/usr/share/solarui/covers/{}", filename),
+            format!("{}/.local/share/solarui/covers/{}", get_user_home().to_string_lossy(), filename),
+        ];
+        for c in &candidates {
+            if Path::new(c).exists() {
+                return Some(c.clone());
+            }
+        }
+        None
+    };
+
     // Tile 1: "Browse your games & apps"
     let bento_apps = Button::new();
     bento_apps.add_css_class("xbox-bento-card");
@@ -1988,9 +2046,8 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
     let b1_pic = Picture::new();
     b1_pic.set_can_shrink(true);
     b1_pic.set_content_fit(gtk4::ContentFit::Cover);
-    let b1_path = "/home/darkmorpheus/BlazeFedora/blazeos_custom_apps/usr/share/solarui/covers/bento_browse.png";
-    if Path::new(b1_path).exists() {
-        b1_pic.set_filename(Some(Path::new(b1_path)));
+    if let Some(p) = get_cover_asset_path("bento_browse.png") {
+        b1_pic.set_filename(Some(Path::new(&p)));
     }
     bento1_overlay.set_child(Some(&b1_pic));
 
@@ -2028,9 +2085,8 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
     let b2_pic = Picture::new();
     b2_pic.set_can_shrink(true);
     b2_pic.set_content_fit(gtk4::ContentFit::Cover);
-    let b2_path = "/home/darkmorpheus/BlazeFedora/blazeos_custom_apps/usr/share/solarui/covers/bento_performance.png";
-    if Path::new(b2_path).exists() {
-        b2_pic.set_filename(Some(Path::new(b2_path)));
+    if let Some(p) = get_cover_asset_path("bento_performance.png") {
+        b2_pic.set_filename(Some(Path::new(&p)));
     }
     bento2_overlay.set_child(Some(&b2_pic));
 
@@ -2077,9 +2133,8 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
     let b3_pic = Picture::new();
     b3_pic.set_can_shrink(true);
     b3_pic.set_content_fit(gtk4::ContentFit::Cover);
-    let b3_path = "/home/darkmorpheus/BlazeFedora/blazeos_custom_apps/usr/share/solarui/covers/bento_store.png";
-    if Path::new(b3_path).exists() {
-        b3_pic.set_filename(Some(Path::new(b3_path)));
+    if let Some(p) = get_cover_asset_path("bento_store.png") {
+        b3_pic.set_filename(Some(Path::new(&p)));
     }
     bento3_overlay.set_child(Some(&b3_pic));
 
@@ -2124,9 +2179,8 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
     let b4_pic = Picture::new();
     b4_pic.set_can_shrink(true);
     b4_pic.set_content_fit(gtk4::ContentFit::Cover);
-    let b4_path = "/home/darkmorpheus/BlazeFedora/blazeos_custom_apps/usr/share/solarui/covers/bento_settings.png";
-    if Path::new(b4_path).exists() {
-        b4_pic.set_filename(Some(Path::new(b4_path)));
+    if let Some(p) = get_cover_asset_path("bento_settings.png") {
+        b4_pic.set_filename(Some(Path::new(&p)));
     }
     bento4_overlay.set_child(Some(&b4_pic));
 
@@ -2415,6 +2469,7 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
 }
 
 
+#[allow(dead_code)]
 fn update_hero_showcase(
     game: &GameEntry,
     title_lbl: &Label,
@@ -2452,18 +2507,19 @@ fn update_hero_showcase(
 }
 
 fn get_default_wallpaper_path() -> String {
+    let home = get_user_home();
     let candidates = [
-        "/usr/share/blazeos/wallpapers/xbox_dynamic.png",
-        "/home/darkmorpheus/BlazeFedora/blazeos_custom_apps/usr/share/blazeos/wallpapers/xbox_dynamic.png",
-        "/usr/share/blazeos/wallpapers/galaxy.png",
-        "/usr/share/blazeos/wallpapers/default.png",
-        "/usr/share/blazeos/wallpapers/blazeos-wallpaper-1.png",
-        "/home/darkmorpheus/BlazeFedora/blazeos_custom_apps/usr/share/blazeos/wallpapers/galaxy.png",
-        "/home/darkmorpheus/BlazeFedora/blazeos_custom_apps/usr/share/blazeos/wallpapers/default.png",
+        "/usr/share/blazeos/wallpapers/xbox_dynamic.png".to_string(),
+        "/usr/share/blazeos/wallpapers/galaxy.png".to_string(),
+        "/usr/share/blazeos/wallpapers/default.png".to_string(),
+        "/usr/share/blazeos/wallpapers/blazeos-wallpaper-1.png".to_string(),
+        "/usr/share/backgrounds/default.png".to_string(),
+        format!("{}/.local/share/blazeos/wallpapers/xbox_dynamic.png", home.to_string_lossy()),
+        format!("{}/.local/share/blazeos/wallpapers/galaxy.png", home.to_string_lossy()),
     ];
-    for c in candidates {
+    for c in &candidates {
         if Path::new(c).exists() {
-            return c.to_string();
+            return c.clone();
         }
     }
     String::new()
@@ -2559,7 +2615,7 @@ fn fetch_and_apply_store_screenshot(game: &GameEntry, hero_pic: &Picture, bg_pic
                             .and_then(|v| v.get("data"))
                             .and_then(|v| v.get("screenshots"))
                             .and_then(|v| v.as_array()) {
-                            if let Some(first_ss) = ss_list.get(0).and_then(|s| s.get("path_full")).and_then(|s| s.as_str()) {
+                            if let Some(first_ss) = ss_list.first().and_then(|s| s.get("path_full")).and_then(|s| s.as_str()) {
                                 let _ = std::fs::create_dir_all(&cache_dir);
                                 let _ = Command::new("curl")
                                     .args(["-sL", "-m", "6", first_ss, "-o", ss_dest.to_str().unwrap()])
@@ -2577,6 +2633,7 @@ fn fetch_and_apply_store_screenshot(game: &GameEntry, hero_pic: &Picture, bg_pic
 }
 
 // ── 10 Saniye Hover: Steam Oynanış Videosu / Fragmanı Kendi Çerçevesinde Başlatma ──
+#[allow(dead_code)]
 fn trigger_store_video_preview(game: &GameEntry, hero_vid: &Video, hero_pic: &Picture, trailer_badge: &Label) {
     println!("Triggering 10s gameplay video preview for {}", game.title);
     trailer_badge.set_text("▶ Oynanış Fragmanı Başlatıldı (Kendi Çerçevesinde)");
@@ -2618,7 +2675,7 @@ fn trigger_store_video_preview(game: &GameEntry, hero_vid: &Video, hero_pic: &Pi
                             .and_then(|v| v.get("data"))
                             .and_then(|v| v.get("movies"))
                             .and_then(|v| v.as_array()) {
-                            if let Some(first_movie) = movies.get(0) {
+                            if let Some(first_movie) = movies.first() {
                                 if let Some(mid) = first_movie.get("id").and_then(|m| m.as_i64()) {
                                     let video_url = format!("https://cdn.cloudflare.steamstatic.com/steam/apps/{}/movie480.mp4", mid);
                                     println!("Streaming trailer in widget frame: {}", video_url);
@@ -2654,15 +2711,17 @@ fn get_game_screenshot_path(game: &GameEntry) -> Option<String> {
             }
         }
     }
+    let home = get_user_home();
+    let user_covers = home.join(".local/share/solarui/covers");
     let bundled_dirs = [
-        "/usr/share/solarui/covers",
-        "/home/darkmorpheus/BlazeFedora/blazeos_custom_apps/usr/share/solarui/covers",
+        PathBuf::from("/usr/share/solarui/covers"),
+        user_covers.clone(),
     ];
-    for d in bundled_dirs {
+    for d in &bundled_dirs {
         for key in &check_keys {
             for prefix in [&format!("{}-screenshot", key), key] {
                 for ext in ["jpg", "png", "svg"] {
-                    let p = Path::new(d).join(format!("{}.{}", prefix, ext));
+                    let p = d.join(format!("{}.{}", prefix, ext));
                     if p.exists() {
                         return Some(p.to_string_lossy().to_string());
                     }
@@ -2673,6 +2732,7 @@ fn get_game_screenshot_path(game: &GameEntry) -> Option<String> {
     None
 }
 
+#[allow(dead_code)]
 fn get_game_trailer_path(game: &GameEntry) -> Option<String> {
     if let Some(m) = &game.movie_url {
         if Path::new(m).exists() {
@@ -2691,14 +2751,15 @@ fn get_game_trailer_path(game: &GameEntry) -> Option<String> {
             return Some(p.to_string_lossy().to_string());
         }
     }
+    let home = get_user_home();
     let bundled_dirs = [
-        "/usr/share/solarui/covers",
-        "/home/darkmorpheus/BlazeFedora/blazeos_custom_apps/usr/share/solarui/covers",
+        PathBuf::from("/usr/share/solarui/covers"),
+        home.join(".local/share/solarui/covers"),
     ];
-    for d in bundled_dirs {
+    for d in &bundled_dirs {
         for key in &check_keys {
             for prefix in [&format!("{}-trailer", key), key] {
-                let p = Path::new(d).join(format!("{}.mp4", prefix));
+                let p = d.join(format!("{}.mp4", prefix));
                 if p.exists() {
                     return Some(p.to_string_lossy().to_string());
                 }
@@ -2729,14 +2790,15 @@ fn get_game_cover_path(game: &GameEntry) -> Option<String> {
             }
         }
     }
+    let home = get_user_home();
     let bundled_dirs = [
-        "/usr/share/solarui/covers",
-        "/home/darkmorpheus/BlazeFedora/blazeos_custom_apps/usr/share/solarui/covers",
+        PathBuf::from("/usr/share/solarui/covers"),
+        home.join(".local/share/solarui/covers"),
     ];
-    for d in bundled_dirs {
+    for d in &bundled_dirs {
         for key in &check_keys {
             for ext in ["jpg", "png", "svg"] {
-                let p = Path::new(d).join(format!("{}.{}", key, ext));
+                let p = d.join(format!("{}.{}", key, ext));
                 if p.exists() {
                     return Some(p.to_string_lossy().to_string());
                 }
@@ -2756,13 +2818,14 @@ fn create_game_cover_image(game: &GameEntry) -> Picture {
     if let Some(p) = get_game_cover_path(game) {
         pic.set_filename(Some(Path::new(&p)));
     } else {
+        let home = get_user_home();
         let bundled = [
-            "/usr/share/solarui/covers/steam-deck.jpg",
-            "/home/darkmorpheus/BlazeFedora/blazeos_custom_apps/usr/share/solarui/covers/steam-deck.jpg",
+            PathBuf::from("/usr/share/solarui/covers/steam-deck.jpg"),
+            home.join(".local/share/solarui/covers/steam-deck.jpg"),
         ];
-        for b in bundled {
-            if Path::new(b).exists() {
-                pic.set_filename(Some(Path::new(b)));
+        for b in &bundled {
+            if b.exists() {
+                pic.set_filename(Some(b));
                 break;
             }
         }
@@ -2826,10 +2889,11 @@ pub fn clean_gamezone_cache() {
 }
 
 fn dirs_cache_dir() -> PathBuf {
-    let home = std::env::var("HOME").unwrap_or_else(|_| "/home/darkmorpheus".to_string());
-    PathBuf::from(home).join(".cache/blaze-gamezone/media")
+    let home = get_user_home();
+    home.join(".cache/blaze-gamezone/media")
 }
 
+#[allow(clippy::too_many_arguments)]
 fn new_game_entry(
     id: &str,
     title: &str,
@@ -2864,14 +2928,16 @@ fn new_game_entry(
 
 // ── Hesap Algılama (Steam PersonaName & Epic/Legendary displayName) ──
 pub fn detect_logged_in_accounts() -> (Option<String>, Option<String>) {
-    let home = std::env::var("HOME").unwrap_or_else(|_| "/home/darkmorpheus".to_string());
+    let home = get_user_home();
     let steam_vdfs = [
-        PathBuf::from(&home).join(".steam/steam/config/loginusers.vdf"),
-        PathBuf::from(&home).join(".local/share/Steam/config/loginusers.vdf"),
+        home.join(".steam/steam/config/loginusers.vdf"),
+        home.join(".local/share/Steam/config/loginusers.vdf"),
+        home.join(".var/app/com.valvesoftware.Steam/.steam/steam/config/loginusers.vdf"),
+        home.join(".var/app/com.valvesoftware.Steam/.local/share/Steam/config/loginusers.vdf"),
     ];
     let mut steam_user = None;
-    for vdf in steam_vdfs {
-        if let Ok(content) = std::fs::read_to_string(&vdf) {
+    for vdf in &steam_vdfs {
+        if let Ok(content) = std::fs::read_to_string(vdf) {
             for line in content.lines() {
                 let trimmed = line.trim();
                 if trimmed.starts_with("\"PersonaName\"") {
@@ -2888,7 +2954,7 @@ pub fn detect_logged_in_accounts() -> (Option<String>, Option<String>) {
         }
     }
     let mut epic_user = None;
-    let legendary_user = PathBuf::from(&home).join(".config/legendary/user.json");
+    let legendary_user = home.join(".config/legendary/user.json");
     if let Ok(content) = std::fs::read_to_string(&legendary_user) {
         if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
             if let Some(name) = val.get("displayName").and_then(|v| v.as_str()) {
@@ -2901,8 +2967,8 @@ pub fn detect_logged_in_accounts() -> (Option<String>, Option<String>) {
 
 // ── Oyun Geçmişi Takipçisi (Son Oynananlar) ──
 pub fn recent_history_file() -> PathBuf {
-    let home = std::env::var("HOME").unwrap_or_else(|_| "/home/darkmorpheus".to_string());
-    PathBuf::from(home).join(".config/solarui/gamezone/recent_history.json")
+    let home = get_user_home();
+    home.join(".config/solarui/gamezone/recent_history.json")
 }
 
 pub fn get_recent_game_ids() -> Vec<String> {
@@ -3060,15 +3126,22 @@ pub fn discover_store_showcase_for_lang(lang: Language) -> Vec<GameEntry> {
 pub fn discover_all_games() -> Vec<GameEntry> {
     let mut list = Vec::new();
     let cache_dir = dirs_cache_dir();
-    let home = std::env::var("HOME").unwrap_or_else(|_| "/home/darkmorpheus".to_string());
+    let home = get_user_home();
 
     // 1. Kurulu Başlatıcı Kartları (Yalnızca sistemde varsa kütüphaneye ekle)
-    if is_game_installed(None, "steam", "steam-deck") {
+    let is_flatpak_steam = home.join(".var/app/com.valvesoftware.Steam").exists()
+        || Path::new("/var/lib/flatpak/app/com.valvesoftware.Steam").exists();
+    if is_game_installed(None, "steam", "steam-deck") || is_flatpak_steam {
+        let exec_cmd = if is_game_installed(None, "steam", "steam-deck") {
+            "steam -gamepadui"
+        } else {
+            "flatpak run com.valvesoftware.Steam -gamepadui"
+        };
         list.push(new_game_entry(
             "steam-deck",
             "Steam Big Picture",
             "Steam Deck Arayüzü",
-            "steam -gamepadui",
+            exec_cmd,
             "Resmi Steam Deck kumanda ve tam ekran oyun arayüzü.",
             true,
             None,
@@ -3080,12 +3153,19 @@ pub fn discover_all_games() -> Vec<GameEntry> {
         ));
     }
 
-    if is_game_installed(None, "heroic", "heroic") {
+    let is_flatpak_heroic = home.join(".var/app/com.heroicgameslauncher.hgl").exists()
+        || Path::new("/var/lib/flatpak/app/com.heroicgameslauncher.hgl").exists();
+    if is_game_installed(None, "heroic", "heroic") || is_flatpak_heroic {
+        let exec_cmd = if is_game_installed(None, "heroic", "heroic") {
+            "heroic"
+        } else {
+            "flatpak run com.heroicgameslauncher.hgl"
+        };
         list.push(new_game_entry(
             "heroic",
             "Heroic Games Launcher",
             "Epic Games & GOG",
-            "heroic",
+            exec_cmd,
             "Açık kaynak Epic Games, GOG ve Amazon Games yöneticisi.",
             false,
             None,
@@ -3097,12 +3177,19 @@ pub fn discover_all_games() -> Vec<GameEntry> {
         ));
     }
 
-    if is_game_installed(None, "lutris", "lutris") {
+    let is_flatpak_lutris = home.join(".var/app/net.lutris.Lutris").exists()
+        || Path::new("/var/lib/flatpak/app/net.lutris.Lutris").exists();
+    if is_game_installed(None, "lutris", "lutris") || is_flatpak_lutris {
+        let exec_cmd = if is_game_installed(None, "lutris", "lutris") {
+            "lutris"
+        } else {
+            "flatpak run net.lutris.Lutris"
+        };
         list.push(new_game_entry(
             "lutris",
             "Lutris Gamepad UI",
             "Açık Kaynak Oyun Yöneticisi",
-            "lutris",
+            exec_cmd,
             "Tüm platformlar, emülatörler ve Wine oyunları tek yerde.",
             false,
             None,
@@ -3114,12 +3201,19 @@ pub fn discover_all_games() -> Vec<GameEntry> {
         ));
     }
 
-    if is_game_installed(None, "retroarch", "retroarch") {
+    let is_flatpak_retroarch = home.join(".var/app/org.libretro.RetroArch").exists()
+        || Path::new("/var/lib/flatpak/app/org.libretro.RetroArch").exists();
+    if is_game_installed(None, "retroarch", "retroarch") || is_flatpak_retroarch {
+        let exec_cmd = if is_game_installed(None, "retroarch", "retroarch") {
+            "retroarch"
+        } else {
+            "flatpak run org.libretro.RetroArch"
+        };
         list.push(new_game_entry(
             "retroarch",
             "RetroArch Emulation Hub",
             "Retro Konsol",
-            "retroarch",
+            exec_cmd,
             "PS2, PSP, N64, SNES ve klasik konsol emülasyon merkezi.",
             false,
             None,
@@ -3131,13 +3225,15 @@ pub fn discover_all_games() -> Vec<GameEntry> {
         ));
     }
 
-    // 2. Kurulu Steam Oyunlarını Tara (~/.steam/steam/steamapps/*.acf)
+    // 2. Kurulu Steam Oyunlarını Tara (~/.steam/steam/steamapps/*.acf & Flatpak Steam)
     let steam_dirs = [
-        PathBuf::from(&home).join(".steam/steam/steamapps"),
-        PathBuf::from(&home).join(".local/share/Steam/steamapps"),
+        home.join(".steam/steam/steamapps"),
+        home.join(".local/share/Steam/steamapps"),
+        home.join(".var/app/com.valvesoftware.Steam/.local/share/Steam/steamapps"),
+        home.join(".var/app/com.valvesoftware.Steam/.steam/steam/steamapps"),
     ];
 
-    for s_dir in steam_dirs {
+    for s_dir in &steam_dirs {
         if s_dir.exists() {
             if let Ok(entries) = std::fs::read_dir(s_dir) {
                 for e in entries.flatten() {
@@ -3324,7 +3420,7 @@ fn launch_game_entry(game: &GameEntry) {
         .spawn();
 
     let parts: Vec<&str> = game.exec.split_whitespace().collect();
-    if let Some(cmd) = parts.get(0) {
+    if let Some(cmd) = parts.first() {
         let args = &parts[1..];
         let _ = Command::new(cmd)
             .args(args)
@@ -3332,6 +3428,7 @@ fn launch_game_entry(game: &GameEntry) {
     }
 }
 
+#[allow(dead_code)]
 fn get_live_system_metrics() -> (String, String, String) {
     let ram_str = if let Ok(mem) = std::fs::read_to_string("/proc/meminfo") {
         let mut total = 0u64;
@@ -3354,7 +3451,7 @@ fn get_live_system_metrics() -> (String, String, String) {
         "21%".to_string()
     };
 
-    (format!("18%"), ram_str, format!("60"))
+    ("18%".to_string(), ram_str, "60".to_string())
 }
 
 fn activate_gaming_optimizations() {

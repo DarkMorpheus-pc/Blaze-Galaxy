@@ -1,0 +1,27 @@
+#!/bin/bash
+# Remove only the replaceable SolarUI desktop layer. Recovery stays intact.
+set -euo pipefail
+
+SELECTED=$(cat /etc/blazeos-selected-session 2>/dev/null || true)
+if [ -z "$SELECTED" ] || [ "$SELECTED" = solarui.desktop ]; then
+    echo "Refusing to remove SolarUI without a validated replacement session." >&2
+    exit 1
+fi
+if [ ! -f "/usr/share/wayland-sessions/$SELECTED" ] &&
+   [ ! -f "/usr/share/xsessions/$SELECTED" ]; then
+    echo "Replacement session does not exist: $SELECTED" >&2
+    exit 1
+fi
+for path in \
+    /usr/bin/solar-shell /usr/bin/solar-session /usr/bin/solar-session-wrapper \
+    /usr/bin/solar-settings /usr/bin/solar-omnibar /usr/bin/solar-core \
+    /usr/share/wayland-sessions/solarui.desktop; do
+    [ ! -e "$path" ] || rm -f -- "$path"
+done
+for tree in \
+    /usr/share/quickshell/end4-pC /usr/share/caelestia \
+    /etc/solarui /etc/skel/.config/solarui /etc/skel/.config/noctalia \
+    /etc/skel/.config/caelestia /etc/skel/.config/quickshell/caelestia; do
+    [ ! -e "$tree" ] || find "$tree" -depth -delete
+done
+echo "SolarUI desktop layer removed; recovery components were retained."

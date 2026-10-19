@@ -108,9 +108,14 @@ cat > /usr/share/polkit-1/rules.d/20-livesys-solarui.rules << FOE
 polkit.addRule(function(action, subject) {
     if (!subject.local)
         return undefined;
-    if (subject.user !== 'liveuser')
+    // The live profile is named liveuser on Fedora images and blaze on
+    // BlazeOS branding images.  Both are non-persistent live accounts.
+    if (subject.user !== 'liveuser' && subject.user !== 'blaze')
         return undefined;
-    if (action.id.indexOf('org.fedoraproject.pkexec.liveinst') !== 0)
+    // Fedora changed the live installer action id between Anaconda releases
+    // (pkexec.liveinst vs AnacondaInstaller).  Match both forms so the live
+    // session does not reject a valid user password with a misleading error.
+    if (!(/org\.fedoraproject\.(pkexec\.liveinst|AnacondaInstaller)/.test(action.id)))
         return undefined;
     return 'yes';
 });
@@ -136,6 +141,12 @@ FOE
 echo "solarui" > /tmp/anaconda_desktop_choice 2>/dev/null || :
 chmod 666 /tmp/anaconda_desktop_choice 2>/dev/null || :
 echo "grub2" > /tmp/anaconda_bootloader_choice 2>/dev/null || :
+echo "minimal" > /tmp/anaconda_desktop_profile 2>/dev/null || :
+chmod 666 /tmp/anaconda_desktop_profile 2>/dev/null || :
+echo "standard" > /tmp/anaconda_usage_profile 2>/dev/null || :
+chmod 666 /tmp/anaconda_usage_profile 2>/dev/null || :
+echo "no" > /tmp/anaconda_remove_solarui 2>/dev/null || :
+chmod 666 /tmp/anaconda_remove_solarui 2>/dev/null || :
 # Ensure networking is active and auto-connect any available ethernet NIC in the background without blocking boot
 (
     systemctl start systemd-resolved.service 2>/dev/null || :
@@ -155,6 +166,9 @@ echo "grub2" > /tmp/anaconda_bootloader_choice 2>/dev/null || :
             if [ -d "$target/etc" ]; then
                 [ -f /tmp/anaconda_desktop_choice ] && cp -f /tmp/anaconda_desktop_choice "$target/etc/blazeos-desktop-choice" 2>/dev/null || :
                 [ -f /tmp/anaconda_bootloader_choice ] && cp -f /tmp/anaconda_bootloader_choice "$target/etc/blazeos-bootloader-choice" 2>/dev/null || :
+                [ -f /tmp/anaconda_desktop_profile ] && cp -f /tmp/anaconda_desktop_profile "$target/etc/blazeos-desktop-profile" 2>/dev/null || :
+                [ -f /tmp/anaconda_usage_profile ] && cp -f /tmp/anaconda_usage_profile "$target/etc/blazeos-usage-profile" 2>/dev/null || :
+                [ -f /tmp/anaconda_remove_solarui ] && cp -f /tmp/anaconda_remove_solarui "$target/etc/blazeos-remove-solarui" 2>/dev/null || :
                 # Image payloads may preserve the mock builder's EFI stub. Keep
                 # enforcing the portable redirect through Anaconda finalization
                 # so an immediate reboot cannot land at a bare grub prompt.

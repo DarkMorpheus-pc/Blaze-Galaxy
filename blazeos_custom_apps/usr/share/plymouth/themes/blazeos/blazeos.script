@@ -1,51 +1,127 @@
-// BlazeOS SolarEvolution 5 - Clean Static Boot Splash
-// Pure black background with centered transparent logo (no animations)
+// BlazeOS SolarEvolution boot and offline-update presentation.
 Window.SetBackgroundTopColor(0.0, 0.0, 0.0);
 Window.SetBackgroundBottomColor(0.0, 0.0, 0.0);
 
 sw = Window.GetWidth();
 sh = Window.GetHeight();
+mode = Plymouth.GetMode();
+is_update = mode == "updates" || mode == "system-upgrade";
 
 logo_image = Image("logo.png");
+update_logo_image = Image("logo-glow.png");
 lw = logo_image.GetWidth();
 lh = logo_image.GetHeight();
-
 logo = Sprite(logo_image);
-logo.SetPosition((sw - lw) / 2, (sh - lh) / 2, 1);
-logo.SetOpacity(1.0);
 
-fun refresh_callback() {
+title = Sprite();
+subtitle = Sprite();
+percent = Sprite();
+message = Sprite();
+security_footer = Sprite();
+track_image = Image("progress-track.png");
+fill_image = Image("progress-fill.png");
+track = Sprite();
+fill = Sprite();
+update_progress = 0;
+
+fun center_text(sprite, image, y, z) {
+    sprite.SetImage(image);
+    sprite.SetPosition((sw - image.GetWidth()) / 2, y, z);
+}
+
+fun layout() {
     sw = Window.GetWidth();
     sh = Window.GetHeight();
-    logo.SetPosition((sw - lw) / 2, (sh - lh) / 2, 1);
+    if (is_update) {
+        logo.SetImage(update_logo_image);
+        update_lw = update_logo_image.GetWidth();
+        update_lh = update_logo_image.GetHeight();
+        logo.SetPosition((sw - update_lw) / 2 + 24, (sh - update_lh) / 2 - 170, 1);
+        title_image = Image.Text("Evren güncelleniyor, daha da genişliyor…", 1.0, 1.0, 1.0);
+        subtitle_image = Image.Text("Lütfen bilgisayarınızı kapatmayın", 0.72, 0.76, 0.84);
+        center_text(title, title_image, sh / 2 + 75, 4);
+        center_text(subtitle, subtitle_image, sh / 2 + 112, 4);
+        track.SetImage(track_image);
+        track.SetPosition((sw - track_image.GetWidth()) / 2, sh / 2 + 158, 2);
+        if (update_progress > 0) {
+            fill_width = Math.Int(track_image.GetWidth() * update_progress / 100);
+            scaled_fill = fill_image.Scale(fill_width, fill_image.GetHeight());
+            fill.SetImage(scaled_fill);
+            fill.SetPosition((sw - track_image.GetWidth()) / 2, sh / 2 + 158, 3);
+            fill.SetOpacity(1.0);
+        } else {
+            fill.SetOpacity(0.0);
+        }
+        percent_image = Image.Text(update_progress + "%", 1.0, 0.78, 0.22);
+        center_text(percent, percent_image, sh / 2 + 184, 4);
+        security_image = Image.Text("Secured by Blaze", 0.75, 0.78, 0.84);
+        center_text(security_footer, security_image, sh - 64, 4);
+    } else {
+        logo.SetImage(logo_image);
+        logo.SetPosition((sw - lw) / 2 + 24, (sh - lh) / 2, 1);
+        title.SetOpacity(0.0);
+        subtitle.SetOpacity(0.0);
+        percent.SetOpacity(0.0);
+        track.SetOpacity(0.0);
+        fill.SetOpacity(0.0);
+        message.SetOpacity(0.0);
+        security_footer.SetOpacity(0.0);
+    }
 }
+
+fun system_update_callback(progress_value) {
+    is_update = 1;
+    update_progress = Math.Int(progress_value);
+    if (update_progress < 0) update_progress = 0;
+    if (update_progress > 100) update_progress = 100;
+    title.SetOpacity(1.0);
+    subtitle.SetOpacity(1.0);
+    percent.SetOpacity(1.0);
+    track.SetOpacity(1.0);
+    security_footer.SetOpacity(1.0);
+    layout();
+}
+Plymouth.SetSystemUpdateFunction(system_update_callback);
+
+fun refresh_callback() { layout(); }
 Plymouth.SetRefreshFunction(refresh_callback);
 
 fun display_normal_callback() {
-    sw = Window.GetWidth();
-    sh = Window.GetHeight();
-    logo.SetPosition((sw - lw) / 2, (sh - lh) / 2, 1);
     logo.SetOpacity(1.0);
+    layout();
 }
 Plymouth.SetDisplayNormalFunction(display_normal_callback);
 
-fun quit_callback() {
-    logo.SetOpacity(0.0);
-}
-Plymouth.SetQuitFunction(quit_callback);
+fun update_status_callback(text) {}
+Plymouth.SetUpdateStatusFunction(update_status_callback);
 
 fun display_message_callback(text) {
+    if (is_update) {
+        message_image = Image.Text(text, 0.90, 0.92, 0.96);
+        center_text(message, message_image, sh / 2 + 222, 4);
+        message.SetOpacity(1.0);
+    }
 }
 Plymouth.SetDisplayMessageFunction(display_message_callback);
 
-fun hide_message_callback(text) {
-}
+fun hide_message_callback(text) { message.SetOpacity(0.0); }
 Plymouth.SetHideMessageFunction(hide_message_callback);
 
-fun display_password_callback(prompt, bullets) {
+fun quit_callback() {
+    logo.SetOpacity(0.0);
+    title.SetOpacity(0.0);
+    subtitle.SetOpacity(0.0);
+    percent.SetOpacity(0.0);
+    track.SetOpacity(0.0);
+    fill.SetOpacity(0.0);
+    message.SetOpacity(0.0);
+    security_footer.SetOpacity(0.0);
 }
-Plymouth.SetDisplayPasswordFunction(display_password_callback);
+Plymouth.SetQuitFunction(quit_callback);
 
-fun display_question_callback(prompt, entry) {
-}
+fun display_password_callback(prompt, bullets) {}
+Plymouth.SetDisplayPasswordFunction(display_password_callback);
+fun display_question_callback(prompt, entry) {}
 Plymouth.SetDisplayQuestionFunction(display_question_callback);
+
+layout();

@@ -9,18 +9,27 @@ export QT_QPA_PLATFORM="wayland;xcb"
 export GDK_BACKEND="wayland,x11"
 export SDL_VIDEODRIVER="wayland"
 export CLUTTER_BACKEND="wayland"
-export WLR_NO_HARDWARE_CURSORS="1"
-export WLR_RENDERER_ALLOW_SOFTWARE="1"
+# Let wlroots use the real cursor/GPU on physical systems.  The old global
+# WLR_NO_HARDWARE_CURSORS=1 forced a CPU cursor composition path and made the
+# pointer visibly stutter even when the GPU was healthy.  Software rendering
+# is selected only by the failure fallback below (or by the VM-specific path).
 export ELECTRON_OZONE_PLATFORM_HINT="wayland"
 export NVD_BACKEND="direct"
 export __GL_GSYNC_ALLOWED="0"
 export __GL_VRR_ALLOWED="0"
-export WEBKIT_DISABLE_DMABUF_RENDERER="1"
 
 # Check if running in a virtual machine (QEMU, KVM, VirtualBox, VMware) or software rasterizer
 if systemd-detect-virt -q 2>/dev/null || grep -qE -i 'hypervisor|qemu|kvm|virtualbox|vmware' /proc/cpuinfo /sys/class/dmi/id/product_name /sys/class/dmi/id/sys_vendor 2>/dev/null; then
     export QSG_RENDER_LOOP="basic"
 fi
+
+# Ensure Flatpak and user local application directories are present in XDG_DATA_DIRS
+DEFAULT_DATA_DIRS="/usr/local/share:/usr/share"
+USER_FLATPAK_DIR="${HOME}/.local/share/flatpak/exports/share"
+SYSTEM_FLATPAK_DIR="/var/lib/flatpak/exports/share"
+USER_LOCAL_DATA="${HOME}/.local/share"
+CURRENT_DATA_DIRS="${XDG_DATA_DIRS:-$DEFAULT_DATA_DIRS}"
+export XDG_DATA_DIRS="${USER_LOCAL_DATA}:${USER_FLATPAK_DIR}:${SYSTEM_FLATPAK_DIR}:${CURRENT_DATA_DIRS}"
 
 LOG_DIR="${HOME}/.local/share/solarui"
 mkdir -p "$LOG_DIR" 2>/dev/null || :
@@ -38,7 +47,11 @@ fi
 
 # systemd user session ortamini guncelle (niri --session bayragi olmadan calisirken)
 if command -v systemctl >/dev/null 2>&1; then
-    systemctl --user import-environment         XDG_SESSION_TYPE XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP         XDG_RUNTIME_DIR MOZ_ENABLE_WAYLAND QT_QPA_PLATFORM         GDK_BACKEND SDL_VIDEODRIVER ELECTRON_OZONE_PLATFORM_HINT         2>>"$LOG_FILE" || :
+    systemctl --user import-environment \
+        XDG_SESSION_TYPE XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP \
+        XDG_RUNTIME_DIR XDG_DATA_DIRS MOZ_ENABLE_WAYLAND QT_QPA_PLATFORM \
+        GDK_BACKEND SDL_VIDEODRIVER ELECTRON_OZONE_PLATFORM_HINT \
+        2>>"$LOG_FILE" || :
 fi
 if command -v dbus-update-activation-environment >/dev/null 2>&1; then
     dbus-update-activation-environment --all 2>>"$LOG_FILE" || :

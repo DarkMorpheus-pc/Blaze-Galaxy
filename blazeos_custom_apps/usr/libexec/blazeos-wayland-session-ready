@@ -1,0 +1,35 @@
+#!/bin/bash
+# Publish compositor variables after Niri creates its Wayland socket.  Portals
+# started by the user manager before this point otherwise fail with no display.
+set -u
+
+LOG="${XDG_STATE_HOME:-$HOME/.local/state}/blazeos/wayland-session-ready.log"
+mkdir -p "$(dirname "$LOG")"
+exec >>"$LOG" 2>&1
+
+for _ in $(seq 1 40); do
+    [ -n "${WAYLAND_DISPLAY:-}" ] && [ -S "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/${WAYLAND_DISPLAY}" ] && break
+    sleep 0.1
+done
+
+if [ -z "${WAYLAND_DISPLAY:-}" ]; then
+    echo "WAYLAND_DISPLAY was not provided by the compositor"
+    exit 1
+fi
+
+systemctl --user import-environment WAYLAND_DISPLAY NIRI_SOCKET \
+    XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP XDG_SESSION_TYPE 2>/dev/null || :
+dbus-update-activation-environment --systemd WAYLAND_DISPLAY NIRI_SOCKET \
+    XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP XDG_SESSION_TYPE 2>/dev/null || :
+
+# pkexec needs a graphical authentication agent in a Wayland session.  The
+# agent is deliberately started after the compositor socket and DBus
+# environment are ready; otherwise it silently fails to register with polkit.
+if [ -x /usr/libexec/polkit-mate-authentication-agent-1 ] && \
+   ! pgrep -u "$(id -u)" -f '^/usr/libexec/polkit-mate-authentication-agent-1$' >/dev/null; then
+    /usr/libexec/polkit-mate-authentication-agent-1 &
+fi
+
+systemctl --user reset-failed xdg-desktop-portal-gtk.service 2>/dev/null || :
+systemctl --user restart xdg-desktop-portal.service 2>/dev/null || :
+echo "Wayland session environment published: ${WAYLAND_DISPLAY}"

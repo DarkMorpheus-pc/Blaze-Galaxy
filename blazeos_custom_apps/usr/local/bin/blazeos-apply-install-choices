@@ -1,0 +1,95 @@
+#!/bin/bash
+# Apply boot-critical choices before SDDM. Network provisioning is delegated so
+# a slow mirror can never leave the user at a black screen.
+set -euo pipefail
+
+LOG=/var/log/blazeos-install-choices.log
+STATE_DIR=/var/lib/blazeos
+DONE="$STATE_DIR/install-choices-applied"
+PENDING="$STATE_DIR/desktop-provision-pending"
+exec >>"$LOG" 2>&1
+
+echo "=== BlazeOS boot choices: $(date --iso-8601=seconds) ==="
+if grep -qE 'rd\.live\.image|root=live:' /proc/cmdline 2>/dev/null ||
+   [ -d /run/initramfs/live ] || [ -f /run/liveuser ]; then
+    echo "Live environment detected; target provisioning skipped."
+    exit 0
+fi
+[ -e "$DONE" ] && exit 0
+mkdir -p "$STATE_DIR"
+
+DESKTOP=solarui
+BOOTLOADER=grub2
+PROFILE=minimal
+USAGE_PROFILE=standard
+REMOVE_SOLARUI=no
+[ -s /etc/blazeos-desktop-choice ] && DESKTOP=$(tr -d '[:space:]' </etc/blazeos-desktop-choice)
+[ -s /etc/blazeos-bootloader-choice ] && BOOTLOADER=$(tr -d '[:space:]' </etc/blazeos-bootloader-choice)
+[ -s /etc/blazeos-desktop-profile ] && PROFILE=$(tr -d '[:space:]' </etc/blazeos-desktop-profile)
+[ -s /etc/blazeos-usage-profile ] && USAGE_PROFILE=$(tr -d '[:space:]' </etc/blazeos-usage-profile)
+[ -s /etc/blazeos-remove-solarui ] && REMOVE_SOLARUI=$(tr -d '[:space:]' </etc/blazeos-remove-solarui)
+case "$PROFILE" in minimal|full) ;; *) PROFILE=minimal ;; esac
+case "$USAGE_PROFILE" in light|daily|office|gaming|standard|developer) ;; *) USAGE_PROFILE=standard ;; esac
+case "$REMOVE_SOLARUI" in yes|no) ;; *) REMOVE_SOLARUI=no ;; esac
+
+session_for() {
+    case "$1" in
+        solarui|solarui_pure) echo solarui.desktop ;;
+        niri) echo niri.desktop ;;
+        gnome) echo gnome.desktop ;;
+        kde) echo plasma.desktop ;;
+        cosmic) echo cosmic.desktop ;;
+        hyprland) echo hyprland.desktop ;;
+        cinnamon)
+            if [ -f /usr/share/wayland-sessions/cinnamon-wayland.desktop ]; then
+                echo cinnamon-wayland.desktop
+            else
+                echo cinnamon.desktop
+            fi ;;
+        xfce) echo xfce.desktop ;;
+        sway) echo sway.desktop ;;
+        *) return 1 ;;
+    esac
+}
+session_exists() {
+    [ -f "/usr/share/wayland-sessions/$1" ] || [ -f "/usr/share/xsessions/$1" ]
+}
+
+SESSION=$(session_for "$DESKTOP") || {
+    echo "Unknown desktop '$DESKTOP'; using SolarUI"
+    DESKTOP=solarui
+    SESSION=solarui.desktop
+}
+if session_exists "$SESSION" && [ "$USAGE_PROFILE" = standard ]; then
+    printf '%s\n' "$SESSION" >/etc/blazeos-selected-session
+    : >"$STATE_DIR/desktop-provisioned"
+else
+    echo "Queuing $DESKTOP ($PROFILE); graphical boot will continue with SolarUI."
+    printf '%s\n' solarui.desktop >/etc/blazeos-selected-session
+    printf 'desktop=%s\nprofile=%s\nusage_profile=%s\nremove_solarui=%s\n' \
+        "$DESKTOP" "$PROFILE" "$USAGE_PROFILE" "$REMOVE_SOLARUI" >"$PENDING"
+fi
+
+echo "Bootloader choice: $BOOTLOADER"
+case "$BOOTLOADER" in
+    limine)
+        if [ ! -d /sys/firmware/efi ]; then
+            echo "Limine requires UEFI; keeping GRUB on this BIOS installation"
+            BOOTLOADER=grub2
+            printf '%s\n' "$BOOTLOADER" >/etc/blazeos-bootloader-choice
+        else
+            /usr/local/bin/blaze-bootloader switch-to-limine
+        fi ;;
+    grub|grub2)
+        mkdir -p /boot/grub2
+        grub2-mkconfig -o /boot/grub2/grub.cfg
+        if [ -d /sys/firmware/efi ] && [ -d /boot/efi/EFI/fedora ]; then
+            /usr/bin/gen_grub_cfgstub /boot/grub2 /boot/efi/EFI/fedora
+        fi ;;
+    *) echo "Unknown bootloader '$BOOTLOADER'"; exit 1 ;;
+esac
+
+printf 'desktop=%s\nsession=%s\nprofile=%s\nusage_profile=%s\nremove_solarui=%s\nbootloader=%s\npending=%s\napplied_at=%s\n' \
+    "$DESKTOP" "$SESSION" "$PROFILE" "$USAGE_PROFILE" "$REMOVE_SOLARUI" "$BOOTLOADER" \
+    "$([ -e "$PENDING" ] && echo yes || echo no)" "$(date --iso-8601=seconds)" >"$DONE"
+echo "Boot-critical choices applied successfully."

@@ -13,6 +13,7 @@ set -u
 # --- BlazeOS logo kaynağını bul -------------------------------------------
 SRC=""
 for c in \
+    /usr/share/blazeos/gdm/logo.png \
     /usr/share/icons/hicolor/256x256/apps/blazeos-logo.png \
     /usr/share/icons/hicolor/128x128/apps/blazeos-logo.png \
     /usr/share/blazeos/icons/blazeos-logo-256.png \

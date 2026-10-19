@@ -14,20 +14,13 @@ pub struct CaelestiaProvider {
 
 impl Default for CaelestiaProvider {
     fn default() -> Self {
-        Self::for_hybrid()
+        Self::for_full()
     }
 }
 
 impl CaelestiaProvider {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    pub fn for_hybrid() -> Self {
-        Self {
-            caelestia_bin: Self::discover_bin(),
-            is_full_mode: false,
-        }
     }
 
     pub fn for_full() -> Self {
@@ -38,7 +31,9 @@ impl CaelestiaProvider {
     }
 
     fn discover_bin() -> PathBuf {
-        let home = std::env::var("HOME").unwrap_or_else(|_| "/home/darkmorpheus".to_string());
+        let home = std::env::var("HOME").unwrap_or_else(|_| {
+            std::env::var("USER").map(|u| format!("/home/{}", u)).unwrap_or_else(|_| "/tmp".to_string())
+        });
         let candidates = [
             PathBuf::from("/usr/bin/caelestia"),
             PathBuf::from("/usr/local/bin/caelestia"),
@@ -180,11 +175,7 @@ impl CaelestiaProvider {
 #[async_trait]
 impl ShellProvider for CaelestiaProvider {
     fn name(&self) -> &'static str {
-        if self.is_full_mode {
-            "Caelestia Shell (Official)"
-        } else {
-            "Caelestia Hybrid Surfaces (Official)"
-        }
+        "Caelestia Shell (Official)"
     }
 
     async fn is_installed(&self) -> bool {

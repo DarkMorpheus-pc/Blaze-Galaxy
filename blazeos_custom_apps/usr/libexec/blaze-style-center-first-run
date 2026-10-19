@@ -1,0 +1,35 @@
+#!/bin/bash
+set -u
+
+[ -f /etc/blazeos-setup-completed ] || exit 0
+[ ! -e "${XDG_CONFIG_HOME:-$HOME/.config}/blazeos/style-center-completed" ] || exit 0
+
+session="${XDG_CURRENT_DESKTOP:-} ${DESKTOP_SESSION:-}"
+# Display managers do not all export the desktop variables at the same point.
+# Use the installer choice only as a fallback; never open this GNOME/KDE tool
+# inside an explicitly selected SolarUI/Niri session.
+if [ -z "${session// }" ]; then
+    session=$(cat /etc/blazeos-selected-session 2>/dev/null || true)
+fi
+case "${session,,}" in
+    *gnome*|*kde*|*plasma*) ;;
+    *) exit 0 ;;
+esac
+
+runtime_dir=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}
+mkdir -p "$runtime_dir" 2>/dev/null || true
+exec 9>"$runtime_dir/blaze-style-center-first-run.lock"
+flock -n 9 || exit 0
+
+# Some display managers start XDG autostart entries before the graphical bus is
+# fully exported. Wait briefly instead of losing the one-shot first-run window.
+for _ in $(seq 1 30); do
+    [ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ] && \
+        { [ -n "${WAYLAND_DISPLAY:-}" ] || [ -n "${DISPLAY:-}" ]; } && break
+    sleep 1
+done
+
+# Appearance presets now live inside BlazeOS Merkezi. Keep the style-center
+# executable as the shared, reversible settings backend.
+export BLAZEOS_CONTROL_PAGE=appearance
+exec /usr/local/bin/blazeos-control

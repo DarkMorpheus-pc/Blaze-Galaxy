@@ -2,7 +2,9 @@ use anyhow::{bail, Context, Result};
 use std::path::PathBuf;
 
 fn get_noctalia_settings_path() -> PathBuf {
-    let home = std::env::var("HOME").unwrap_or_else(|_| "/home/darkmorpheus".to_string());
+    let home = std::env::var("HOME").unwrap_or_else(|_| {
+        std::env::var("USER").map(|u| format!("/home/{}", u)).unwrap_or_else(|_| "/tmp".to_string())
+    });
     PathBuf::from(home).join(".local/state/noctalia/settings.toml")
 }
 

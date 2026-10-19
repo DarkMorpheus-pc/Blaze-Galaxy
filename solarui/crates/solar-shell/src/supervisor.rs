@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use tracing::{info, warn};
 
 use crate::engine::ShellEngine;
-use crate::providers::{CaelestiaProvider, NoctaliaProvider, ShellProvider};
+use crate::providers::{CaelestiaProvider, End4PcProvider, NoctaliaProvider, ShellProvider};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct DesiredState {
@@ -32,7 +32,8 @@ impl Default for DesiredState {
 pub enum ActualEngine {
     Noctalia,
     Caelestia,
-    Hybrid,
+    End4Pc,
+    Conflict,
     None,
     Failed(String),
 }
@@ -42,7 +43,8 @@ impl ActualEngine {
         match self {
             ActualEngine::Noctalia => "noctalia",
             ActualEngine::Caelestia => "caelestia",
-            ActualEngine::Hybrid => "hybrid",
+            ActualEngine::End4Pc => "end4-pc",
+            ActualEngine::Conflict => "conflict",
             ActualEngine::None => "none",
             ActualEngine::Failed(_) => "failed",
         }
@@ -53,6 +55,7 @@ pub struct SolarShellSupervisor {
     state_file: PathBuf,
     noctalia: NoctaliaProvider,
     caelestia: CaelestiaProvider,
+    end4_pc: End4PcProvider,
 }
 
 impl Default for SolarShellSupervisor {
@@ -62,6 +65,7 @@ impl Default for SolarShellSupervisor {
             state_file,
             noctalia: NoctaliaProvider::new(),
             caelestia: CaelestiaProvider::new(),
+            end4_pc: End4PcProvider::new(),
         }
     }
 }
@@ -101,25 +105,25 @@ impl SolarShellSupervisor {
     }
 
     pub fn is_reconciled(desired: ShellEngine, actual: &ActualEngine) -> bool {
-        match (desired, actual) {
-            (ShellEngine::Noctalia, ActualEngine::Noctalia) => true,
-            (ShellEngine::Caelestia, ActualEngine::Caelestia) => true,
-            // Hybrid modda her iki bilesenin de calisir olmasi gerekir.
-            // Sadece Noctalia calısıyorsa Caelestia cokmus demektir ve onarilmali.
-            (ShellEngine::Hybrid, ActualEngine::Hybrid) => true,
-            _ => false,
-        }
+        matches!(
+            (desired, actual),
+            (ShellEngine::Noctalia, ActualEngine::Noctalia)
+                | (ShellEngine::Caelestia, ActualEngine::Caelestia)
+                | (ShellEngine::End4Pc, ActualEngine::End4Pc)
+        )
     }
 
     pub async fn detect_actual_engine(&self) -> ActualEngine {
         let n_alive = self.noctalia.health_check().await.unwrap_or(false);
         let c_alive = self.caelestia.health_check().await.unwrap_or(false);
+        let e_alive = self.end4_pc.health_check().await.unwrap_or(false);
 
-        match (n_alive, c_alive) {
-            (true, true) => ActualEngine::Hybrid,
-            (true, false) => ActualEngine::Noctalia,
-            (false, true) => ActualEngine::Caelestia,
-            (false, false) => ActualEngine::None,
+        match (n_alive, c_alive, e_alive) {
+            (true, false, false) => ActualEngine::Noctalia,
+            (false, true, false) => ActualEngine::Caelestia,
+            (false, false, true) => ActualEngine::End4Pc,
+            (false, false, false) => ActualEngine::None,
+            _ => ActualEngine::Conflict,
         }
     }
 
@@ -206,17 +210,10 @@ mod tests {
             ShellEngine::Caelestia,
             &ActualEngine::Caelestia
         ));
-        // Hybrid requires both providers; a lone Noctalia process means the
-        // Caelestia half crashed and the supervisor must reconcile it.
-        assert!(!SolarShellSupervisor::is_reconciled(
-            ShellEngine::Hybrid,
-            &ActualEngine::Noctalia
-        ));
         assert!(SolarShellSupervisor::is_reconciled(
-            ShellEngine::Hybrid,
-            &ActualEngine::Hybrid
+            ShellEngine::End4Pc,
+            &ActualEngine::End4Pc
         ));
-
         // Uyuşmazlık durumları
         assert!(!SolarShellSupervisor::is_reconciled(
             ShellEngine::Noctalia,

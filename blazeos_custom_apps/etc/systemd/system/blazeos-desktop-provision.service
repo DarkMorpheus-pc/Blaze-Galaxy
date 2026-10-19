@@ -1,0 +1,17 @@
+[Unit]
+Description=Retry optional BlazeOS desktop provisioning without blocking login
+Wants=network-online.target
+After=network-online.target local-fs.target display-manager.service blazeos-apply-install-choices.service
+ConditionKernelCommandLine=!rd.live.image
+ConditionPathExists=/var/lib/blazeos/desktop-provision-pending
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/blazeos-desktop-provision
+TimeoutStartSec=50min
+Nice=15
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+
+[Install]
+WantedBy=graphical.target

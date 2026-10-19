@@ -96,7 +96,7 @@ async fn main() -> Result<()> {
     }
 
     let args: Vec<String> = std::env::args().collect();
-    let bin_name = args.get(0).map(|s| s.as_str()).unwrap_or("");
+    let bin_name = args.first().map(|s| s.as_str()).unwrap_or("");
     let default_cmd = if bin_name.ends_with("solar-settings") {
         "settings"
     } else if bin_name.ends_with("blaze-gamezone") || bin_name.ends_with("gamezone") {
@@ -136,15 +136,12 @@ async fn main() -> Result<()> {
             let s = state.read().await;
             let vm = ShelfViewModel::from_state(&s);
 
-            let is_in_sync = match (desired.desired_engine, &actual) {
-                (engine::ShellEngine::Noctalia, supervisor::ActualEngine::Noctalia) => true,
-                (engine::ShellEngine::Caelestia, supervisor::ActualEngine::Caelestia) => true,
-                (
-                    engine::ShellEngine::Hybrid,
-                    supervisor::ActualEngine::Noctalia | supervisor::ActualEngine::Hybrid,
-                ) => true,
-                _ => false,
-            };
+            let is_in_sync = matches!(
+                (desired.desired_engine, &actual),
+                (engine::ShellEngine::Noctalia, supervisor::ActualEngine::Noctalia)
+                    | (engine::ShellEngine::Caelestia, supervisor::ActualEngine::Caelestia)
+                    | (engine::ShellEngine::End4Pc, supervisor::ActualEngine::End4Pc)
+            );
             let sync_status = if is_in_sync {
                 "Reconciled (OK)"
             } else {
@@ -473,7 +470,7 @@ async fn main() -> Result<()> {
 }
 
 async fn run_gamezone_shell_session() -> Result<()> {
-    // 1. Mevcut aktif/istenen masaüstü kabuk motorunu (Noctalia, Caelestia, Hybrid) tespit et ve kaydet
+    // 1. Mevcut aktif/istenen masaüstü kabuk motorunu tespit et ve kaydet
     let supervisor = supervisor::SolarShellSupervisor::new();
     let desired = supervisor.load_desired_state().unwrap_or_default();
     let prev_engine = desired.desired_engine;
@@ -499,6 +496,13 @@ async fn run_gamezone_shell_session() -> Result<()> {
     let _ = std::process::Command::new("pkill")
         .args(["-TERM", "-f", "caelestia"])
         .status();
+    if let Ok(end4) = std::env::var("SOLARUI_END4_PC_DIR") {
+        let _ = std::process::Command::new("qs").args(["--path", &end4, "kill"]).status();
+    } else {
+        let _ = std::process::Command::new("qs")
+            .args(["--path", "/usr/share/quickshell/end4-pC", "kill"])
+            .status();
+    }
     let _ = std::process::Command::new("pkill")
         .args(["-f", "solar-shell (run|gui|taskbar|window)"])
         .status();
@@ -531,7 +535,9 @@ async fn run_gamezone_shell_session() -> Result<()> {
 }
 
 async fn sync_noctalia_settings() -> Result<()> {
-    let home = std::env::var("HOME").unwrap_or_else(|_| "/home/darkmorpheus".to_string());
+    let home = std::env::var("HOME").unwrap_or_else(|_| {
+        std::env::var("USER").map(|u| format!("/home/{}", u)).unwrap_or_else(|_| "/tmp".to_string())
+    });
     let state_file = std::path::PathBuf::from(home).join(".local/state/noctalia/settings.toml");
 
     if !state_file.exists() {

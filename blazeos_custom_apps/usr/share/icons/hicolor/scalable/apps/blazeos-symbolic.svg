@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <path d="M30 29C17 29 8 22 8 9c13 0 22 7 22 20Z"/>
+  <path d="M34 29C47 29 56 22 56 9 43 9 34 16 34 29Z"/>
+  <path d="M30 34C15 34 5 42 5 57c15 0 25-8 25-23Z"/>
+  <path d="M34 34c15 0 25 8 25 23-15 0-25-8-25-23Z"/>
+</svg>

@@ -37,6 +37,9 @@ mkdir -p %{buildroot}/usr/bin
 mkdir -p %{buildroot}/usr/share/wayland-sessions
 mkdir -p %{buildroot}/etc/solarui
 mkdir -p %{buildroot}/usr/lib/systemd/user
+mkdir -p %{buildroot}/usr/share/quickshell
+mkdir -p %{buildroot}/usr/share/doc/solarui
+mkdir -p %{buildroot}/usr/share/licenses/solarui/end4-pC
 
 install -m 755 %{_topdir}/../../release/solar-core %{buildroot}/usr/bin/solar-core
 install -m 755 %{_topdir}/../../release/solar-shell %{buildroot}/usr/bin/solar-shell
@@ -47,6 +50,10 @@ install -m 644 %{_topdir}/../../../data/niri.kdl %{buildroot}/etc/solarui/niri.k
 install -m 644 %{_topdir}/../../../data/systemd/solarui-session.target %{buildroot}/usr/lib/systemd/user/solarui-session.target
 install -m 644 %{_topdir}/../../../data/systemd/solar-core.service %{buildroot}/usr/lib/systemd/user/solar-core.service
 install -m 644 %{_topdir}/../../../data/systemd/solar-shell.service %{buildroot}/usr/lib/systemd/user/solar-shell.service
+cp -a %{_topdir}/../../../vendor/end4-pC %{buildroot}/usr/share/quickshell/end4-pC
+install -m 644 %{_topdir}/../../../vendor/end4-pC/UPSTREAM.md %{buildroot}/usr/share/doc/solarui/end4-pC-UPSTREAM
+install -m 644 %{_topdir}/../../../vendor/end4-pC/BLAZEOS-CHANGES.md %{buildroot}/usr/share/doc/solarui/end4-pC-BLAZEOS-CHANGES
+install -m 644 %{_topdir}/../../../vendor/end4-pC/LICENSE %{buildroot}/usr/share/licenses/solarui/end4-pC/LICENSE
 
 %files
 /usr/bin/solar-core
@@ -57,6 +64,10 @@ install -m 644 %{_topdir}/../../../data/systemd/solar-shell.service %{buildroot}
 /usr/lib/systemd/user/solarui-session.target
 /usr/lib/systemd/user/solar-core.service
 /usr/lib/systemd/user/solar-shell.service
+/usr/share/quickshell/end4-pC
+/usr/share/doc/solarui/end4-pC-UPSTREAM
+/usr/share/doc/solarui/end4-pC-BLAZEOS-CHANGES
+/usr/share/licenses/solarui/end4-pC/LICENSE
 
 %changelog
 * Fri Sep 11 2026 BlazeOS Team <team@blazeos.org> - 0.1.0-1

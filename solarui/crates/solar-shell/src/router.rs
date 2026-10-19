@@ -3,11 +3,12 @@ use tracing::{info, warn};
 
 use crate::actions::ShellAction;
 use crate::engine::{ShellEngine, SolarShellConfig, SurfaceProvider};
-use crate::providers::{CaelestiaProvider, NoctaliaProvider, ShellProvider};
+use crate::providers::{CaelestiaProvider, End4PcProvider, NoctaliaProvider, ShellProvider};
 
 pub struct SolarSurfaceRouter {
     noctalia: NoctaliaProvider,
     caelestia: CaelestiaProvider,
+    end4_pc: End4PcProvider,
 }
 
 impl Default for SolarSurfaceRouter {
@@ -15,6 +16,7 @@ impl Default for SolarSurfaceRouter {
         Self {
             noctalia: NoctaliaProvider::new(),
             caelestia: CaelestiaProvider::new(),
+            end4_pc: End4PcProvider::new(),
         }
     }
 }
@@ -25,19 +27,11 @@ impl SolarSurfaceRouter {
     }
 
     /// Aksiyon için hangi Surface Provider'ın kullanılacağını belirler.
-    pub fn provider_for(&self, action: ShellAction, shell_cfg: &SolarShellConfig) -> SurfaceProvider {
+    pub fn provider_for(&self, _action: ShellAction, shell_cfg: &SolarShellConfig) -> SurfaceProvider {
         match shell_cfg.engine {
             ShellEngine::Noctalia => SurfaceProvider::Noctalia,
             ShellEngine::Caelestia => SurfaceProvider::Caelestia,
-            ShellEngine::Hybrid => match action {
-                ShellAction::Launcher => shell_cfg.launcher_provider,
-                ShellAction::Dashboard => shell_cfg.dashboard_provider,
-                ShellAction::ControlCenter
-                | ShellAction::Session
-                | ShellAction::Settings
-                | ShellAction::WindowSwitcher => shell_cfg.bar_provider,
-                ShellAction::Overview => SurfaceProvider::SolarUI,
-            },
+            ShellEngine::End4Pc => SurfaceProvider::End4Pc,
         }
     }
 
@@ -70,6 +64,7 @@ impl SolarSurfaceRouter {
                     }
                 }
             }
+            SurfaceProvider::End4Pc => self.end4_pc.dispatch(action).await,
             SurfaceProvider::SolarUI => {
                 match action {
                     ShellAction::Overview => {
@@ -128,22 +123,15 @@ mod tests {
     }
 
     #[test]
-    fn test_router_hybrid_mode_custom_distribution() {
+    fn test_router_end4_pc_mode() {
         let router = SolarSurfaceRouter::new();
         let cfg = SolarShellConfig {
-            engine: ShellEngine::Hybrid,
-            launcher_provider: SurfaceProvider::Caelestia,
-            dashboard_provider: SurfaceProvider::Caelestia,
-            bar_provider: SurfaceProvider::Noctalia,
-            notifications_provider: SurfaceProvider::Noctalia,
-            osd_provider: SurfaceProvider::Noctalia,
+            engine: ShellEngine::End4Pc,
+            ..Default::default()
         };
-
-        // Hybrid modunda Launcher ve Dashboard Caelestia'dan alınırken, Bar/Session Noctalia'dan alınır
-        assert_eq!(router.provider_for(ShellAction::Launcher, &cfg), SurfaceProvider::Caelestia);
-        assert_eq!(router.provider_for(ShellAction::Dashboard, &cfg), SurfaceProvider::Caelestia);
-        assert_eq!(router.provider_for(ShellAction::Session, &cfg), SurfaceProvider::Noctalia);
-        assert_eq!(router.provider_for(ShellAction::ControlCenter, &cfg), SurfaceProvider::Noctalia);
-        assert_eq!(router.provider_for(ShellAction::Overview, &cfg), SurfaceProvider::SolarUI);
+        assert_eq!(router.provider_for(ShellAction::Launcher, &cfg), SurfaceProvider::End4Pc);
+        assert_eq!(router.provider_for(ShellAction::Settings, &cfg), SurfaceProvider::End4Pc);
+        assert_eq!(router.provider_for(ShellAction::Session, &cfg), SurfaceProvider::End4Pc);
     }
+
 }

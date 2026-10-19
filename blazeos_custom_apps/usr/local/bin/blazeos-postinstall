@@ -15,6 +15,12 @@ LOG="/var/log/blazeos-postinstall.log"
 exec >> "$LOG" 2>&1
 echo "=== Starting BlazeOS Post-Install at $(date) ==="
 
+# The installer launcher belongs only to the live image.  Remove both the
+# copied desktop shortcut and the application menu entry after installation;
+# keeping it causes users to accidentally launch Anaconda on the installed OS.
+rm -f /etc/skel/Desktop/liveinst.desktop /usr/share/applications/liveinst.desktop
+find /home -maxdepth 3 -type f -name liveinst.desktop -delete 2>/dev/null || true
+
 # 1. Check if Apple-Style OOBE has completed
 if [ ! -f /etc/blazeos-setup-completed ]; then
     echo "BlazeOS first-boot OOBE pending. Ensuring SDDM 00-blaze-oobe.conf is active..."
@@ -161,127 +167,36 @@ ASCEOF
     fi
 done < /etc/passwd
 
-# 4. Resolve and provision the selected desktop. SolarUI is the only offline
-# stock desktop. Optional desktops come exclusively from enabled Fedora repos.
-DNF_BIN="$(command -v dnf5 || command -v dnf || true)"
-CHOICE="solarui"
-[ -f /etc/blazeos-desktop-choice ] && CHOICE=$(tr -d ' \n\r' < /etc/blazeos-desktop-choice)
-
-install_packages() {
-    [ -n "$DNF_BIN" ] || return 1
-    timeout 15m "$DNF_BIN" install -y --setopt=install_weak_deps=False "$@"
-}
-
-install_environment() {
-    [ -n "$DNF_BIN" ] || return 1
-    timeout 15m "$DNF_BIN" environment install -y "$1"
-}
-
-set_nodisplay() {
-    local file="$1" value="$2"
-    [ -f "$file" ] || return 0
-    if grep -q '^NoDisplay=' "$file"; then
-        sed -i "s/^NoDisplay=.*/NoDisplay=${value}/" "$file"
-    else
-        sed -i "/^\[Desktop Entry\]/a NoDisplay=${value}" "$file"
-    fi
-}
-
-set_default_session() {
-    local desktop="$1" session="${1%.desktop}"
-    if [ ! -f "/usr/share/wayland-sessions/$desktop" ] && [ ! -f "/usr/share/xsessions/$desktop" ]; then
-        echo "Requested session file is missing: $desktop"
-        return 1
-    fi
-    sed -i "s/^DefaultSession=.*/DefaultSession=${desktop}/" /etc/gdm/custom.conf 2>/dev/null || true
-    sed -i "s/^Session=.*/Session=${desktop}/" /etc/sddm.conf.d/autologin.conf 2>/dev/null || true
-    for account in /var/lib/AccountsService/users/*; do
-        [ -f "$account" ] || continue
-        sed -i "s/^Session=.*/Session=${session}/" "$account"
-    done
-}
-
-echo "Desktop choice: $CHOICE"
+# 4. Synchronize the session selected by the non-blocking desktop provisioner.
+# Package downloads are owned by blazeos-desktop-provision.service and must
+# never be repeated from this first-login cleanup service.
 SELECTED_DESKTOP="solarui.desktop"
-PROVISION_OK=1
-case "$CHOICE" in
-    solarui|solarui_pure)
-        ;;
-    niri)
-        set_nodisplay /usr/share/wayland-sessions/niri.desktop false
-        SELECTED_DESKTOP="niri.desktop"
-        ;;
-    gnome)
-        rpm -q gnome-shell >/dev/null 2>&1 || install_packages gnome-shell gnome-session gnome-control-center gnome-settings-daemon nautilus ptyxis || PROVISION_OK=0
-        SELECTED_DESKTOP="gnome.desktop"
-        ;;
-    kde)
-        rpm -q plasma-workspace-wayland >/dev/null 2>&1 || install_environment kde-desktop-environment || PROVISION_OK=0
-        SELECTED_DESKTOP="plasma.desktop"
-        ;;
-    cosmic)
-        rpm -q cosmic-session >/dev/null 2>&1 || install_environment cosmic-desktop-environment || PROVISION_OK=0
-        SELECTED_DESKTOP="cosmic.desktop"
-        ;;
-    hyprland)
-        rpm -q hyprland >/dev/null 2>&1 || install_packages hyprland foot wofi waybar || PROVISION_OK=0
-        SELECTED_DESKTOP="hyprland.desktop"
-        ;;
-    cinnamon)
-        rpm -q cinnamon >/dev/null 2>&1 || install_environment cinnamon-desktop-environment || PROVISION_OK=0
-        SELECTED_DESKTOP="cinnamon.desktop"
-        [ -f /usr/share/wayland-sessions/cinnamon-wayland.desktop ] && SELECTED_DESKTOP="cinnamon-wayland.desktop"
-        ;;
-    xfce)
-        rpm -q xfce4-session >/dev/null 2>&1 || install_environment xfce-desktop-environment || PROVISION_OK=0
-        SELECTED_DESKTOP="xfce.desktop"
-        ;;
-    sway)
-        rpm -q sway >/dev/null 2>&1 || install_environment sway-desktop-environment || PROVISION_OK=0
-        SELECTED_DESKTOP="sway.desktop"
-        ;;
-    *)
-        echo "Unknown desktop choice '$CHOICE'; falling back to SolarUI."
-        CHOICE="solarui"
-        ;;
-esac
-
-set_nodisplay /usr/share/wayland-sessions/gnome.desktop true
-set_nodisplay /usr/share/wayland-sessions/niri.desktop true
-set_nodisplay /usr/share/wayland-sessions/solarui.desktop false
-
-if [ "$PROVISION_OK" -eq 1 ] && set_default_session "$SELECTED_DESKTOP"; then
-    [ "$CHOICE" = "gnome" ] && set_nodisplay /usr/share/wayland-sessions/gnome.desktop false
-    [ "$CHOICE" = "niri" ] && set_nodisplay /usr/share/wayland-sessions/niri.desktop false
-else
-    echo "Optional desktop provisioning failed; SolarUI remains active and setup will retry next boot."
-    set_default_session solarui.desktop || true
-    exit 1
+if [ -s /etc/blazeos-selected-session ]; then
+    SELECTED_DESKTOP=$(tr -d ' \n\r' </etc/blazeos-selected-session)
 fi
-
-# Synchronize GDM and AccountsService user session definitions
-DEFAULT_SESSION_DESKTOP=$(grep -E '^DefaultSession=' /etc/gdm/custom.conf 2>/dev/null | cut -d= -f2 | tr -d ' \r\n')
-if [ -n "$DEFAULT_SESSION_DESKTOP" ]; then
-    SESSION_NAME="${DEFAULT_SESSION_DESKTOP%.desktop}"
-    SESSION_TYPE="wayland"
-    if [ -f "/usr/share/wayland-sessions/${DEFAULT_SESSION_DESKTOP}" ] || [ -f "/usr/share/wayland-sessions/${SESSION_NAME}.desktop" ]; then
-        SESSION_TYPE="wayland"
-    elif [ -f "/usr/share/xsessions/${DEFAULT_SESSION_DESKTOP}" ] || [ -f "/usr/share/xsessions/${SESSION_NAME}.desktop" ]; then
-        SESSION_TYPE="x11"
+if [ ! -f "/usr/share/wayland-sessions/$SELECTED_DESKTOP" ] && \
+   [ ! -f "/usr/share/xsessions/$SELECTED_DESKTOP" ]; then
+    echo "Selected session is not ready yet: $SELECTED_DESKTOP; keeping SolarUI."
+    SELECTED_DESKTOP="solarui.desktop"
+fi
+SESSION_NAME="${SELECTED_DESKTOP%.desktop}"
+SESSION_TYPE="wayland"
+[ -f "/usr/share/xsessions/$SELECTED_DESKTOP" ] && SESSION_TYPE="x11"
+for account in /var/lib/AccountsService/users/*; do
+    [ -f "$account" ] || continue
+    sed -i "s/^Session=.*/Session=${SESSION_NAME}/" "$account"
+    if grep -q '^XSession=' "$account"; then
+        sed -i "s/^XSession=.*/XSession=${SESSION_NAME}/" "$account"
+    else
+        printf 'XSession=%s\n' "$SESSION_NAME" >>"$account"
     fi
-
-    while IFS=: read -r user pass uid gid gecos home shell; do
-        if [ "$uid" -ge 1000 ] && [ "$uid" -lt 65534 ] && [ "$user" != "liveuser" ]; then
-            ACCOUNT="/var/lib/AccountsService/users/$user"
-            if [ -f "$ACCOUNT" ]; then
-                sed -i "s/^Session=.*/Session=${SESSION_NAME}/" "$ACCOUNT"
-                sed -i "s/^XSession=.*/XSession=${SESSION_NAME}/" "$ACCOUNT"
-                sed -i "s/^SessionType=.*/SessionType=${SESSION_TYPE}/" "$ACCOUNT"
-                restorecon -F "$ACCOUNT" 2>/dev/null || true
-            fi
-        fi
-    done < /etc/passwd
-fi
+    if grep -q '^SessionType=' "$account"; then
+        sed -i "s/^SessionType=.*/SessionType=${SESSION_TYPE}/" "$account"
+    else
+        printf 'SessionType=%s\n' "$SESSION_TYPE" >>"$account"
+    fi
+    restorecon -F "$account" 2>/dev/null || true
+done
 
 # 5. Check bootloader choice
 if [ -f /etc/blazeos-bootloader-choice ]; then

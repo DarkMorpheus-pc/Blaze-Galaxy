@@ -4,8 +4,11 @@ DefaultDependencies=no
 Conflicts=shutdown.target getty@tty1.service kmsconvt@tty1.service plymouth-quit-wait.service
 After=systemd-remount-fs.service systemd-vconsole-setup.service systemd-udevd.service systemd-udev-settle.service dbus.service
 Wants=systemd-udev-settle.service dbus.service
-Before=shutdown.target
-OnFailure=blaze-recovery.service
+Conflicts=display-manager.service graphical.target
+Before=shutdown.target display-manager.service graphical.target
+# Never silently replace the graphical BERE entry with the text BERP menu.
+# If the compositor fails, systemd keeps the failure visible in the journal so
+# the user can explicitly choose the BERP console entry from GRUB.
 
 [Service]
 User=root
@@ -18,6 +21,7 @@ ExecStartPre=-/usr/bin/chmod 0700 /run/user/0
 ExecStartPre=-/usr/bin/plymouth quit
 ExecStartPre=-/usr/bin/chvt 1
 ExecStart=/usr/bin/blaze-recovery-gui-launcher
+TimeoutStartSec=30s
 Type=simple
 Restart=no
 StandardInput=tty

@@ -1581,7 +1581,7 @@
         "shell-engine": {
           "noctalia": "Noctalia v5 (C++23 Native)",
           "caelestia": "Caelestia (Quickshell QML)",
-          "hybrid": "SolarUI Hybrid (Surface Provider)"
+          "hybrid": "Removed (will migrate to Noctalia)"
         },
         "launcher-provider": {
           "noctalia": "Noctalia Launcher",

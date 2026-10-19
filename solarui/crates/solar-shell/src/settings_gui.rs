@@ -1139,7 +1139,7 @@ fn build_shell_tab() -> GtkBox {
     sec.append(&title);
 
     let desc = Label::new(Some(
-        "SolarUI mimarisi altında Noctalia v5 (C++23 Native) ve Caelestia Shell (Quickshell QML) arasında dinamik geçiş yapabilir veya Hibrit modda Noctalia omurgasını Caelestia yüzeyleri (Launcher/Dashboard) ile birleştirebilirsiniz.",
+        "Noctalia, Caelestia ve end4-pC tam kabuk motorları arasında güvenli biçimde geçiş yapabilirsiniz. Her motor kendi bar, bildirim, OSD ve sistem tepsisini tek başına yönetir.",
     ));
     desc.add_css_class("setting-subtext");
     desc.set_wrap(true);
@@ -1159,56 +1159,20 @@ fn build_shell_tab() -> GtkBox {
     let engines = [
         "Noctalia v5 (C++23 Native)",
         "Caelestia Shell (Quickshell QML)",
-        "SolarUI Hibrit (Noctalia + Caelestia)",
+        "end4-pC (Material 3 Expressive)",
     ];
     let engine_model = StringList::new(&engines);
     let engine_dd = DropDown::new(Some(engine_model), None::<gtk4::Expression>);
     let active_idx = match cfg.shell.engine {
         ShellEngine::Noctalia => 0,
         ShellEngine::Caelestia => 1,
-        ShellEngine::Hybrid => 2,
+        ShellEngine::End4Pc => 2,
     };
     engine_dd.set_selected(active_idx);
     row1.append(&engine_dd);
     sec.append(&row1);
 
-    // 2. Launcher Provider Selector (for Hybrid)
-    let row2 = GtkBox::new(Orientation::Horizontal, 12);
-    let lbl2 = Label::new(Some("Başlatıcı Sağlayıcı (Launcher):"));
-    lbl2.add_css_class("setting-label");
-    lbl2.set_hexpand(true);
-    lbl2.set_halign(gtk4::Align::Start);
-    row2.append(&lbl2);
-
-    let launchers = ["Noctalia Başlatıcı", "Caelestia Başlatıcı"];
-    let launcher_model = StringList::new(&launchers);
-    let launcher_dd = DropDown::new(Some(launcher_model), None::<gtk4::Expression>);
-    launcher_dd.set_selected(match cfg.shell.launcher_provider {
-        SurfaceProvider::Noctalia => 0,
-        _ => 1,
-    });
-    row2.append(&launcher_dd);
-    sec.append(&row2);
-
-    // 3. Dashboard Provider Selector (for Hybrid)
-    let row3 = GtkBox::new(Orientation::Horizontal, 12);
-    let lbl3 = Label::new(Some("Dashboard Sağlayıcı:"));
-    lbl3.add_css_class("setting-label");
-    lbl3.set_hexpand(true);
-    lbl3.set_halign(gtk4::Align::Start);
-    row3.append(&lbl3);
-
-    let dash_providers = ["Caelestia Dashboard", "Noctalia Kontrol Merkezi"];
-    let dash_model = StringList::new(&dash_providers);
-    let dash_dd = DropDown::new(Some(dash_model), None::<gtk4::Expression>);
-    dash_dd.set_selected(match cfg.shell.dashboard_provider {
-        SurfaceProvider::Caelestia => 0,
-        _ => 1,
-    });
-    row3.append(&dash_dd);
-    sec.append(&row3);
-
-    // 4. Action Buttons
+    // 2. Action Buttons
     let btn_box = GtkBox::new(Orientation::Horizontal, 10);
     btn_box.set_margin_top(8);
 
@@ -1217,8 +1181,6 @@ fn build_shell_tab() -> GtkBox {
     apply_btn.set_halign(gtk4::Align::Start);
 
     let engine_dd_clone = engine_dd.clone();
-    let launcher_dd_clone = launcher_dd.clone();
-    let dash_dd_clone = dash_dd.clone();
 
     let shell_status_lbl = Label::new(Some(""));
     shell_status_lbl.add_css_class("setting-subtext");
@@ -1230,17 +1192,18 @@ fn build_shell_tab() -> GtkBox {
         let target_engine = match engine_dd_clone.selected() {
             0 => ShellEngine::Noctalia,
             1 => ShellEngine::Caelestia,
-            _ => ShellEngine::Hybrid,
+            _ => ShellEngine::End4Pc,
         };
         cfg.shell.engine = target_engine;
-        cfg.shell.launcher_provider = match launcher_dd_clone.selected() {
-            0 => SurfaceProvider::Noctalia,
-            _ => SurfaceProvider::Caelestia,
+        cfg.shell.launcher_provider = match target_engine {
+            ShellEngine::Noctalia => SurfaceProvider::Noctalia,
+            ShellEngine::Caelestia => SurfaceProvider::Caelestia,
+            ShellEngine::End4Pc => SurfaceProvider::End4Pc,
         };
-        cfg.shell.dashboard_provider = match dash_dd_clone.selected() {
-            0 => SurfaceProvider::Caelestia,
-            _ => SurfaceProvider::Noctalia,
-        };
+        cfg.shell.dashboard_provider = cfg.shell.launcher_provider;
+        cfg.shell.bar_provider = cfg.shell.launcher_provider;
+        cfg.shell.notifications_provider = cfg.shell.launcher_provider;
+        cfg.shell.osd_provider = cfg.shell.launcher_provider;
         let _ = cfg.save();
 
         update_noctalia_shell_settings(
@@ -1278,6 +1241,25 @@ fn build_shell_tab() -> GtkBox {
     });
     btn_box.append(&reconcile_btn);
 
+    let end4_settings_btn = Button::with_label("end4-pC Ayarlarını Aç");
+    end4_settings_btn.add_css_class("secondary-btn");
+    end4_settings_btn.set_halign(gtk4::Align::Start);
+    let shell_status_end4 = shell_status_lbl.clone();
+    end4_settings_btn.connect_clicked(move |_| {
+        let cfg = SolarConfig::load();
+        if cfg.shell.engine != ShellEngine::End4Pc {
+            shell_status_end4.set_text("end4-pC ayarları için önce end4-pC motorunu uygulayın.");
+            return;
+        }
+        shell_status_end4.set_text("end4-pC ayarları açılıyor...");
+        std::thread::spawn(|| {
+            let _ = Command::new("solar-shell")
+                .args(["route", "settings"])
+                .status();
+        });
+    });
+    btn_box.append(&end4_settings_btn);
+
     sec.append(&btn_box);
     sec.append(&shell_status_lbl);
     tab.append(&sec);
@@ -1291,8 +1273,8 @@ fn build_caelestia_tab() -> GtkBox {
     tab.set_margin_bottom(10);
     
     let cfg = SolarConfig::load();
-    if cfg.shell.engine == ShellEngine::Noctalia {
-        let msg = Label::new(Some("Bu ayarlar sadece SolarUI Hibrit veya tam Caelestia motoru aktifken kullanılabilir. Lütfen 'Kabuk Motoru' sekmesinden motoru değiştirin."));
+    if cfg.shell.engine != ShellEngine::Caelestia {
+        let msg = Label::new(Some("Bu ayarlar yalnız tam Caelestia motoru aktifken kullanılabilir. Lütfen 'Kabuk Motoru' sekmesinden Caelestia'yı seçin."));
         msg.add_css_class("setting-label");
         msg.set_wrap(true);
         msg.set_halign(gtk4::Align::Center);
@@ -1717,7 +1699,7 @@ pub fn sync_caelestia_scale(_scale: f64) {
         val = serde_json::json!({});
     }
 
-    if !val.get("appearance").map_or(false, |v| v.is_object()) {
+    if !val.get("appearance").is_some_and(|v| v.is_object()) {
         val["appearance"] = serde_json::json!({});
     }
 
@@ -1866,14 +1848,13 @@ pub fn apply_display_scale_dynamically(scale: f64) {
         if out.status.success() {
             let s = String::from_utf8_lossy(&out.stdout);
             for token in s.split('"') {
-                if token == "Virtual-1"
+                if (token == "Virtual-1"
                     || token.starts_with("eDP")
                     || token.starts_with("HDMI")
-                    || token.starts_with("DP-")
+                    || token.starts_with("DP-"))
+                    && !outputs_found.contains(&token.to_string())
                 {
-                    if !outputs_found.contains(&token.to_string()) {
-                        outputs_found.push(token.to_string());
-                    }
+                    outputs_found.push(token.to_string());
                 }
             }
         }
@@ -2042,7 +2023,4 @@ fn build_omnibar_tab() -> GtkBox {
     tab.append(&sec);
     tab
 }
-
-
-
 

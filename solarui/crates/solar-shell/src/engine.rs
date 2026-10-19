@@ -11,7 +11,7 @@ impl ShellEngineExt for ShellEngine {
         match self {
             ShellEngine::Noctalia => "Noctalia v5 (C++23 Native Wayland)",
             ShellEngine::Caelestia => "Caelestia (Quickshell QML)",
-            ShellEngine::Hybrid => "SolarUI Hybrid (Noctalia Bar + Caelestia Surfaces)",
+            ShellEngine::End4Pc => "end4-pC (Material 3 Expressive Quickshell)",
         }
     }
 }

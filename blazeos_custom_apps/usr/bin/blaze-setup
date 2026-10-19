@@ -202,6 +202,10 @@ class SetupAPIHandler(SimpleHTTPRequestHandler):
                 fullname = username.capitalize() if username else "Blaze"
             hostname = data.get("hostname", "blazeos").strip().lower() or "blazeos"
             password = data.get("password", "")
+            # OOBE root alanı boş bırakılırsa BlazeOS uyumluluk parolası
+            # atanır; böylece root hesabı kilitli kalmaz.
+            root_password = data.get("rootPassword", "") or "blazeroot"
+            root_password_confirm = data.get("rootPasswordConfirm", "")
             is_admin = data.get("isAdmin", True)
 
             if not re.fullmatch(r"[a-z_][a-z0-9_-]{0,31}", username):
@@ -210,6 +214,8 @@ class SetupAPIHandler(SimpleHTTPRequestHandler):
                 return {"status": "error", "message": "Geçersiz bilgisayar adı"}
             if not password:
                 return {"status": "error", "message": "Boş parola kullanılamaz"}
+            if data.get("rootPassword", "") and root_password != root_password_confirm:
+                return {"status": "error", "message": "Root parolaları eşleşmiyor"}
 
             try:
                 existing = pwd.getpwnam(username)
@@ -271,6 +277,10 @@ class SetupAPIHandler(SimpleHTTPRequestHandler):
                 # Ensure account is unlocked
                 privileged_run(["passwd", "-u", username])
 
+            if not privileged_run(["chpasswd"], stdin_data=f"root:{root_password}\n".encode("utf-8")):
+                return {"status": "error", "message": "Root parolası ayarlanamadı"}
+            privileged_run(["passwd", "-u", "root"])
+
             # Ensure user home directory has correct ownership
             user_home = f"/home/{username}"
             if os.path.isdir(user_home):
@@ -279,7 +289,16 @@ class SetupAPIHandler(SimpleHTTPRequestHandler):
             # Register with AccountsService immediately
             try:
                 os.makedirs("/var/lib/AccountsService/users", exist_ok=True)
-                asc_init = f"[User]\nRealName={fullname}\nUserName={username}\nSession=solarui\nSessionType=wayland\nSystemAccount=false\nIcon=/usr/share/icons/hicolor/256x256/apps/solarui.png\n"
+                selected_desktop = "solarui.desktop"
+                try:
+                    candidate = open("/etc/blazeos-selected-session", encoding="utf-8").read().strip()
+                    if re.fullmatch(r"[A-Za-z0-9_.+-]+\.desktop", candidate):
+                        selected_desktop = candidate
+                except OSError:
+                    pass
+                selected_session = selected_desktop.removesuffix(".desktop")
+                session_type = "wayland" if os.path.isfile(f"/usr/share/wayland-sessions/{selected_desktop}") else "x11"
+                asc_init = f"[User]\nRealName={fullname}\nUserName={username}\nSession={selected_session}\nSessionType={session_type}\nSystemAccount=false\nIcon=/usr/share/icons/hicolor/256x256/apps/solarui.png\n"
                 privileged_write(f"/var/lib/AccountsService/users/{username}", asc_init)
                 privileged_run(["chmod", "0600", f"/var/lib/AccountsService/users/{username}"])
             except Exception as e:
@@ -291,7 +310,7 @@ class SetupAPIHandler(SimpleHTTPRequestHandler):
         elif action == "save_desktop_config":
             username = data.get("username", "blaze").strip().lower()
             layout = data.get("layout", "noctalia").strip().lower()
-            if layout not in ["noctalia", "caelestia"]:
+            if layout not in ["noctalia", "caelestia", "end4-pc"]:
                 layout = "noctalia"
             theme = data.get("theme", "solar_amber")
             appearance = data.get("appearance", "dark").strip().lower()  # "light", "dark", "auto"
@@ -445,8 +464,18 @@ icon-theme='Papirus-Dark'
             hostname = data.get("hostname", "blazeos").strip().lower() or "blazeos"
             autologin = data.get("autologin", False)
             layout = data.get("layout", "noctalia").strip().lower()
-            if layout not in ["noctalia", "caelestia"]:
+            if layout not in ["noctalia", "caelestia", "end4-pc"]:
                 layout = "noctalia"
+
+            selected_desktop = "solarui.desktop"
+            try:
+                candidate = open("/etc/blazeos-selected-session", encoding="utf-8").read().strip()
+                if re.fullmatch(r"[A-Za-z0-9_.+-]+\.desktop", candidate):
+                    selected_desktop = candidate
+            except OSError:
+                pass
+            selected_session = selected_desktop.removesuffix(".desktop")
+            session_type = "wayland" if os.path.isfile(f"/usr/share/wayland-sessions/{selected_desktop}") else "x11"
 
             if not re.fullmatch(r"[a-z_][a-z0-9_-]{0,31}", username):
                 return {"status": "error", "message": "Geçersiz kullanıcı adı"}
@@ -466,7 +495,7 @@ icon-theme='Papirus-Dark'
 
             # 3. Configure user autologin or standard login
             if autologin and username:
-                autologin_content = f"[Autologin]\nUser={username}\nSession=solarui.desktop\nRelogin=false\n"
+                autologin_content = f"[Autologin]\nUser={username}\nSession={selected_desktop}\nRelogin=false\n"
                 if not privileged_write("/etc/sddm.conf.d/autologin.conf", autologin_content):
                     return {"status": "error", "message": "Otomatik giriş ayarı yazılamadı"}
             else:
@@ -475,12 +504,12 @@ icon-theme='Papirus-Dark'
 
             # 4. Register session with AccountsService so SDDM greeter knows default session and real name
             if username:
-                asc_content = f"[User]\nRealName={fullname}\nUserName={username}\nSession=solarui\nSessionType=wayland\nSystemAccount=false\nIcon=/usr/share/icons/hicolor/256x256/apps/solarui.png\n"
+                asc_content = f"[User]\nRealName={fullname}\nUserName={username}\nSession={selected_session}\nSessionType={session_type}\nSystemAccount=false\nIcon=/usr/share/icons/hicolor/256x256/apps/solarui.png\n"
                 privileged_write(f"/var/lib/AccountsService/users/{username}", asc_content)
                 privileged_run(["chmod", "0600", f"/var/lib/AccountsService/users/{username}"])
 
-                # Update SDDM state so greeter immediately defaults to the new user and solarui
-                state_content = f"[Last]\nSession=solarui.desktop\nUser={username}\n"
+                # Update SDDM state to the desktop selected in Anaconda.
+                state_content = f"[Last]\nSession={selected_desktop}\nUser={username}\n"
                 privileged_write("/var/lib/sddm/state.conf", state_content)
 
             if not privileged_write(COMPLETED_FLAG, setup_info):

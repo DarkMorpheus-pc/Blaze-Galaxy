@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct SolarConfig {
     #[serde(default)]
     pub shell: SolarShellConfig,
@@ -22,22 +22,6 @@ pub struct SolarConfig {
     pub acoustic: AcousticConfig,
     #[serde(default)]
     pub oobe: OobeConfig,
-}
-
-impl Default for SolarConfig {
-    fn default() -> Self {
-        Self {
-            shell: SolarShellConfig::default(),
-            performance: PerformanceConfig::default(),
-            taskbar: TaskbarConfig::default(),
-            shortcuts_hud: ShortcutsHudConfig::default(),
-            branding: BrandingConfig::default(),
-            display: DisplayConfig::default(),
-            omnibar: OmnibarConfig::default(),
-            acoustic: AcousticConfig::default(),
-            oobe: OobeConfig::default(),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -211,7 +195,7 @@ fn default_branding_title() -> String {
     "SolarUI Desktop Environment".to_string()
 }
 fn default_branding_subtitle() -> String {
-    "KDE Plasma Serbestliği & Noctalia Bar Hibrit Tasarımı".to_string()
+    "Niri Akıcılığı ve Seçilebilir Tam Kabuk Motorları".to_string()
 }
 fn default_branding_signature() -> String {
     "Designed & Crafted for BlazeOS & CachyOS by DarkMorpheus".to_string()
@@ -278,17 +262,22 @@ impl SolarConfig {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum ShellEngine {
+    #[default]
     Noctalia,
     Caelestia,
-    Hybrid,
+    End4Pc,
 }
 
-impl Default for ShellEngine {
-    fn default() -> Self {
-        ShellEngine::Noctalia
+impl<'de> Deserialize<'de> for ShellEngine {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        value.parse().map_err(serde::de::Error::custom)
     }
 }
 
@@ -297,7 +286,7 @@ impl ShellEngine {
         match self {
             ShellEngine::Noctalia => "noctalia",
             ShellEngine::Caelestia => "caelestia",
-            ShellEngine::Hybrid => "hybrid",
+            ShellEngine::End4Pc => "end4-pc",
         }
     }
 }
@@ -314,27 +303,25 @@ impl std::str::FromStr for ShellEngine {
         match s.to_lowercase().trim() {
             "noctalia" | "noctalia-v5" | "native" => Ok(ShellEngine::Noctalia),
             "caelestia" | "quickshell" | "qml" => Ok(ShellEngine::Caelestia),
-            "hybrid" | "mixed" | "surface-router" => Ok(ShellEngine::Hybrid),
+            "end4-pc" | "end4pc" | "end4" => Ok(ShellEngine::End4Pc),
+            // Legacy Hybrid configurations migrate to the safe single-shell mode.
+            "hybrid" | "mixed" | "surface-router" => Ok(ShellEngine::Noctalia),
             other => Err(format!(
-                "Bilinmeyen kabuk motoru: '{}'. Geçerli seçenekler: noctalia, caelestia, hybrid",
+                "Bilinmeyen kabuk motoru: '{}'. Geçerli seçenekler: noctalia, caelestia, end4-pc",
                 other
             )),
         }
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum SurfaceProvider {
+    #[default]
     Noctalia,
     Caelestia,
+    End4Pc,
     SolarUI,
-}
-
-impl Default for SurfaceProvider {
-    fn default() -> Self {
-        SurfaceProvider::Noctalia
-    }
 }
 
 impl SurfaceProvider {
@@ -342,6 +329,7 @@ impl SurfaceProvider {
         match self {
             SurfaceProvider::Noctalia => "noctalia",
             SurfaceProvider::Caelestia => "caelestia",
+            SurfaceProvider::End4Pc => "end4-pc",
             SurfaceProvider::SolarUI => "solarui",
         }
     }
@@ -359,27 +347,23 @@ impl std::str::FromStr for SurfaceProvider {
         match s.to_lowercase().trim() {
             "noctalia" | "noctalia-v5" => Ok(SurfaceProvider::Noctalia),
             "caelestia" | "quickshell" => Ok(SurfaceProvider::Caelestia),
+            "end4-pc" | "end4pc" | "end4" => Ok(SurfaceProvider::End4Pc),
             "solarui" | "native" => Ok(SurfaceProvider::SolarUI),
             other => Err(format!(
-                "Bilinmeyen sağlayıcı: '{}'. Geçerli seçenekler: noctalia, caelestia, solarui",
+                "Bilinmeyen sağlayıcı: '{}'. Geçerli seçenekler: noctalia, caelestia, end4-pc, solarui",
                 other
             )),
         }
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum PerformanceProfile {
     Legacy,
+    #[default]
     Balanced,
     Ultra,
-}
-
-impl Default for PerformanceProfile {
-    fn default() -> Self {
-        PerformanceProfile::Balanced
-    }
 }
 
 impl PerformanceProfile {
@@ -584,7 +568,11 @@ mod tests {
         );
         assert_eq!(
             "hybrid".parse::<ShellEngine>().unwrap(),
-            ShellEngine::Hybrid
+            ShellEngine::Noctalia
+        );
+        assert_eq!(
+            "end4-pc".parse::<ShellEngine>().unwrap(),
+            ShellEngine::End4Pc
         );
         assert!("invalid_engine".parse::<ShellEngine>().is_err());
     }
@@ -602,6 +590,10 @@ mod tests {
         assert_eq!(
             "solarui".parse::<SurfaceProvider>().unwrap(),
             SurfaceProvider::SolarUI
+        );
+        assert_eq!(
+            "end4-pc".parse::<SurfaceProvider>().unwrap(),
+            SurfaceProvider::End4Pc
         );
         assert!("invalid_provider".parse::<SurfaceProvider>().is_err());
     }
@@ -635,7 +627,7 @@ mod tests {
         "#;
 
         let parsed: SolarConfig = toml::from_str(partial_toml).expect("Parse partial toml");
-        assert_eq!(parsed.shell.engine, ShellEngine::Hybrid);
+        assert_eq!(parsed.shell.engine, ShellEngine::Noctalia);
         assert_eq!(parsed.shell.launcher_provider, SurfaceProvider::Caelestia);
         // Omitted fields should receive their respective defaults!
         assert_eq!(parsed.shell.dashboard_provider, SurfaceProvider::Caelestia);
