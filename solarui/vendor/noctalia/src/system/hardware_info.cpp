@@ -356,10 +356,6 @@ namespace {
 
   std::string detectCompositor() {
     const auto kind = compositors::detect();
-    // SolarUI product label; backend identities stay unchanged for IPC/config.
-    if (kind == compositors::CompositorKind::Niri) {
-      return "SolarUI";
-    }
     if (kind != compositors::CompositorKind::Unknown) {
       return std::string(compositors::name(kind));
     }

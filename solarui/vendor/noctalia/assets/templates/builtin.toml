@@ -49,7 +49,7 @@ name = "Labwc"
 category = "compositor"
 
 [catalog.niri]
-name = "SolarUI"
+name = "Niri"
 category = "compositor"
 
 [catalog.hyprland]

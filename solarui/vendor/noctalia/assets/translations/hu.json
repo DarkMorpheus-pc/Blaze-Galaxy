@@ -259,7 +259,6 @@
       "uptime": "Rendszeridő - {uptime}",
       "weather": {
         "data-unavailable": "Az időjárási adatok nem érhetők el.",
-        "disabled": "Az időjárás le van tiltva a konfigurációban.",
         "fetching": "Előrejelzés lekérése…"
       }
     },
@@ -1156,7 +1155,6 @@
         "borders": "Szegélyek",
         "brightness": "Fényerő",
         "built-in": "Beépített",
-        "calendar": "Naptár",
         "capsules": "Kapszulák",
         "clipboard": "Vágólap",
         "community": "Közösség",
@@ -1227,7 +1225,7 @@
         "keybinds": "Billentyűkiosztás",
         "launcher": "Indító",
         "location": "Hely",
-        "niri": "SolarUI",
+        "niri": "Niri",
         "notifications": "Értesítések",
         "osd": "Képernyőkijelzés",
         "panels": "Panelek",
@@ -1935,10 +1933,6 @@
         "main-axis-padding": {
           "description": "Belső kitöltés az ikonsor végein (az első ikon előtt és az utolsó ikon után)"
         },
-        "monitors": {
-          "description": "Válaszd ki, mely monitorokon jelenjen meg a dokk (hagyd üresen az összeshez); az aktív monitor szűrése ezeken a monitorokon belül érvényesül",
-          "label": "Monitorok"
-        },
         "pinned-apps": {
           "description": "A dokkhoz rögzített alkalmazások asztali bejegyzés azonosítói",
           "label": "Kitűzött alkalmazások"
@@ -2231,10 +2225,6 @@
           "description": "Válassz legfeljebb hat gyorsgombot a kezdőlaphoz",
           "label": "Kezdőlap Parancsikonok"
         },
-        "launcher-app-grid": {
-          "description": "Ha az eredmények kizárólag alkalmazásokból állnak, akkor jelenítse meg rácsosan az alkalmazásikonokat, alattuk címkével",
-          "label": "Alkalmazásrács-nézet"
-        },
         "launcher-auto-paste": {
           "description": "A számológép, az emoji és egyéb másolási műveletek után illessze be a fókuszban lévő ablakba (ugyanazok a gyorsbillentyűk, mint a vágólap automatikus beillesztésénél)",
           "label": "Automatikus beillesztés"
@@ -2270,6 +2260,10 @@
         "launcher-global-windows": {
           "description": "Az előtag nélküli keresés során a nyitott ablakokat is mutassa",
           "label": "Ablakok a Globális keresésben"
+        },
+        "launcher-grid": {
+          "description": "Ha az eredmények kizárólag alkalmazásokból állnak, akkor jelenítse meg rácsosan az alkalmazásikonokat, alattuk címkével",
+          "label": "Alkalmazásrács-nézet"
         },
         "launcher-pinned-apps": {
           "label": "Rögzített alkalmazások"
@@ -2739,7 +2733,7 @@
           "placeholder": "$CMD"
         },
         "niri-overview-type-to-launch": {
-          "description": "Nyisd meg az Indítót, amikor gépelsz a SolarUI áttekintésben; egy apró billentyűzet-fókusz felületet használ, amíg az áttekintés nyitva van",
+          "description": "Nyisd meg az Indítót, amikor gépelsz a niri áttekintésben; egy apró billentyűzet-fókusz felületet használ, amíg az áttekintés nyitva van",
           "label": "Gépelj az indításhoz"
         },
         "offline-mode": {

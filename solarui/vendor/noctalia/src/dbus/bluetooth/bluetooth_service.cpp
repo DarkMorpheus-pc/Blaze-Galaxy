@@ -132,7 +132,6 @@ namespace {
 
   void applyRfkillState(BluetoothState& out) {
     out.rfkillSoftBlocked = isRfkillSoftBlocked(RfkillDeviceType::Bluetooth);
-    out.rfkillHardBlocked = isRfkillHardBlocked(RfkillDeviceType::Bluetooth);
   }
 
   void readAdapterProps(const InterfaceProps& props, BluetoothState& out) {
@@ -489,9 +488,6 @@ void BluetoothService::registerIpc(IpcService& ipc, StateFeedbackCallback stateF
     if (!state().adapterPresent) {
       return "error: bluetooth adapter unavailable\n";
     }
-    if (enabled && state().rfkillHardBlocked) {
-      return "error: bluetooth adapter is rfkill hard-blocked\n";
-    }
     if (state().powered == enabled) {
       return "ok\n";
     }
@@ -577,8 +573,7 @@ void BluetoothService::setPowered(bool enabled) {
   if (enabled) {
     const RfkillSwitchResult rfkillResult = setRfkillSoftBlocked(RfkillDeviceType::Bluetooth, false);
     if (rfkillResult.hardBlocked) {
-      kLog.warn("setPowered: bluetooth rfkill hard block is active");
-      return;
+      kLog.warn("setPowered: bluetooth rfkill reports a hard block");
     }
     if (!rfkillResult.success) {
       kLog.warn("setPowered: rfkill unblock failed ({}), trying BlueZ Powered anyway", rfkillResult.detail);
@@ -589,18 +584,32 @@ void BluetoothService::setPowered(bool enabled) {
       emitState(BluetoothStateChangeOrigin::Noctalia);
     }
   }
-  if (enabled != m_state.powered) {
+  const bool changesPower = enabled != m_state.powered;
+  if (changesPower) {
     m_pendingLocalPowered = enabled;
+    ++m_pendingPoweredRevision;
   }
+  const auto pendingRevision = m_pendingPoweredRevision;
   try {
     if (!enabled && m_state.discovering) {
       m_impl->adapter->callMethodAsync("StopDiscovery")
           .onInterface(kAdapterInterface)
           .uponReplyInvoke([](std::optional<sdbus::Error>) {});
     }
-    m_impl->adapter->setProperty("Powered").onInterface(kAdapterInterface).toValue(enabled);
+    m_impl->adapter->setPropertyAsync("Powered")
+        .onInterface(kAdapterInterface)
+        .toValue(enabled)
+        .uponReplyInvoke([this, enabled, changesPower, pendingRevision](std::optional<sdbus::Error> err) {
+          if (err.has_value()) {
+            if (changesPower && pendingRevision == m_pendingPoweredRevision && m_pendingLocalPowered == enabled) {
+              m_pendingLocalPowered.reset();
+            }
+            kLog.warn("setPowered failed: {}", err->what());
+            emitState();
+          }
+        });
   } catch (const sdbus::Error& e) {
-    if (m_pendingLocalPowered == enabled) {
+    if (changesPower && pendingRevision == m_pendingPoweredRevision && m_pendingLocalPowered == enabled) {
       m_pendingLocalPowered.reset();
     }
     kLog.warn("setPowered failed: {}", e.what());
@@ -612,7 +621,14 @@ void BluetoothService::setDiscoverable(bool enabled) {
     return;
   }
   try {
-    m_impl->adapter->setProperty("Discoverable").onInterface(kAdapterInterface).toValue(enabled);
+    m_impl->adapter->setPropertyAsync("Discoverable")
+        .onInterface(kAdapterInterface)
+        .toValue(enabled)
+        .uponReplyInvoke([](std::optional<sdbus::Error> err) {
+          if (err.has_value()) {
+            kLog.warn("setDiscoverable failed: {}", err->what());
+          }
+        });
   } catch (const sdbus::Error& e) {
     kLog.warn("setDiscoverable failed: {}", e.what());
   }
@@ -623,7 +639,14 @@ void BluetoothService::setPairable(bool enabled) {
     return;
   }
   try {
-    m_impl->adapter->setProperty("Pairable").onInterface(kAdapterInterface).toValue(enabled);
+    m_impl->adapter->setPropertyAsync("Pairable")
+        .onInterface(kAdapterInterface)
+        .toValue(enabled)
+        .uponReplyInvoke([](std::optional<sdbus::Error> err) {
+          if (err.has_value()) {
+            kLog.warn("setPairable failed: {}", err->what());
+          }
+        });
   } catch (const sdbus::Error& e) {
     kLog.warn("setPairable failed: {}", e.what());
   }
@@ -728,12 +751,14 @@ bool BluetoothService::pair(const std::string& devicePath) {
     proxy->callMethodAsync("Pair")
         .onInterface(kDeviceInterface)
         .uponReplyInvoke([this, devicePath](std::optional<sdbus::Error> err) {
-          if (err.has_value()) {
-            kLog.warn("Device.Pair failed {}: {}", devicePath, err->what());
-            if (auto* dev = findDevice(devicePath)) {
-              dev->connecting = false;
-              emitDevices();
-            }
+          if (!err.has_value()) {
+            setTrusted(devicePath, true);
+            return;
+          }
+          kLog.warn("Device.Pair failed {}: {}", devicePath, err->what());
+          if (auto* dev = findDevice(devicePath)) {
+            dev->connecting = false;
+            emitDevices();
           }
         });
     return true;
@@ -773,7 +798,14 @@ void BluetoothService::setTrusted(const std::string& devicePath, bool trusted) {
     return;
   }
   try {
-    proxy->setProperty("Trusted").onInterface(kDeviceInterface).toValue(trusted);
+    proxy->setPropertyAsync("Trusted")
+        .onInterface(kDeviceInterface)
+        .toValue(trusted)
+        .uponReplyInvoke([devicePath](std::optional<sdbus::Error> err) {
+          if (err.has_value()) {
+            kLog.warn("setTrusted failed {}: {}", devicePath, err->what());
+          }
+        });
   } catch (const sdbus::Error& e) {
     kLog.warn("setTrusted failed {}: {}", devicePath, e.what());
   }
@@ -812,7 +844,7 @@ BluetoothStateChangeOrigin BluetoothService::consumePoweredChangeOrigin(bool pow
 }
 
 void BluetoothService::scheduleAutoReconnect() {
-  if (!m_state.powered || m_state.rfkillHardBlocked) {
+  if (!m_state.powered) {
     return;
   }
   m_autoReconnectAttempt = 0;
@@ -831,7 +863,7 @@ void BluetoothService::armAutoReconnect() {
 }
 
 void BluetoothService::runAutoReconnectPass() {
-  if (!m_state.powered || m_state.rfkillHardBlocked) {
+  if (!m_state.powered) {
     return;
   }
   std::vector<std::string> pending;

@@ -42,6 +42,9 @@ namespace compositors {
   namespace niri {
     class NiriRuntime;
   }
+  namespace umbriel {
+    class UmbrielRuntime;
+  }
 } // namespace compositors
 
 class WorkspaceAlertService;
@@ -112,6 +115,7 @@ public:
   [[nodiscard]] bool hasExactWindowIdentity() const noexcept;
   [[nodiscard]] bool containsWlrToplevelHandle(zwlr_foreign_toplevel_handle_v1* handle) const;
   void activateToplevel(zwlr_foreign_toplevel_handle_v1* handle);
+  void activateToplevelForAppId(std::string_view appId);
   void activateToplevelInfo(const ToplevelInfo& window);
   void closeToplevel(zwlr_foreign_toplevel_handle_v1* handle);
   void closeToplevelInfo(const ToplevelInfo& window);
@@ -151,6 +155,9 @@ public:
   [[nodiscard]] std::vector<std::string> workspaceDisplayKeys(wl_output* outputFilter = nullptr) const;
   [[nodiscard]] std::vector<WorkspaceWindowAssignment>
   workspaceWindowAssignments(wl_output* outputFilter = nullptr) const;
+  // Workspace keys of the overlay workspaces currently open on `outputFilter`
+  // (nullptr = every output). Empty unless the active workspace backend tracks them.
+  [[nodiscard]] std::vector<std::string> openOverlayWorkspaceKeys(wl_output* outputFilter = nullptr) const;
 
   // Workspace alerts: user-requested "attention" markers overlaid onto the
   // workspace model by reusing Workspace::id (no new per-backend identifier).
@@ -177,6 +184,9 @@ public:
 
   [[nodiscard]] bool requestSessionExit() const;
   [[nodiscard]] bool setOutputPower(bool on) const;
+  void setOutputPowerOffPending(bool pending) noexcept { m_outputPowerOffPending = pending; }
+  [[nodiscard]] bool shouldSuppressLockTransition() const;
+  void setOutputPowerChangeCallback(ChangeCallback callback);
 
   [[nodiscard]] bool tracksOverviewState() const noexcept;
   [[nodiscard]] bool hasOverviewState() const noexcept;
@@ -184,6 +194,9 @@ public:
 
   [[nodiscard]] compositors::niri::NiriRuntime& niriRuntime() noexcept;
   [[nodiscard]] const compositors::niri::NiriRuntime& niriRuntime() const noexcept;
+
+  [[nodiscard]] compositors::umbriel::UmbrielRuntime& umbrielRuntime() noexcept;
+  [[nodiscard]] const compositors::umbriel::UmbrielRuntime& umbrielRuntime() const noexcept;
 
 private:
   struct WorkspaceModelSnapshot {
@@ -213,6 +226,7 @@ private:
   std::vector<std::unique_ptr<compositors::FocusedOutputBackend>> m_focusedOutputBackends;
   std::unique_ptr<compositors::OutputPowerBackend> m_outputPowerBackend;
   mutable std::optional<bool> m_lastRequestedOutputPowerState;
+  bool m_outputPowerOffPending = false;
   std::unique_ptr<KeyboardLayoutBackend> m_keyboardLayoutBackend;
   ChangeCallback m_workspaceChangeCallback;
   ChangeCallback m_overviewChangeCallback;

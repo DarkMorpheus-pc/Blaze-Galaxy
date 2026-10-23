@@ -374,7 +374,9 @@ namespace ui {
       if (want.type == "graph") {
         return callbackProp(want, "onPointerMove") != nullptr || callbackProp(want, "onPointerLeave") != nullptr;
       }
-      return callbackProp(want, "onClick") != nullptr || callbackProp(want, "onHover") != nullptr;
+      return callbackProp(want, "onClick") != nullptr
+          || callbackProp(want, "onHover") != nullptr
+          || strProp(want, "tooltip") != nullptr;
     }
 
     // If a reconcile flips that need, the existing node cannot be reused (its
@@ -460,19 +462,19 @@ namespace ui {
                                                             "visible",   "gap",     "padding",     "paddingH",
                                                             "paddingV",  "align",   "justify",     "fill",
                                                             "radius",    "border",  "borderWidth", "minWidth",
-                                                            "minHeight", "onClick", "onHover"};
-      static const std::unordered_set<std::string> kBox = {"width",       "height",   "flexGrow", "opacity",
-                                                           "visible",     "fill",     "radius",   "border",
-                                                           "borderWidth", "softness", "onClick",  "onHover"};
+                                                            "minHeight", "onClick", "onHover",     "tooltip"};
+      static const std::unordered_set<std::string> kBox = {"width",   "height",  "flexGrow", "opacity",     "visible",
+                                                           "fill",    "radius",  "border",   "borderWidth", "softness",
+                                                           "onClick", "onHover", "tooltip"};
       static const std::unordered_set<std::string> kLabel = {"width",      "height",   "flexGrow", "opacity",
                                                              "visible",    "text",     "fontSize", "color",
                                                              "fontWeight", "maxWidth", "maxLines", "textAlign",
                                                              "fontFamily", "baseline"};
       static const std::unordered_set<std::string> kGlyph = {"width",   "height", "flexGrow", "opacity",
                                                              "visible", "name",   "size",     "color"};
-      static const std::unordered_set<std::string> kImage = {"width",   "height",      "flexGrow", "opacity",
-                                                             "visible", "path",        "radius",   "fit",
-                                                             "border",  "borderWidth", "onClick",  "onHover"};
+      static const std::unordered_set<std::string> kImage = {"width",   "height",  "flexGrow", "opacity", "visible",
+                                                             "path",    "radius",  "fit",      "border",  "borderWidth",
+                                                             "onClick", "onHover", "tooltip"};
       static const std::unordered_set<std::string> kSeparator = {"width",   "height",  "flexGrow",
                                                                  "opacity", "visible", "thickness",
                                                                  "color",   "spacing", "orientation"};
@@ -504,9 +506,9 @@ namespace ui {
       static const std::unordered_set<std::string> kToggle = {"width",   "height",  "flexGrow", "opacity",
                                                               "visible", "checked", "enabled",  "onChange"};
       static const std::unordered_set<std::string> kScroll = {
-          "width",    "height", "flexGrow",    "opacity",       "visible",  "fill",
-          "radius",   "border", "borderWidth", "gap",           "padding",  "paddingH",
-          "paddingV", "align",  "justify",     "stickToBottom", "onScroll", "scrollToBottomRev"
+          "width",   "height",        "flexGrow", "opacity",           "visible",  "fill",     "radius",
+          "border",  "borderWidth",   "gap",      "padding",           "paddingH", "paddingV", "align",
+          "justify", "stickToBottom", "onScroll", "scrollToBottomRev", "revealKey"
       };
       static const std::unordered_set<std::string> kDragSource = {
           "width",   "height",   "flexGrow",    "opacity",         "visible",       "gap",
@@ -590,6 +592,7 @@ namespace ui {
     std::string pointerStreamKey;         // coalescing stream shared by this graph's pointer callbacks
     std::string imagePath;                // last-applied resolved image source
     std::string lastText;                 // markdown source cache - setMarkdown re-parses, only call on change
+    std::string revealKey;                // last-applied scroll revealKey, empty while no child carries it
     float lastMarkdownScale = 0.0F;       // content scale baked into the parsed markdown
     float lastMarkdownFontScale = 0.0F;   // text-only multiplier baked into the parsed markdown
     float imageTargetSize = 0.0F;
@@ -660,7 +663,7 @@ namespace ui {
       auto flex = std::make_unique<Flex>();
       flex->setDirection(FlexDirection::Vertical);
       flex->setAlign(FlexAlign::Stretch);
-      if (callbackProp(desired, "onClick") != nullptr || callbackProp(desired, "onHover") != nullptr) {
+      if (wantsInputAreaWrapper(desired)) {
         return wrapClickable(std::move(flex), callbackProp(desired, "onClick") != nullptr);
       }
       return flex;
@@ -669,7 +672,7 @@ namespace ui {
       auto flex = std::make_unique<Flex>();
       flex->setDirection(FlexDirection::Horizontal);
       flex->setAlign(FlexAlign::Stretch);
-      if (callbackProp(desired, "onClick") != nullptr || callbackProp(desired, "onHover") != nullptr) {
+      if (wantsInputAreaWrapper(desired)) {
         return wrapClickable(std::move(flex), callbackProp(desired, "onClick") != nullptr);
       }
       return flex;
@@ -687,7 +690,7 @@ namespace ui {
       return zone;
     }
     if (desired.type == "box") {
-      if (callbackProp(desired, "onClick") != nullptr || callbackProp(desired, "onHover") != nullptr) {
+      if (wantsInputAreaWrapper(desired)) {
         return wrapClickable(std::make_unique<Box>(), callbackProp(desired, "onClick") != nullptr);
       }
       return std::make_unique<Box>();
@@ -699,7 +702,7 @@ namespace ui {
       return std::make_unique<Glyph>();
     }
     if (desired.type == "image") {
-      if (callbackProp(desired, "onClick") != nullptr || callbackProp(desired, "onHover") != nullptr) {
+      if (wantsInputAreaWrapper(desired)) {
         return wrapClickable(std::make_unique<Image>(), callbackProp(desired, "onClick") != nullptr);
       }
       return std::make_unique<Image>();
@@ -855,8 +858,44 @@ namespace ui {
       } else if (container != nullptr && want.children.empty() && !slot.children.empty()) {
         structureChanged |= syncChildren(*container, slot.children, {}, renderer);
       }
+      if (want.type == "scroll" && slot.node != nullptr) {
+        syncScrollReveal(slot, want);
+      }
     }
     return structureChanged;
+  }
+
+  const UiTreeReconciler::Slot*
+  UiTreeReconciler::findKeyedSlot(const std::vector<Slot>& slots, const std::string& key) {
+    for (const auto& slot : slots) {
+      if (slot.key == key) {
+        return &slot;
+      }
+      if (const Slot* match = findKeyedSlot(slot.children, key)) {
+        return match;
+      }
+    }
+    return nullptr;
+  }
+
+  void UiTreeReconciler::syncScrollReveal(Slot& slot, const UiTreeNode& desired) {
+    const std::string* revealKey = strProp(desired, "revealKey");
+    if (revealKey == nullptr || revealKey->empty()) {
+      slot.revealKey.clear();
+      return;
+    }
+    // Looked up before the unchanged check, so a key whose child is missing is
+    // forgotten and the reveal lands on the render that adds or restores it.
+    const Slot* target = findKeyedSlot(slot.children, *revealKey);
+    if (target == nullptr) {
+      slot.revealKey.clear();
+      return;
+    }
+    if (*revealKey == slot.revealKey) {
+      return;
+    }
+    slot.revealKey = *revealKey;
+    static_cast<ScrollView*>(slot.node)->requestScrollIntoView(target->node);
   }
 
   void UiTreeReconciler::syncWrapperCallbacks(Slot& slot, const UiTreeNode& desired, Node* node) {
@@ -893,6 +932,16 @@ namespace ui {
       slot.hoverCallbackName.clear();
       if (inputArea != nullptr) {
         clearWrapperHover(inputArea);
+      }
+    }
+    // Tooltip on wrappable containers, unconditional so a dropped tooltip
+    // clears on the retained InputArea. Empty routes to clearTooltip().
+    if (inputArea != nullptr) {
+      const std::string* tooltip = strProp(desired, "tooltip");
+      if (tooltip != nullptr && !tooltip->empty()) {
+        inputArea->setTooltip(*tooltip);
+      } else {
+        inputArea->clearTooltip();
       }
     }
   }

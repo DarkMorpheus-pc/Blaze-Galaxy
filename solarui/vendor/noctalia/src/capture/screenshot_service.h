@@ -5,6 +5,7 @@
 #include "capture/screenshot_region_overlay.h"
 
 #include <cstdint>
+#include <expected>
 #include <filesystem>
 #include <memory>
 #include <optional>
@@ -20,6 +21,7 @@ class NotificationManager;
 struct Config;
 class RenderContext;
 class WaylandConnection;
+class SoundPlayer;
 struct KeyboardEvent;
 struct PointerEvent;
 struct wl_output;
@@ -55,16 +57,24 @@ public:
   // freezeFirst selects the frozen annotator (screenshot-annotate); otherwise the overlay
   // starts transparent over the running desktop (annotate).
   void beginAnnotation(RenderContext& renderContext, const OutputOptions& options, bool freezeFirst);
+  // Opens the annotator on an image decoded from disk, with no screencopy involved.
+  // Returns the reason when the file cannot be decoded or no output can host the editor.
+  [[nodiscard]] std::expected<void, std::string>
+  beginImageFileAnnotation(RenderContext& renderContext, const std::string& path, const OutputOptions& options);
   [[nodiscard]] bool overlayBusy() const noexcept;
 
   void onOutputChange();
 
   [[nodiscard]] bool onPointerEvent(const PointerEvent& event);
   [[nodiscard]] bool onKeyboardEvent(const KeyboardEvent& event);
+  // Seat modifier change; refreshes the gesture cursor without pointer motion.
+  void onModifiersChanged();
 
   [[nodiscard]] static OutputOptions outputOptionsFromConfig(const Config& config);
 
   void registerIpc(IpcService& ipc, const ConfigService& configService);
+
+  void setSoundPlayer(SoundPlayer* soundPlayer);
 
 private:
   struct PendingCapture {
@@ -173,6 +183,7 @@ private:
   void notifyError(const std::string& message);
   void rememberRegion(const LogicalRect& region);
   [[nodiscard]] std::optional<LogicalRect> loadRememberedRegion() const;
+  void playCaptureSound();
 
   WaylandConnection& m_wayland;
   CompositorPlatform& m_platform;
@@ -193,4 +204,5 @@ private:
   std::optional<PendingDelivery> m_pendingDelivery;
   FreezeTarget m_freezeTarget = FreezeTarget::Region;
   bool m_freezeCaptureActive = false;
+  SoundPlayer* m_soundPlayer = nullptr;
 };

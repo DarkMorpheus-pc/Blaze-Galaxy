@@ -657,7 +657,8 @@
     },
     "empty": {
       "no-results": "Sonuç bulunamadı",
-      "type-to-search": "Arama…"
+      "type-to-search": "Arama…",
+      "loading": "Sonuçlar yükleniyor..."
     },
     "origins": {
       "appimage": "AppImage",
@@ -687,9 +688,51 @@
       },
       "window": {
         "title": "Pencereler"
+      },
+      "panel": {
+        "builtin": {
+          "clipboard": "Pano",
+          "control-center": "Kontrol Merkezi",
+          "launcher": "Başlatıcı",
+          "polkit": "Kimlik Doğrulama",
+          "session": "Oturum",
+          "setup-wizard": "Kurulum Sihirbazı",
+          "test": "Test Paneli",
+          "tray-drawer": "Sistem Çekmecesi",
+          "wallpaper": "Duvar Kağıdı"
+        },
+        "title": "Paneller"
       }
     },
-    "search-placeholder": "Uygulama ara…"
+    "search-placeholder": "Uygulama ara…",
+    "browser": {
+      "actions": {
+        "power": "Güç",
+        "settings": "Ayarlar"
+      },
+      "navigation": {
+        "all": "Tümü",
+        "all-apps": "Tüm Uygulamalar",
+        "categories": "Kategoriler",
+        "pinned": "Sabitlenenler",
+        "providers": "Sağlayıcılar",
+        "recent": "Son Kullanılanlar"
+      },
+      "options": {
+        "show-grid": "Izgara Görünümü",
+        "show-list": "Liste Görünümü",
+        "sort-by-frequency": "Sık Kullanılanlara Öncelik Ver",
+        "use-default-order": "Varsayılan Sıralamayı Kullan"
+      },
+      "sections": {
+        "all-apps": "Tüm Uygulamalar",
+        "other-apps": "Diğer Uygulamalar",
+        "pinned": "Sabitlenenler",
+        "providers": "Sağlayıcılar",
+        "recent": "Son Kullanılanlar",
+        "search-results": "Arama Sonuçları"
+      }
+    }
   },
   "location": {
     "errors": {

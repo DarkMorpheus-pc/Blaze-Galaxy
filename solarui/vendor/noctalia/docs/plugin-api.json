@@ -157,14 +157,38 @@
   },
   {
     "level": 29,
-    "noctaliaVersion": null,
+    "noctaliaVersion": "v5.0.1",
     "feature": "graph-pointer-tracking",
     "introduced": "`onPointerMove` and `onPointerLeave` callbacks on `ui.graph` nodes."
   },
   {
     "level": 30,
-    "noctaliaVersion": null,
+    "noctaliaVersion": "v5.0.1",
     "feature": "panel-layer",
     "introduced": "The `layer` panel entry option for choosing the layer-shell layer of a floating plugin panel."
+  },
+  {
+    "level": 31,
+    "noctaliaVersion": "v5.2.0",
+    "feature": "get-color",
+    "introduced": "`noctalia.getColor(role)` for reading colors from the active theme palette."
+  },
+  {
+    "level": 32,
+    "noctaliaVersion": "v5.2.0",
+    "feature": "container-tooltip",
+    "introduced": "The `tooltip` prop on `ui.box`, `ui.row`, `ui.column`, and `ui.image`, shown on hover."
+  },
+  {
+    "level": 33,
+    "noctaliaVersion": "v5.3.0",
+    "feature": "scroll-reveal-key",
+    "introduced": "The `revealKey` prop on `ui.scroll` for scrolling a keyed child into view."
+  },
+  {
+    "level": 34,
+    "noctaliaVersion": "v5.3.0",
+    "feature": "widget-hover-highlight",
+    "introduced": "The `hover_highlight` widget entry option for opting out of the bar's whole-widget hover highlight."
   }
 ]

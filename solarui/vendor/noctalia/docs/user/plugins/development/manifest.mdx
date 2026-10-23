@@ -63,10 +63,10 @@ id    = "hello"
 entry = "widget.luau"
 
   [[widget.setting]]
-  key     = "label"
-  type    = "string"
-  label   = "Label"
-  default = "Hello"
+  key       = "label"
+  type      = "string"
+  label_key = "settings.label.label"
+  default   = "Hello"
 
 [[service]]
 id    = "ticker"
@@ -98,6 +98,23 @@ Middle click is worth knowing about: every widget gets a built-in `middle` bindi
 settings, so `onMiddleClick` does not fire out of the box. Declaring `middle = "none"` frees the button
 for your script - though a declared action is visible in the settings editor where a Luau callback is
 not.
+
+### Widget hover highlight
+
+By default the bar tints the whole widget under the pointer. A `[[widget]]` entry that draws its own hover per item
+(like the built-in workspaces widget) can turn the bar's tint off with `hover_highlight = false`
+<PluginApiBadge feature="widget-hover-highlight" />. Put the key on the entry itself, before any `[widget.*]`
+subtable such as `[widget.actions]`; after one, TOML reads it as part of that subtable.
+
+```toml
+[[widget]]
+id    = "hello"
+entry = "widget.luau"
+hover_highlight = false
+```
+
+This removes only the whole-widget tint; the widget still receives clicks and scrolls.
+`[bar.<name>] hover_highlight = false` still turns the tint off for every widget on that bar.
 
 ## Settings schema
 
@@ -137,17 +154,9 @@ entry = "widget.luau"
   default = "Hello"
 ```
 
-You can define multiple named bar widgets with the same plugin entry and different widget settings:
-
-```toml
-[widget.hello-main]
-type  = "me/hello:hello"
-label = "Main"
-
-[widget.hello-short]
-type  = "me/hello:hello"
-label = "Short"
-```
+The manifest only declares an entry's settings schema. Named widget instances, their configured values, and bar
+placement belong in the user's Noctalia configuration. See [Plugin widgets](/noctalia/bar/widgets/#plugin-widgets) for
+that configuration.
 
 | Field | Notes |
 |-------|-------|

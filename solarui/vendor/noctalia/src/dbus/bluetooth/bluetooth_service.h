@@ -58,7 +58,6 @@ struct BluetoothState {
   bool powered = false;
   /// rfkill soft block (e.g. GDM/GNOME login screen) prevents powering on until cleared.
   bool rfkillSoftBlocked = false;
-  bool rfkillHardBlocked = false;
   bool discoverable = false;
   bool pairable = false;
   bool discovering = false;
@@ -133,6 +132,7 @@ private:
   BluetoothState m_state;
   std::vector<BluetoothDeviceInfo> m_devices;
   std::optional<bool> m_pendingLocalPowered;
+  std::uint64_t m_pendingPoweredRevision = 0;
   Timer m_autoReconnectTimer;
   int m_autoReconnectAttempt = 0;
   bool m_hasStateSnapshot = false;

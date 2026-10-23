@@ -27,6 +27,22 @@
     }
   },
   "bar": {
+    "annotate": {
+      "color-black": "Siyah",
+      "color-blue": "Mavi",
+      "color-green": "Yeşil",
+      "color-orange": "Turuncu",
+      "color-purple": "Mor",
+      "color-red": "Kırmızı",
+      "color-white": "Beyaz",
+      "color-yellow": "Sarı",
+      "redo": "İleri al (Ctrl+Shift+Z)",
+      "size-large": "Büyük",
+      "size-medium": "Orta",
+      "size-small": "Küçük",
+      "tool-text": "Metin (t)",
+      "undo": "Geri al (Ctrl+Z)"
+    },
     "screenshot": {
       "choose-display": "Ekran seçin",
       "confirm-region": "Kopyalamak için {copy} · Kaydetmek için {save} · Varsayılanlar için Enter veya Space · İptal etmek için {cancel} · Tekrar seçmek için sürükle",
@@ -60,6 +76,7 @@
       "network": {
         "active": "Aktif",
         "band": "Şebeke",
+        "cellular": "Hücresel",
         "connected": "Bağlandı",
         "connecting": "Bağlanıyor",
         "download": "İndirme",
@@ -73,8 +90,10 @@
         "not-connected": "Bağlı değil",
         "off": "Kapalı",
         "on": "Açık",
+        "operator": "Operatör",
         "scanning": "Taranıyor",
         "signal": "Sinyal",
+        "technology": "Teknoloji",
         "upload": "Yükleme",
         "vpn": "VPN",
         "wan-ip": "WAN adresi",
@@ -184,9 +203,10 @@
     "audio": {
       "application-volumes": "Uygulama Ses Düzeyleri",
       "choose-effects-profile": "Bir profil seç",
+      "default-device": "Varsayılan Cihaz",
       "effects-profile": "Efektler",
       "input-device-prefix": "Giriş Cihazı",
-      "no-application-audio": "Uygulama sesi yok",
+      "no-application-audio": "Uygulama Sesi Yok",
       "no-application-audio-body": "Şu anda hiçbir uygulama oynatma akışı mevcut değil.",
       "no-input-devices": "Giriş cihazı yok",
       "no-input-devices-body": "Şu anda erişilebilen bir kayıt cihazı yok.",
@@ -257,13 +277,12 @@
       "uptime": "Çalışma süresi – {uptime}",
       "weather": {
         "data-unavailable": "Hava durumu verisi alınamadı.",
-        "disabled": "Hava durumu konfigde devre dışı bırakıldı.",
         "fetching": "Tahminler alınıyor..."
       }
     },
     "media": {
       "active-player": "Aktif oynatıcı",
-      "nothing-playing": "Hiçbir şey çalmıyor",
+      "nothing-playing": "Hiçbir Şey Çalmıyor",
       "now-playing": "Şimdi çalıyor",
       "start-playback": "Bir MPRIS uygulamasında oynatmayı başlat"
     },
@@ -651,13 +670,14 @@
     "context-menu": {
       "open": "Aç",
       "pin": "Başlatıcıya Sabitle",
-      "pin-to-dock": "Dock'a sabitle",
+      "pin-to-dock": "Dok'a Sabitle",
       "unpin": "Başlatıcıdan Kaldır",
-      "unpin-from-dock": "Dock'tan çıkar"
+      "unpin-from-dock": "Dok'tan Çıkar"
     },
     "empty": {
       "no-results": "Sonuç bulunamadı",
-      "type-to-search": "Arama…"
+      "type-to-search": "Arama…",
+      "loading": "Sonuçlar yükleniyor..."
     },
     "origins": {
       "appimage": "AppImage",
@@ -687,9 +707,51 @@
       },
       "window": {
         "title": "Pencereler"
+      },
+      "panel": {
+        "builtin": {
+          "clipboard": "Pano",
+          "control-center": "Kontrol Merkezi",
+          "launcher": "Başlatıcı",
+          "polkit": "Kimlik Doğrulama",
+          "session": "Oturum",
+          "setup-wizard": "Kurulum Sihirbazı",
+          "test": "Test Paneli",
+          "tray-drawer": "Sistem Çekmecesi",
+          "wallpaper": "Duvar Kağıdı"
+        },
+        "title": "Paneller"
       }
     },
-    "search-placeholder": "Uygulama ara…"
+    "search-placeholder": "Uygulama ara…",
+    "browser": {
+      "actions": {
+        "power": "Güç",
+        "settings": "Ayarlar"
+      },
+      "navigation": {
+        "all": "Tümü",
+        "all-apps": "Tüm Uygulamalar",
+        "categories": "Kategoriler",
+        "pinned": "Sabitlenenler",
+        "providers": "Sağlayıcılar",
+        "recent": "Son Kullanılanlar"
+      },
+      "options": {
+        "show-grid": "Izgara Görünümü",
+        "show-list": "Liste Görünümü",
+        "sort-by-frequency": "Sık Kullanılanlara Öncelik Ver",
+        "use-default-order": "Varsayılan Sıralamayı Kullan"
+      },
+      "sections": {
+        "all-apps": "Tüm Uygulamalar",
+        "other-apps": "Diğer Uygulamalar",
+        "pinned": "Sabitlenenler",
+        "providers": "Sağlayıcılar",
+        "recent": "Son Kullanılanlar",
+        "search-results": "Arama Sonuçları"
+      }
+    }
   },
   "location": {
     "errors": {
@@ -1179,7 +1241,6 @@
         "borders": "Kenarlıklar",
         "brightness": "Parlaklık",
         "built-in": "Dahili",
-        "calendar": "Takvim",
         "capsules": "Kapsüller",
         "clipboard": "Pano",
         "community": "Topluluk",
@@ -1239,14 +1300,7 @@
         "wallpaper": "Duvar Kağıdı",
         "weather": "Hava Durumu",
         "widget-list": "Araç Listesi",
-        "widgets": "Araçlar",
-        "help-hud": "Kısayollar & Rehber",
-        "pixel-clock": "Pixel Saat Widget'ı",
-        "taskbar": "Görev Çubuğu",
-        "window-management": "Pencere Yönetimi",
-        "compositor": "Masaüstü & Kompozitör",
-        "shell": "Kabuk & Yüzey Motoru",
-        "performance": "Performans Profili"
+        "widgets": "Araçlar"
       },
       "sections": {
         "accessibility": "Erişilebilirlik",
@@ -1260,7 +1314,7 @@
         "keybinds": "Tuş Atamaları",
         "launcher": "Başlat",
         "location": "Konum",
-        "niri": "SolarUI",
+        "niri": "Niri",
         "notifications": "Bildirimler",
         "osd": "Ekranda Gösterim",
         "panels": "Paneller",
@@ -1270,9 +1324,9 @@
         "security": "Güvenlik",
         "services": "Hizmetler",
         "shell": "Kabuk",
-        "solarui": "SolarUI",
         "system": "Sistem",
         "templates": "Şablonlar",
+        "umbriel": "Umbriel",
         "wallpaper": "Duvar Kağıdı"
       }
     },
@@ -1382,6 +1436,13 @@
       "panel-position": {
         "auto": "Çubuğu Takip Et"
       },
+      "plugins": {
+        "auto-update": {
+          "all": "Tümü",
+          "none": "Hiçbiri",
+          "official": "Resmi"
+        }
+      },
       "screen-position": {
         "bottom-center": "Alt Orta",
         "bottom-left": "Alt Sol",
@@ -1424,6 +1485,9 @@
           "dark": "Koyu",
           "light": "Açık"
         },
+        "shell-mode": {
+          "follow": "Takip et"
+        },
         "source": {
           "built-in": "Dahili",
           "community": "Topluluk",
@@ -1462,54 +1526,14 @@
           "imperial": "Emperyal",
           "metric": "Metrik"
         }
-      },
-      "solarui": {
-        "shell-engine": {
-          "noctalia": "Noctalia v5 (C++23 Native)",
-          "caelestia": "Caelestia (Quickshell QML)",
-          "hybrid": "Kaldırıldı (Noctalia'ya geçirilecek)"
-        },
-        "launcher-provider": {
-          "noctalia": "Noctalia Başlatıcı",
-          "caelestia": "Caelestia Başlatıcı"
-        },
-        "dashboard-provider": {
-          "caelestia": "Caelestia Dashboard",
-          "noctalia": "Noctalia Kontrol Merkezi"
-        },
-        "performance-profile": {
-          "legacy": "Hafif (Legacy / Düşük Kaynak)",
-          "balanced": "Dengeli (Balanced / Varsayılan)",
-          "ultra": "Yüksek (Ultra / Tam Efekt & Blur)"
-        },
-        "clock-style": {
-          "stacked-vertical": "Pixel Üst Üste Dikey",
-          "bold-horizontal": "Pixel Kalın Yatay",
-          "outline": "Pixel İçi Boş Kontur",
-          "analog-bold": "Pixel Analog Kalın",
-          "analog-outline": "Pixel Analog Kontur",
-          "analog-tachymeter": "Pixel Analog Kadran"
-        },
-        "clock-color-mode": {
-          "dynamic": "Material 3 Dinamik",
-          "white": "Beyaz",
-          "black": "Siyah"
-        },
-        "taskbar-preset": {
-          "frosted-glass": "Buzlu Cam (Akrilik)",
-          "solid-obsidian": "Düz Renk (Obsidyen)",
-          "pure-transparent": "Tam Şeffaf",
-          "m3-wallpaper": "Material 3 Duvar Kâğıdı"
-        },
-        "window-mode": {
-          "floating-kde": "KDE Serbest Pencereler (Floating)",
-          "tiling-strip": "SolarUI Şerit Döşeme (Tiling)"
-        }
       }
     },
     "plugins": {
       "browse-store": "Eklentileri Keşfet",
       "panels": {
+        "layer": {
+          "label": "Katman"
+        },
         "open-near-click": {
           "description": "Çubuk bileşenine tıklayarak açıldığında panelin nerede konumlandırılacağı",
           "label": "Çubuk Boyunca"
@@ -1535,6 +1559,8 @@
         "incompatible-plugin-api": "uyumsuz eklenti API'si",
         "remove": "Eklentiyi kaldır",
         "requires": "Gereksinimler: {dependencies}",
+        "search-empty": "\"{query}\" aramasına eşleşen eklenti yok",
+        "search-placeholder": "Yüklü eklentilerde ara",
         "title": "Eklentiler",
         "update-all": "Tümünü güncelle ({count})",
         "update-available": "güncelleme mevcut",
@@ -1596,106 +1622,9 @@
         "sort-updated-at-desc": "Güncellenme tarihine göre sırala (yeniden eskiye)",
         "source-all": "Tüm kaynaklar",
         "title": "Eklenti Mağazası"
-      },
-      "solarui": {
-        "clock-color-mode": {
-          "dynamic": "Dinamik (Material You)",
-          "monochrome": "Tek Renk",
-          "white": "Saf Beyaz"
-        },
-        "clock-style": {
-          "analog-bold": "Analog (Kalın İbre)",
-          "analog-outline": "Analog (İnce Dış Hat)",
-          "analog-tachymeter": "Analog (Takimetre / Spor)",
-          "bold-horizontal": "Yatay Kalın (Tek Satır)",
-          "outline": "Dış Hat (Outline)",
-          "stacked-vertical": "Dikey Yığın (Modern)"
-        },
-        "taskbar-preset": {
-          "frosted-glass": "Buzlu Cam (Varsayılan)",
-          "m3-dynamic": "Material 3 Dinamik",
-          "solid-obsidian": "Obsidyen Düz Renk",
-          "transparent": "Tam Şeffaf"
-        },
-        "window-mode": {
-          "kde-floating": "KDE Tipi Serbest Gezinen (Floating)",
-          "niri-tiling": "SolarUI Kayan Döşeme (Tiling)"
-        }
       }
     },
     "schema": {
-      "solarui": {
-        "shell-engine": {
-          "description": "Masaüstü kabuk motorunu belirler (Noctalia v5, Caelestia veya Hibrit)",
-          "label": "Masaüstü Kabuk Motoru"
-        },
-        "apply-shell-engine": {
-          "button": "Motoru Değiştir ve Uygula",
-          "description": "Seçilen kabuk motoruna güvenli geçiş yapar ve SolarConfig'e işler",
-          "label": "Kabuk Geçişini Başlat"
-        },
-        "launcher-provider": {
-          "description": "Uygulama arama ve başlatıcı yüzeyini hangi motorun sağlayacağı",
-          "label": "Başlatıcı Sağlayıcısı (Launcher)"
-        },
-        "dashboard-provider": {
-          "description": "Masaüstü panel ve kontrol merkezi yüzeyini hangi motorun sağlayacağı",
-          "label": "Dashboard / Panel Sağlayıcısı"
-        },
-        "performance-profile": {
-          "description": "Donanım optimizasyonu, cam bulanıklığı (blur) ve animasyon derinliği",
-          "label": "Performans Profili"
-        },
-        "clock-battery": {
-          "description": "Saat widget'ında pil durum kapsülünü göster",
-          "label": "Pil Kapsülü Göstergesi"
-        },
-        "clock-color-mode": {
-          "description": "Duvar kağıdından dinamik Material You renkleri alma veya beyaz renk",
-          "label": "Saat Renk Uyumu"
-        },
-        "clock-date": {
-          "description": "Saat widget'ında Türkçe gün ve ay bilgisini göster",
-          "label": "Tarih ve Gün Göstergesi"
-        },
-        "clock-enabled": {
-          "description": "Masaüstünde Google Pixel tarzı widget göster",
-          "label": "Pixel Masaüstü Saati"
-        },
-        "clock-opacity": {
-          "description": "Masaüstü saatinin saydamlık ve opaklık seviyesi",
-          "label": "Saat Opaklığı"
-        },
-        "clock-style": {
-          "description": "Masaüstü Pixel saatinin görsel stili (Dijital & Analog seçenekler)",
-          "label": "Saat Tasarım Stili"
-        },
-        "shortcuts-hud": {
-          "action": "Kısayol HUD'unu Aç",
-          "description": "Tüm sistem kısayollarını ve pencere kontrollerini gösteren HUD",
-          "label": "SolarUI Kısayol Rehberi"
-        },
-        "taskbar-opacity": {
-          "description": "Alt görev çubuğunun zemin saydamlığı",
-          "label": "Görev Çubuğu Opaklığı"
-        },
-        "taskbar-preset": {
-          "description": "Buzlu cam efekti, obsidyen düz renk veya şeffaf stil seçimi",
-          "label": "Görev Çubuğu Teması"
-        },
-        "taskbar-radius": {
-          "description": "Görev çubuğu köşelerinin yuvarlaklık derecesi (0-60px)",
-          "label": "Görev Çubuğu Kavis Çapı"
-        },
-        "taskbar-thickness": {
-          "description": "Alt görev çubuğunun piksel cinsinden yüksekliği",
-          "label": "Görev Çubuğu Kalınlığı"
-        },
-        "window-mode": {
-          "description": "KDE tarzı serbest gezinen pencereler veya SolarUI döşeme modu",
-          "label": "Pencere Yönetim Modu"
-        }
-      },
       "accessibility": {
         "high-contrast": {
           "description": "Yüzey ve arka plan renklerini uç değerlere çekerek kontrastı artır",
@@ -2129,10 +2058,6 @@
         "main-axis-padding": {
           "description": "Simge sırasının uçlarındaki iç boşluk (ilk simgeden önce ve son simgeden sonra)"
         },
-        "monitors": {
-          "description": "Rıhtımın hangi monitörlerde gösterileceğini seçin (tümü için boş bırakın); aktif monitör filtrelemesi bu monitörler içinde uygulanır",
-          "label": "Monitörler"
-        },
         "pinned-apps": {
           "description": "Rıhtıma sabitlenmiş uygulamaların masaüstü girdi kimlikleri",
           "label": "Sabitlenmiş Uygulamalar"
@@ -2458,10 +2383,6 @@
           "description": "Sonuçlarda uygulamaların yanında uygulama eylem girdilerini de göster",
           "label": "Uygulama Eylemlerini Göster"
         },
-        "launcher-app-grid": {
-          "description": "Sonuçlar yalnızca uygulamalarken uygulamaları, altlarında etiketleri yer alan bir uygulama ikonu ızgarası olarak göster",
-          "label": "Uygulama Izgarası Görünümü"
-        },
         "launcher-auto-paste": {
           "description": "Hesap makinesi, emoji ve diğer kopyalama olaylarından sonra sonucu odaktaki pencereye yapıştır (panonun otomatik yapıştırma kısa yollarıyla aynı)",
           "label": "Otomatik Yapıştırma"
@@ -2497,6 +2418,10 @@
         "launcher-global-windows": {
           "description": "Pencereleri önek olmadan aramada göster",
           "label": "Global Aramada Pencereler"
+        },
+        "launcher-grid": {
+          "description": "Sonuçlar yalnızca uygulamalarken uygulamaları, altlarında etiketleri yer alan bir uygulama ikonu ızgarası olarak göster",
+          "label": "Uygulama Izgarası Görünümü"
         },
         "launcher-pinned-apps": {
           "description": "Başlat menüsüne sabitlenmiş uygulamaların masaüstü girdi ID'leri; başlat menüsü açıldığında ilk olarak onlar görünür",
@@ -2981,7 +2906,7 @@
           "placeholder": "$CMD"
         },
         "niri-overview-type-to-launch": {
-          "description": "SolarUI genel bakışında yazarken başlat menüsünü aç; genel bakış açıkken küçük bir klavye odak yüzeyi kullanır",
+          "description": "Niri genel bakışında yazarken başlat menüsünü aç; genel bakış açıkken küçük bir klavye odak yüzeyi kullanır",
           "label": "Başlatmak İçin Yaz"
         },
         "offline-mode": {
@@ -3346,6 +3271,26 @@
     "widgets": {
       "actions": {
         "command-placeholder": "Kabuk komutu",
+        "commands": {
+          "dock-reload": {
+            "label": "Doku yenile"
+          },
+          "dock-show": {
+            "label": "Doku göster"
+          },
+          "dpms-off": {
+            "description": "Monitörleri kapat"
+          },
+          "log-level-set": {
+            "label": "Günlük seviyesini ayarla"
+          },
+          "settings-close": {
+            "label": "Ayarları kapat"
+          },
+          "settings-open-plugin": {
+            "label": "Eklenti ayarlarını kapat"
+          }
+        },
         "default": "Varsayılan",
         "disabled": "Devre Dışı",
         "run-command": "Bir komut çalıştır…",
@@ -4054,7 +3999,6 @@
         "plugin-store": "Uzak eklenti kataloğu ve indirme istekleri çalışmayacak.",
         "plugins": "Eklenti HTTP istekleri çalışmayacak. Git kaynakları yine de güncellenebilir.",
         "security": "Harici IP sorgulama ve telemetri çalışmayacak.",
-        "services": "Takvim hesabı eşzamanlaması çalışmayacak.",
         "template-store": "Topluluk şablonu indirmeleri çalışmayacak.",
         "templates": "Topluluk şablonu indirmeleri ve güncellemeleri çalışmayacak.",
         "title": "Çevrimdışı Mod"

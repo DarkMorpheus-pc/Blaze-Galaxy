@@ -37,7 +37,9 @@ namespace {
       return TextMetrics{.bottom = fontSize};
     }
 
-    TextMetrics measureFont(float fontSize, FontWeight) override { return TextMetrics{.bottom = fontSize}; }
+    TextMetrics measureFont(float fontSize, FontWeight, std::string_view) override {
+      return TextMetrics{.bottom = fontSize};
+    }
 
     void measureTextCursorStops(
         std::string_view, float, const std::vector<std::size_t>&, std::vector<float>&, FontWeight
@@ -71,9 +73,9 @@ namespace {
       return false;
     }
 
-    bool onPointerRelease(std::optional<std::size_t> index) override {
+    PointerReleaseResult onPointerRelease(std::optional<std::size_t> index) override {
       releases.push_back(index);
-      return false;
+      return {};
     }
 
     void reset() {

@@ -425,9 +425,10 @@ std::unique_ptr<Widget> WidgetFactory::create(
             .audioSpectrum = m_audioSpectrum,
             .mpris = m_mpris,
         },
-        barName, outputName, enableScroll
+        barName, outputName, context.verticalBar, enableScroll
     );
     widget->setContentScale(contentScale);
+    widget->setBarHoverTint(pluginEntry->entry->widgetHoverHighlight);
     return widget;
   }
 

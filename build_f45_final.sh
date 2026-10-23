@@ -21,9 +21,9 @@ if ! grep -q 'end4-pc' <<<"$SOLAR_SHELL_PROBE"; then
     echo "Refusing to build: solar-shell does not contain the End4 switch implementation" >&2
     exit 1
 fi
-grep -qx 'VERSION="5.04"' "$OVERLAY/etc/os-release"
-grep -qx 'VERSION_ID=5.04' "$OVERLAY/etc/os-release"
-grep -qx 'PRETTY_NAME="Blaze SolarEvolution 5.04"' "$OVERLAY/etc/os-release"
+grep -qx 'VERSION="5.05"' "$OVERLAY/etc/os-release"
+grep -qx 'VERSION_ID=5.05' "$OVERLAY/etc/os-release"
+grep -qx 'PRETTY_NAME="Blaze SolarEvolution 5.05"' "$OVERLAY/etc/os-release"
 bash -n \
     "$OVERLAY/usr/libexec/livesys/sessions.d/livesys-solarui" \
     "$OVERLAY/usr/libexec/blazeos-oobe-hygiene" \

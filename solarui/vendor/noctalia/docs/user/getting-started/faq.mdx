@@ -13,7 +13,7 @@ Find answers to common setup and troubleshooting questions for Noctalia.
 
 <FaqItem question="What distributions are supported?">
 
-Noctalia is packaged for Arch Linux, NixOS, Fedora, openSUSE, and Void Linux. You can also install it manually on other Linux distributions if the required build and runtime dependencies are available.
+Noctalia is packaged for Arch Linux, NixOS, Fedora, openSUSE. You can also install it manually on other Linux distributions if the required build and runtime dependencies are available.
 
 See the [Installation guide](/noctalia/getting-started/installation/) for distro-specific commands and manual install steps.
 
@@ -332,6 +332,8 @@ Noctalia authenticates through PAM using the `login` service. Make sure `/etc/pa
 
 If you changed your PAM stack for fingerprint, security key, or other authentication methods, make sure those changes are present in the `login` PAM service used by Noctalia.
 
+After a successful PAM unlock, Noctalia asks the same PAM stack to refresh existing credentials, such as Kerberos tickets or PAM-integrated GPG and keyring credentials.
+
 </FaqItem>
 
 <FaqItem question="Does the lock screen engage before suspend?">
@@ -395,6 +397,41 @@ sudo pkill -HUP dbus-daemon
 # Restart the wpa_supplicant runit service if you hit the service-flags issue
 sudo sv restart wpa_supplicant
 ```
+
+</FaqItem>
+
+<FaqItem question="Why does connecting to Wi-Fi hang or fail as not authorized?" id="networkmanager-polkit">
+
+Some distributions, openSUSE among them, require polkit authorization before NetworkManager adds or activates a connection. If no polkit agent answers that prompt, the request either fails as not authorized or waits until the D-Bus timeout (about 25 seconds) and then fails. Noctalia shows a notification in both cases.
+
+**Option 1: enable Noctalia's polkit agent (recommended)**
+
+Set `shell.polkit_agent = true` (Settings → Security). Noctalia then shows the authentication prompt itself. Your system's polkit policy stays unchanged. Skip this if another desktop agent already handles prompts in your session.
+
+**Option 2: allow NetworkManager actions without a prompt**
+
+A polkit rule can authorize NetworkManager actions for a group. This lets every member of that group change network settings without a password, so use a group limited to trusted administrators. The group is usually `wheel` on openSUSE, Fedora, and Arch, and often `netdev` on Debian and Ubuntu; check that your user belongs to it with `id`.
+
+```js title="/etc/polkit-1/rules.d/49-networkmanager.rules"
+polkit.addRule(function (action, subject) {
+  var allowed = [
+    "org.freedesktop.NetworkManager.enable-disable-network",
+    "org.freedesktop.NetworkManager.enable-disable-wifi",
+    "org.freedesktop.NetworkManager.enable-disable-wwan",
+    "org.freedesktop.NetworkManager.network-control",
+    "org.freedesktop.NetworkManager.settings.modify.own",
+    "org.freedesktop.NetworkManager.settings.modify.system",
+    "org.freedesktop.NetworkManager.wifi.scan",
+    "org.freedesktop.NetworkManager.wifi.share.open",
+    "org.freedesktop.NetworkManager.wifi.share.protected",
+  ];
+  if (allowed.indexOf(action.id) >= 0 && subject.isInGroup("wheel")) {
+    return polkit.Result.YES;
+  }
+});
+```
+
+polkit reloads rules automatically; no restart is needed.
 
 </FaqItem>
 

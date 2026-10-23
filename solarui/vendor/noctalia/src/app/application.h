@@ -3,6 +3,8 @@
 #include "app/deferred_call_poll_source.h"
 #include "app/timer_poll_source.h"
 #include "calendar/calendar_poll_source.h"
+#include "calendar/calendar_reminder_monitor.h"
+#include "calendar/calendar_reminder_poll_source.h"
 #include "calendar/calendar_service.h"
 #include "capture/screenshot_service.h"
 #include "compositors/compositor_platform.h"
@@ -13,6 +15,7 @@
 #include "core/timer_manager.h"
 #include "dbus/network/external_ip_service.h"
 #include "dbus/notification/notification_poll_source.h"
+#include "dbus/secret/secret_collection_probe.h"
 #include "hooks/battery_hook_state.h"
 #include "hooks/hook_manager.h"
 #include "idle/idle_grace_overlay.h"
@@ -30,6 +33,7 @@
 #include "render/gl_shared_context.h"
 #include "render/render_context.h"
 #include "scripting/plugin_manager.h"
+#include "scripting/plugin_recommendations.h"
 #include "scripting/plugin_service_host.h"
 #include "scripting/script_api_context.h"
 #include "security/secret_store.h"
@@ -168,6 +172,7 @@ private:
   void initAuxServicesAndHooks();
   void initSystemBusServices();
   void initBrightnessAndPipewire();
+  void initEarlySessionBusAndTray();
   void initSessionBusServices();
   void initUi();
   // Sub-phases of initUi(), called in order.
@@ -199,7 +204,13 @@ private:
   // so the first credential lookups report "no provider". Watch the bus name and re-drive the
   // consumers that gave up once an owner appears.
   void installSecretServiceNameWatch();
-  void retrySecretServiceConsumers();
+  // The provider may be present but its collection still locked at startup (PAM holds the password
+  // but only opens the store on first request; or a fingerprint/autologin session unlocks it a few
+  // seconds later). Watch the collection set and re-drive consumers once the default collection is
+  // actually unlocked, so a lookup that lost the startup race recovers without restarting Noctalia.
+  void installSecretServiceCollectionWatch();
+  void onSecretServiceCollectionChanged();
+  void retrySecretServiceConsumers(bool defaultCollectionUnlocked = false);
   void scheduleNotificationShellRefresh();
   void syncPolkitAgent();
   [[nodiscard]] bool likelySupportsInSessionPolkit() const noexcept;
@@ -210,6 +221,7 @@ private:
   void scheduleGreeterAutoSync();
   bool runShellCommandBlocking(const std::string& command);
   bool runIdleAction(const IdleActionRequest& action);
+  bool setOutputPower(bool on);
   void onIconThemeChanged();
   void onGraphicsReset(RenderGraphicsResetStatus status);
   void recoverGraphicsAfterReset();
@@ -240,18 +252,24 @@ private:
   scripting::ScriptApiContext m_scriptApi;
   std::function<void()> m_syncScriptApiOutputs;
   scripting::PluginManager m_pluginManager{m_configService};
+  scripting::PluginRecommendations m_pluginRecommendations{m_configService, m_httpClient, m_pluginManager};
   scripting::PluginServiceHost m_pluginServiceHost{m_scriptApi, &m_httpClient, &m_clipboardService, &m_fileWatcher};
   TimeService m_timeService;
   LockKeysService m_lockKeysService;
   NotificationManager m_notificationManager;
   CalendarService m_calendarService;
+  CalendarReminderMonitor m_calendarReminderMonitor{m_configService, m_notificationManager};
   std::unique_ptr<SessionBus> m_bus;
+  // Set when the early session bus connection fails. Reported once i18n has been
+  // initialized in initStyleThemeAndWayland().
+  std::optional<std::string> m_earlySessionBusError;
   std::unique_ptr<SystemBus> m_systemBus;
   std::unique_ptr<LogindService> m_logindService;
   // Set on PrepareForSleep(true); cleared when the session lock engages (or the lock aborts).
   bool m_releaseSleepDelayWhenLocked = false;
   // Set before Noctalia-initiated suspend so PrepareForSleep skips lock-before-sleep.
   bool m_skipLockOnNextSleep = false;
+  std::uint64_t m_outputPowerRequestGeneration = 0;
   std::unique_ptr<AccountsService> m_accountsService;
   std::unique_ptr<ScreenSaverService> m_screenSaverService;
   std::unique_ptr<ScreenSaverPollSource> m_screenSaverPollSource;
@@ -260,6 +278,7 @@ private:
   IdleInhibitor m_idleInhibitor;
   IdleManager m_idleManager;
   IdleGraceOverlay m_idleGraceOverlay;
+  std::uint64_t m_idleGraceOverlayGeneration = 0;
   HookManager m_hookManager;
   DependencyService m_dependencyService;
   GammaService m_gammaService;
@@ -284,6 +303,7 @@ private:
   bool m_notificationShellRefreshScheduled = false;
   BatteryHookState m_batteryHookState;
   BatteryWarningMonitor m_batteryWarningMonitor;
+  std::optional<bool> m_prevBatteryPluggedForEvents;
   std::optional<bool> m_prevWirelessEnabledForEvents;
   std::optional<bool> m_prevBluetoothPoweredForEvents;
   std::optional<std::string> m_prevPowerProfileActiveForEvents;
@@ -295,6 +315,9 @@ private:
   bool m_notificationBusNameWatchInstalled = false;
   std::unique_ptr<sdbus::IProxy> m_secretServiceNameWatchProxy;
   bool m_secretServiceNameWatchInstalled = false;
+  std::unique_ptr<sdbus::IProxy> m_secretServiceCollectionWatchProxy;
+  std::unique_ptr<SecretCollectionProbe> m_secretServiceCollectionProbe;
+  bool m_secretServiceCollectionWatchInstalled = false;
   bool m_secretServiceOwned = false;
   bool m_storageKeyAutoRetried = false;
   bool m_calendarCredentialAutoRetried = false;
@@ -310,6 +333,8 @@ private:
   GlSharedContext m_glShared;
   SharedTextureCache m_sharedTextureCache;
   RenderContext m_renderContext;
+  // Image controls in panels retain cache-backed handles during teardown.
+  AsyncTextureCache m_asyncTextureCache;
   ThumbnailService m_thumbnailService;
   WallpaperScanner m_wallpaperScanner;
   Bar m_bar;
@@ -345,7 +370,6 @@ private:
   ColorPickerDialogPopup m_colorPickerDialogPopup;
   GlyphPickerDialogPopup m_glyphPickerDialogPopup;
   FileDialogPopup m_fileDialogPopup;
-  AsyncTextureCache m_asyncTextureCache;
 
   // Poll sources (must outlive MainLoop)
   std::unique_ptr<SessionBusPollSource> m_busPollSource;
@@ -376,7 +400,7 @@ private:
   LocationPollSource m_locationPollSource{m_locationService};
   WeatherPollSource m_weatherPollSource{m_weatherService};
   CalendarPollSource m_calendarPollSource{m_calendarService};
-  Timer m_trayInitTimer;
+  CalendarReminderPollSource m_calendarReminderPollSource{m_calendarReminderMonitor};
   Timer m_polkitInitTimer;
   Timer m_polkitIdleCloseTimer;
   Timer m_greeterSyncTimeoutTimer;

@@ -37,6 +37,8 @@
 #include <format>
 #include <optional>
 #include <string>
+#include <utility>
+#include <wayland-client-protocol.h>
 
 PanelManager* PanelManager::s_instance = nullptr;
 
@@ -44,6 +46,7 @@ namespace {
 
   constexpr Logger kLog("panel");
   constexpr auto kKeyboardRelaxDelay = std::chrono::milliseconds(100);
+  constexpr auto kCaptureCloseTimeout = std::chrono::milliseconds(250);
 
   // Layer-shell keyboard interactivity for a panel surface: `initial` is applied at
   // map time, `relaxed` (when set) shortly after by m_keyboardRelaxTimer.
@@ -166,11 +169,13 @@ namespace {
   // Resolves the bar a panel should attach to / position relative to.
   // `shell.panel_anchor_bar` wins when set; otherwise `barName` is the opening
   // source bar. A named bar that does not exist fails loudly (nullopt).
-  // Prefer an enabled bar on the output; if none is enabled there (e.g. a bar-less
-  // monitor), still return a resolved bar so openPanel can use a center-screen
-  // floating layout via attached-panel availability.
+  // Active bar instances are authoritative because temporary IPC state lives
+  // there. Without an active instance, retain the configured bar so a panel can
+  // use its floating or center-screen placement.
   std::optional<BarConfig> resolvePanelBarConfig(
-      ConfigService* configService, CompositorPlatform* platform, wl_output* output, std::string_view barName = {}
+      ConfigService* configService, CompositorPlatform* platform, wl_output* output,
+      const std::function<std::optional<BarConfig>(wl_output*, std::string_view)>& barConfigProvider,
+      std::string_view barName = {}
   ) {
     if (configService == nullptr || configService->config().bars.empty()) {
       return BarConfig{};
@@ -188,11 +193,20 @@ namespace {
     const auto resolve = [wlOutput](const BarConfig& bar) {
       return wlOutput != nullptr ? ConfigService::resolveForOutput(bar, *wlOutput) : bar;
     };
+    const auto runtimeConfig = [&](std::string_view name) -> std::optional<BarConfig> {
+      if (!barConfigProvider || output == nullptr) {
+        return std::nullopt;
+      }
+      return barConfigProvider(output, name);
+    };
 
     if (!effectiveName.empty()) {
       for (const auto& bar : bars) {
         if (bar.name != effectiveName) {
           continue;
+        }
+        if (auto runtime = runtimeConfig(effectiveName); runtime.has_value()) {
+          return runtime;
         }
         BarConfig resolved = resolve(bar);
         if (!resolved.enabled) {
@@ -204,6 +218,9 @@ namespace {
       return std::nullopt;
     }
 
+    if (auto runtime = runtimeConfig({}); runtime.has_value()) {
+      return runtime;
+    }
     for (const auto& bar : bars) {
       BarConfig resolved = resolve(bar);
       if (resolved.enabled) {
@@ -363,6 +380,10 @@ namespace {
 PanelManager::PanelManager() { s_instance = this; }
 
 PanelManager::~PanelManager() {
+  m_captureCloseTimer.stop();
+  if (m_captureCloseFrame != nullptr) {
+    wl_callback_destroy(m_captureCloseFrame);
+  }
   m_persistentHost.setPanelClosedCallback(nullptr);
   if (s_instance == this) {
     s_instance = nullptr;
@@ -478,10 +499,10 @@ void PanelManager::setAttachedPanelAvailabilityCallback(std::function<bool(wl_ou
   m_attachedPanelAvailabilityCallback = std::move(callback);
 }
 
-void PanelManager::setAttachedPanelLayerProvider(
-    std::function<std::optional<std::string>(wl_output*, std::string_view)> provider
+void PanelManager::setBarConfigProvider(
+    std::function<std::optional<BarConfig>(wl_output*, std::string_view)> provider
 ) {
-  m_attachedPanelLayerProvider = std::move(provider);
+  m_barConfigProvider = std::move(provider);
 }
 
 void PanelManager::setAttachedPanelBarSettledCallback(std::function<bool(wl_output*, std::string_view)> callback) {
@@ -523,7 +544,7 @@ void PanelManager::unregisterPanel(const std::string& id) {
 }
 
 void PanelManager::openPanel(const std::string& panelId, PanelOpenRequest request) {
-  if (m_inTransition) {
+  if (m_inTransition || m_afterCaptureClose) {
     return;
   }
 
@@ -581,7 +602,8 @@ void PanelManager::openPanel(const std::string& panelId, PanelOpenRequest reques
     return;
   }
 
-  auto barConfigOpt = resolvePanelBarConfig(m_config, m_platform, request.output, request.sourceBarName);
+  auto barConfigOpt =
+      resolvePanelBarConfig(m_config, m_platform, request.output, m_barConfigProvider, request.sourceBarName);
   if (!barConfigOpt.has_value()) {
     return;
   }
@@ -596,11 +618,6 @@ void PanelManager::openPanel(const std::string& panelId, PanelOpenRequest reques
   auto panelWidth = static_cast<std::uint32_t>(m_activePanel->preferredWidth());
   auto panelHeight = static_cast<std::uint32_t>(m_activePanel->preferredHeight());
   m_sourceBarName = barConfig.name;
-  if (m_attachedPanelLayerProvider != nullptr) {
-    if (auto layer = m_attachedPanelLayerProvider(request.output, m_sourceBarName); layer.has_value()) {
-      barConfig.layer = *layer;
-    }
-  }
   const bool isBottom = barConfig.position == "bottom";
   const bool isLeft = barConfig.position == "left";
   const bool isRight = barConfig.position == "right";
@@ -1462,7 +1479,79 @@ void PanelManager::closePanel(bool animateClose) {
   }
 }
 
+void PanelManager::closePanelForCapture(std::function<void()> afterClose) {
+  if (m_afterCaptureClose) {
+    return;
+  }
+  if (!isOpen() || m_surface == nullptr || m_wlSurface == nullptr || m_inTransition) {
+    closePanel(/*animateClose=*/false);
+    DeferredCall::callLater(std::move(afterClose));
+    return;
+  }
+
+  m_afterCaptureClose = std::move(afterClose);
+  m_closing = true;
+  m_attachedOpenAnimationPending = false;
+  const std::uint64_t generation = ++m_destroyGeneration;
+  deactivateOutsideClickHandlers();
+  m_inputDispatcher.setSceneRoot(nullptr);
+  TooltipManager::instance().forceDestroy();
+  if (m_activePopup != nullptr) {
+    m_activePopup->close();
+    m_activePopup = nullptr;
+  }
+  m_animations.cancelAll();
+  m_keyboardRelaxTimer.stop();
+  m_surface->setPrepareFrameCallback({});
+  m_surface->setFrameTickCallback({});
+  m_surface->setUpdateCallback({});
+  m_surface->setSceneRoot(nullptr);
+  m_surface->clearBlurRegion();
+  m_surface->setOpaque(false);
+  m_surface->setInputRegion({});
+  m_surface->discardPendingFrameCallback();
+
+  static const wl_callback_listener listener = {.done = &PanelManager::handleCaptureCloseFrame};
+  m_captureCloseFrame = wl_surface_frame(m_wlSurface);
+  if (m_captureCloseFrame == nullptr || wl_callback_add_listener(m_captureCloseFrame, &listener, this) != 0) {
+    kLog.warn("could not wait for the panel's clear frame; closing before capture");
+    destroyPanel();
+    return;
+  }
+
+  m_captureCloseTimer.start(kCaptureCloseTimeout, [this, generation]() {
+    if (m_destroyGeneration == generation && m_closing) {
+      kLog.warn("panel clear frame timed out; closing before capture");
+      destroyPanel();
+    }
+  });
+  // The caller defers this handoff out of input dispatch. Submit the clear buffer
+  // now so no intervening state-only commit can claim its frame callback.
+  m_surface->renderNow();
+}
+
+void PanelManager::handleCaptureCloseFrame(void* data, wl_callback* callback, std::uint32_t /*time*/) {
+  auto* self = static_cast<PanelManager*>(data);
+  if (callback != self->m_captureCloseFrame) {
+    return;
+  }
+  wl_callback_destroy(callback);
+  self->m_captureCloseFrame = nullptr;
+  self->m_captureCloseTimer.stop();
+  const std::uint64_t generation = self->m_destroyGeneration;
+  DeferredCall::callLater([self, generation]() {
+    if (self->m_destroyGeneration == generation && self->m_closing) {
+      self->destroyPanel();
+    }
+  });
+}
+
 void PanelManager::destroyPanel() {
+  m_captureCloseTimer.stop();
+  if (m_captureCloseFrame != nullptr) {
+    wl_callback_destroy(m_captureCloseFrame);
+    m_captureCloseFrame = nullptr;
+  }
   if (m_attachedToBar && m_attachedPanelGeometryCallback && m_output != nullptr) {
     m_attachedPanelGeometryCallback(m_output, m_sourceBarName, std::nullopt);
   }
@@ -1528,6 +1617,10 @@ void PanelManager::destroyPanel() {
   }
   if (m_panelClosedCallback) {
     m_panelClosedCallback();
+  }
+  if (m_afterCaptureClose) {
+    m_afterCaptureClose();
+    m_afterCaptureClose = {};
   }
 }
 
@@ -2459,7 +2552,10 @@ void PanelManager::onConfigReloaded() {
     bg->setPanelStyle(m_config->config().shell.panel.borders);
     bg->setFill(colorSpecFromRole(ColorRole::Surface, panelBackgroundOpacity));
     if (m_config->config().shell.panel.borders) {
-      bg->setBorder(colorSpecFromRole(ColorRole::Outline, panelBackgroundOpacity), Style::borderWidth);
+      bg->setBorder(
+          shell::panel_surface::borderColor(m_config, panelBackgroundOpacity),
+          shell::panel_surface::borderWidth(m_config)
+      );
     }
   }
   if (m_panelShadowNode != nullptr) {
@@ -2486,7 +2582,7 @@ void PanelManager::onConfigReloaded() {
     return;
   }
 
-  const auto barConfigOpt = resolvePanelBarConfig(m_config, m_platform, m_output, m_sourceBarName);
+  const auto barConfigOpt = resolvePanelBarConfig(m_config, m_platform, m_output, m_barConfigProvider, m_sourceBarName);
   if (!barConfigOpt.has_value()) {
     return;
   }
@@ -2575,7 +2671,10 @@ void PanelManager::buildScene(std::uint32_t width, std::uint32_t height) {
         const float backgroundOpacity = shell::panel_surface::backgroundOpacity(m_config);
         bg->setFill(colorSpecFromRole(ColorRole::Surface, backgroundOpacity));
         if (panelBorders) {
-          bg->setBorder(colorSpecFromRole(ColorRole::Outline, backgroundOpacity), Style::borderWidth);
+          bg->setBorder(
+              shell::panel_surface::borderColor(m_config, backgroundOpacity),
+              shell::panel_surface::borderWidth(m_config)
+          );
         }
       }
       m_bgNode = sceneParent->addChild(std::move(bg));
@@ -2813,6 +2912,16 @@ void PanelManager::prepareFrame(bool needsUpdate, bool needsLayout) {
   }
 }
 
+std::vector<std::string> PanelManager::availablePanelIds() const {
+  std::vector<std::string> ids;
+  ids.reserve(m_panels.size());
+  for (const auto& entry : m_panels) {
+    ids.push_back(entry.first);
+  }
+  m_persistentHost.appendPanelIds(ids);
+  return ids;
+}
+
 void PanelManager::registerIpc(IpcService& ipc) {
   auto parseOpenArgs = [](std::string_view rawArgs, std::string_view command, std::string& panelId,
                           std::string& context) -> std::optional<std::string> {
@@ -2836,12 +2945,7 @@ void PanelManager::registerIpc(IpcService& ipc) {
   };
 
   auto unknownPanelError = [this](std::string_view panelId) -> std::string {
-    std::vector<std::string> ids;
-    ids.reserve(m_panels.size());
-    for (const auto& entry : m_panels) {
-      ids.push_back(entry.first);
-    }
-    m_persistentHost.appendPanelIds(ids);
+    std::vector<std::string> ids = availablePanelIds();
     std::ranges::sort(ids);
 
     std::string error = "error: unknown panel \"" + std::string(panelId) + "\"";

@@ -42,7 +42,7 @@ public:
   void reload(const IdleConfig& config);
   /// D-Bus screensaver inhibits (e.g. Chrome video playback). Suppresses idle actions while > 0.
   void setScreenSaverInhibitLocks(std::int64_t locks);
-  /// While locked, behaviors with a positive lockedTimeoutSeconds re-arm at that shorter timeout.
+  /// Apply locked timeouts without resuming completed actions or resetting unchanged timers.
   void setSessionLocked(bool locked);
   /// Seconds the compositor has reported session-idle (1s heartbeat notification); 0 when active.
   [[nodiscard]] std::int64_t liveIdleSeconds() const noexcept { return m_liveIdleSeconds; }
@@ -63,16 +63,19 @@ private:
     IdleManager* owner = nullptr;
     IdleBehaviorConfig config;
     ext_idle_notification_v1* notification = nullptr;
+    std::uint32_t notificationTimeoutMs = 0;
     BehaviorPhase phase = BehaviorPhase::Waiting;
   };
 
   [[nodiscard]] double effectiveTimeoutSeconds(const IdleBehaviorConfig& config) const;
+  [[nodiscard]] std::uint32_t effectiveTimeoutMilliseconds(const IdleBehaviorConfig& config) const;
   void clearBehaviors();
   void syncHeartbeat();
   void destroyHeartbeat();
   void notifyLiveIdleChanged();
   void createBehavior(const IdleBehaviorConfig& config);
   void recreateBehaviorNotification(BehaviorState& behavior);
+  void syncBehaviorNotification(BehaviorState& behavior);
   void recreateBehaviorNotifications();
   bool runBehavior(BehaviorState& behavior);
   void runResumeBehavior(BehaviorState& behavior);

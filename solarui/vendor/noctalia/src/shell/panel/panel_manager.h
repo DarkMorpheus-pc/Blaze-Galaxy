@@ -1,5 +1,5 @@
 #pragma once
-
+#include "config/config_types.h"
 #include "core/timer_manager.h"
 #include "render/animation/animation_manager.h"
 #include "render/scene/input_dispatcher.h"
@@ -37,6 +37,7 @@ struct KeyboardEvent;
 struct PointerEvent;
 struct wl_output;
 struct wl_surface;
+struct wl_callback;
 
 struct PanelOpenRequest {
   wl_output* output = nullptr;
@@ -89,7 +90,7 @@ public:
   void setPanelClosedCallback(std::function<void()> callback);
   void setPanelOpenedCallback(std::function<void()> callback);
   void setAttachedPanelAvailabilityCallback(std::function<bool(wl_output*, std::string_view)> callback);
-  void setAttachedPanelLayerProvider(std::function<std::optional<std::string>(wl_output*, std::string_view)> provider);
+  void setBarConfigProvider(std::function<std::optional<BarConfig>(wl_output*, std::string_view)> provider);
   void setAttachedPanelBarSettledCallback(std::function<bool(wl_output*, std::string_view)> callback);
   // Called when an auto-hide bar finishes revealing for an attached panel open.
   void onAttachedBarRevealSettled(wl_output* output, std::string_view barName);
@@ -98,9 +99,13 @@ public:
   // Drops a previously registered panel, closing it first if it is open. Used to
   // retire plugin-backed panels on a plugin enable/disable/reload.
   void unregisterPanel(const std::string& id);
+  // Every currently registered panel id (regular and persistent), unsorted.
+  [[nodiscard]] std::vector<std::string> availablePanelIds() const;
 
   void openPanel(const std::string& panelId, PanelOpenRequest request = {});
   void closePanel(bool animateClose = true);
+  // Call outside input dispatch to clear the displayed buffer before closing and running the action.
+  void closePanelForCapture(std::function<void()> afterClose);
   void togglePanel(const std::string& panelId, PanelOpenRequest request);
   // IPC-friendly overload: asks CompositorPlatform for preferred interactive output.
   void togglePanel(const std::string& panelId);
@@ -181,6 +186,7 @@ private:
   void prepareFrame(bool needsUpdate, bool needsLayout);
   void applyPendingPanelFocus();
   void destroyPanel();
+  static void handleCaptureCloseFrame(void* data, wl_callback* callback, std::uint32_t time);
   // Called before the panel surface commits so outside-click dismissal is ready
   // for its first frame. The panel rect is excluded separately because
   // same-layer stacking order is compositor-defined.
@@ -219,7 +225,7 @@ private:
   std::function<void()> m_panelClosedCallback;
   std::function<void()> m_panelOpenedCallback;
   std::function<bool(wl_output*, std::string_view)> m_attachedPanelAvailabilityCallback;
-  std::function<std::optional<std::string>(wl_output*, std::string_view)> m_attachedPanelLayerProvider;
+  std::function<std::optional<BarConfig>(wl_output*, std::string_view)> m_barConfigProvider;
   std::function<bool(wl_output*, std::string_view)> m_attachedPanelBarSettledCallback;
   PanelClickShield m_clickShield;
   PersistentPanelHost m_persistentHost;
@@ -271,6 +277,9 @@ private:
   AttachedRevealDirection m_attachedRevealDirection = AttachedRevealDirection::Down;
   AttachedRevealDirection m_detachedRevealDirection = AttachedRevealDirection::Down;
   Timer m_keyboardRelaxTimer;
+  Timer m_captureCloseTimer;
+  wl_callback* m_captureCloseFrame = nullptr;
+  std::function<void()> m_afterCaptureClose;
   std::string m_attachedBarPosition; // "top" / "bottom" / "left" / "right" while attached, empty otherwise
   std::string m_sourceBarName;       // name of the bar that opened the current panel
   std::optional<AttachedPanelGeometry> m_attachedPanelGeometry;

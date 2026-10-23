@@ -1009,7 +1009,8 @@ namespace {
           hasCapsuleContent = hasCapsuleContent || widget->shouldShowBarCapsule();
         }
         const bool hasPaintedFill = resolveColorSpec(scaleAlpha(run.spec.fill, run.spec.opacity)).a > 0.0F;
-        const bool hasPaintedBorder = run.spec.border.has_value() && resolveColorSpec(*run.spec.border).a > 0.0F;
+        const bool hasPaintedBorder =
+            run.spec.border.has_value() && run.spec.borderWidth > 0.0F && resolveColorSpec(*run.spec.border).a > 0.0F;
         run.hasPaintedCapsuleBackground = hasCapsuleContent && (hasPaintedFill || hasPaintedBorder);
 
         shell->setVisible(hasVisibleContent);
@@ -1416,6 +1417,22 @@ namespace {
     });
   }
 
+  // Walks up from the hovered area to the bar widget that owns it, if any.
+  Widget* widgetFromHoveredArea(BarInstance& instance, InputArea* hoveredArea) {
+    for (const Node* node = hoveredArea; node != nullptr; node = node->parent()) {
+      if (auto it = instance.widgetByRoot.find(node); it != instance.widgetByRoot.end()) {
+        return it->second;
+      }
+    }
+    return nullptr;
+  }
+
+  // The area the tooltip manager may show a tooltip for: none when the owning widget disables tooltips.
+  InputArea* tooltipAreaForHover(BarInstance& instance, InputArea* hoveredArea) {
+    const Widget* owner = widgetFromHoveredArea(instance, hoveredArea);
+    return owner != nullptr && !owner->showsTooltip() ? nullptr : hoveredArea;
+  }
+
 } // namespace
 
 Bar::Bar() = default;
@@ -1773,7 +1790,7 @@ void Bar::applyPendingWorkspaceReveal() {
       const bool suppressAutoHide =
           (m_autoHideSuppressionCallback != nullptr) ? m_autoHideSuppressionCallback(*instance) : false;
       if (!suppressAutoHide) {
-        startHideFadeOut(*instance);
+        startHideFadeOut(*instance, true);
       }
     }
   });
@@ -1838,7 +1855,8 @@ void Bar::rearmTooltipForHoveredWidget() {
   // Same path a real hover takes, so the usual show delay still applies — the
   // tooltip must not blink into existence the instant the panel disappears.
   TooltipManager::instance().onBarHoverChange(
-      hovered, m_hoveredInstance->surface->layerSurface(), m_hoveredInstance->output
+      tooltipAreaForHover(*m_hoveredInstance, hovered), m_hoveredInstance->surface->layerSurface(),
+      m_hoveredInstance->output
   );
 }
 
@@ -1905,7 +1923,7 @@ void Bar::setInstanceIpcVisible(BarInstance& instance, bool visible) {
     if (visible) {
       revealAutoHideBar(instance);
     } else {
-      startHideFadeOut(instance);
+      startHideFadeOut(instance, true);
     }
     return;
   }
@@ -2127,12 +2145,12 @@ bool Bar::canAttachPanelToBar(wl_output* output, std::string_view barName) const
   return barSupportsSlideBehavior(instance->barConfig) || instanceEffectivelyVisible(*instance);
 }
 
-std::optional<std::string> Bar::layerForBar(wl_output* output, std::string_view barName) const noexcept {
+std::optional<BarConfig> Bar::configForBar(wl_output* output, std::string_view barName) const {
   const BarInstance* instance = instanceForBar(output, barName);
-  if (instance == nullptr || instance->surface == nullptr || !instance->barConfig.enabled) {
+  if (instance == nullptr || !instance->barConfig.enabled) {
     return std::nullopt;
   }
-  return instance->barConfig.layer;
+  return instance->barConfig;
 }
 
 LayerShellLayer Bar::highestLayerForOutput(wl_output* output) const noexcept {
@@ -2403,6 +2421,7 @@ void Bar::createInstance(const WaylandOutput& output, std::size_t barIndex, cons
       .marginBottom = surfaceSpec.marginBottom,
       .marginLeft = surfaceSpec.marginLeft,
       .defaultHeight = surfaceSpec.surfaceHeight,
+      .prewarmBlur = barConfig.compositorBlur,
   };
 
   instance->surface = std::make_unique<LayerSurface>(m_platform->wayland(), std::move(surfaceConfig));
@@ -2713,7 +2732,7 @@ void Bar::attachWidgetsToSections(BarInstance& instance) {
           .fill = scaleAlpha(cap.fill, cap.opacity),
           .configure = [&cap, scale](Box& bg) {
             if (cap.border.has_value()) {
-              bg.setBorder(*cap.border, Style::borderWidth * scale);
+              bg.setBorder(*cap.border, cap.borderWidth * scale);
             } else {
               bg.clearBorder();
             }
@@ -2804,7 +2823,7 @@ void Bar::attachWidgetsToSections(BarInstance& instance) {
           .fill = scaleAlpha(cap.fill, cap.opacity),
           .configure = [&cap, scale](Box& bg) {
             if (cap.border.has_value()) {
-              bg.setBorder(*cap.border, Style::borderWidth * scale);
+              bg.setBorder(*cap.border, cap.borderWidth * scale);
             } else {
               bg.clearBorder();
             }
@@ -2900,23 +2919,9 @@ void Bar::attachWidgetsToSections(BarInstance& instance) {
   attach(instance.endWidgets, instance.endCapsuleRuns, instance.endSection);
 }
 
-namespace {
-
-  // Walks up from the hovered area to the bar widget that owns it, if any.
-  Widget* widgetFromHoveredArea(BarInstance& instance, InputArea* hoveredArea) {
-    for (const Node* node = hoveredArea; node != nullptr; node = node->parent()) {
-      if (auto it = instance.widgetByRoot.find(node); it != instance.widgetByRoot.end()) {
-        return it->second;
-      }
-    }
-    return nullptr;
-  }
-
-} // namespace
-
 void Bar::updateWidgetHoverHighlight(BarInstance& instance, InputArea* hoveredArea) {
   Widget* target = widgetFromHoveredArea(instance, hoveredArea);
-  if (target != nullptr && target->barHoverBox() == nullptr) {
+  if (target != nullptr && (target->barHoverBox() == nullptr || !target->wantsBarHoverTint())) {
     target = nullptr;
   }
   if (target == instance.hoverHighlightWidget) {
@@ -3001,6 +3006,12 @@ void Bar::updateAccordionExpansion(BarInstance& instance, InputArea* hoveredArea
 void Bar::rebuildInstanceContents(BarInstance& instance, const BarConfig& newConfig) {
   noctalia::profiling::ScopedTimer t(kLog, std::format("bar: rebuild contents [{}]", newConfig.name));
 
+  const bool restartHideDelay =
+      instance.autoHideDelayTimer.active() && instance.barConfig.autoHideDelayMs != newConfig.autoHideDelayMs;
+  if (restartHideDelay) {
+    instance.autoHideDelayTimer.stop();
+  }
+
   // Drop any pointer hover/capture state pointing into the widgets we're about
   // to destroy. Hover will be re-acquired on the next pointer motion.
   instance.inputDispatcher.pointerLeave();
@@ -3058,6 +3069,12 @@ void Bar::rebuildInstanceContents(BarInstance& instance, const BarConfig& newCon
     }
     instance.surface->requestLayout();
   }
+  if (restartHideDelay
+      && !instance.pointerInside
+      && instance.attachedPopupCount == 0
+      && barPointerHideAllowed(instance)) {
+    startHideFadeOut(instance);
+  }
 }
 
 void Bar::tickWidgets(std::vector<std::unique_ptr<Widget>>& widgets, float deltaMs) { ::tickWidgets(widgets, deltaMs); }
@@ -3114,6 +3131,7 @@ void Bar::revealAutoHideBar(BarInstance& instance) {
     return;
   }
 
+  instance.autoHideDelayTimer.stop();
   instance.ipcLayoutReleased = false;
   instance.animations.cancelForOwner(instance.slideRoot);
   const float current = instance.hideOpacity;
@@ -3169,7 +3187,7 @@ void Bar::applyBarCompositorBlur(BarInstance& instance) const {
   if (instance.surface == nullptr) {
     return;
   }
-  if (!barContentVisuallyShown(instance)) {
+  if (!instance.barConfig.compositorBlur || !barContentVisuallyShown(instance)) {
     instance.surface->clearBlurRegion();
     return;
   }
@@ -3199,10 +3217,31 @@ void Bar::applyBarCompositorBlur(BarInstance& instance) const {
   instance.surface->setBlurRegion(blurStrips);
 }
 
-void Bar::startHideFadeOut(BarInstance& instance) {
+void Bar::startHideFadeOut(BarInstance& instance, bool immediate) {
   if (instance.autoHideDisablePending || instance.smartAutoHidePinnedVisible) {
     return;
   }
+  if (!immediate
+      && instance.barConfig.autoHide
+      && !instance.barConfig.smartAutoHide
+      && instance.barConfig.autoHideDelayMs > 0) {
+    if (!instance.autoHideDelayTimer.active()) {
+      instance.autoHideDelayTimer.start(
+          std::chrono::milliseconds(instance.barConfig.autoHideDelayMs), [this, inst = &instance]() {
+            if (inst->pointerInside || inst->attachedPopupCount > 0 || !barPointerHideAllowed(*inst)) {
+              return;
+            }
+            const bool suppressed =
+                (m_autoHideSuppressionCallback != nullptr) ? m_autoHideSuppressionCallback(*inst) : false;
+            if (!suppressed) {
+              startHideFadeOut(*inst, true);
+            }
+          }
+      );
+    }
+    return;
+  }
+  instance.autoHideDelayTimer.stop();
   const float current = instance.hideOpacity;
   instance.animations.animate(
       current, 0.0F, Style::animNormal, Easing::EaseInQuad,
@@ -3337,7 +3376,9 @@ void Bar::buildScene(BarInstance& instance, std::uint32_t width, std::uint32_t h
       if (next != nullptr) {
         next->setTooltipPlacement(tooltipPlacementAwayFromEdge(inst->barConfig.position));
       }
-      TooltipManager::instance().onBarHoverChange(next, inst->surface->layerSurface(), inst->output);
+      TooltipManager::instance().onBarHoverChange(
+          tooltipAreaForHover(*inst, next), inst->surface->layerSurface(), inst->output
+      );
       updateWidgetHoverHighlight(*inst, next);
       updateAccordionExpansion(*inst, next);
     });
@@ -3984,6 +4025,7 @@ std::string Bar::setBarAutoHideIpc(std::string_view args) {
 
     instance.ipcLayoutReleased = false;
     instance.autoHideDisablePending = false;
+    instance.autoHideDelayTimer.stop();
     instance.animations.cancelForOwner(instance.slideRoot);
 
     instance.barConfig.autoHide = enabled;
@@ -3999,7 +4041,7 @@ std::string Bar::setBarAutoHideIpc(std::string_view args) {
       if (instance.pointerInside || instance.attachedPopupCount > 0 || suppressAutoHide) {
         revealAutoHideBar(instance);
       } else {
-        startHideFadeOut(instance);
+        startHideFadeOut(instance, true);
       }
       return;
     }

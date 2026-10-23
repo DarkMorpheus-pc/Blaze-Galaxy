@@ -69,9 +69,17 @@ public:
     return false;
   }
 
-  // Called when an adapter-consumed primary-button press is released. Returns
-  // true when the visible pool needs rebinding.
-  virtual bool onPointerRelease(std::optional<std::size_t> /*index*/) { return false; }
+  struct PointerReleaseResult {
+    // The visible pool needs rebinding.
+    bool rebind = false;
+    // Item to activate. The view activates it after rebinding, as its last
+    // action, because activation may destroy the view.
+    std::optional<std::size_t> activateIndex;
+  };
+
+  // Called when an adapter-consumed primary-button press is released. Must not
+  // activate items itself; return the index in activateIndex instead.
+  virtual PointerReleaseResult onPointerRelease(std::optional<std::size_t> /*index*/) { return {}; }
   virtual void onPointerCancel() {}
 
   [[nodiscard]] virtual bool overlayHitTest(
@@ -81,6 +89,10 @@ public:
   }
 
   virtual void applyOverlayHover(Node& /*tile*/, bool /*hovered*/) {}
+
+  // Optional tooltip shown instead of itemTooltip() while the item's overlay is hovered.
+  // Anchored by itemTooltipAnchorInsets().
+  [[nodiscard]] virtual std::string overlayTooltip(std::size_t /*index*/) const { return {}; }
 
   // Optional: secondary button press (e.g. context menu). Anchor coordinates are in the panel scene graph
   // (surface-local).
@@ -117,7 +129,8 @@ public:
   void setScale(float scale);
 
   void scrollToIndex(std::size_t index);
-  void setSelectedIndex(std::optional<std::size_t> index);
+  // Pointer selection can keep the viewport stable until release.
+  void setSelectedIndex(std::optional<std::size_t> index, bool scrollToSelection = true);
   [[nodiscard]] std::optional<std::size_t> selectedIndex() const noexcept { return m_selectedIndex; }
   // Surface-local anchor point for item `index` (cell center). False when layout
   // metrics are unavailable or the index is out of range.
@@ -200,4 +213,6 @@ private:
   float m_pressLocalX = 0.0F;
   float m_pressLocalY = 0.0F;
   bool m_dragThresholdPassed = false;
+  // Hides the hovered item's tooltip after an adapter-consumed press, until the hover target changes.
+  bool m_tooltipSuppressed = false;
 };

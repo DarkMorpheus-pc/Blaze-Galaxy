@@ -327,6 +327,7 @@ bool SessionActionRunner::requestShutdownDetached() const {
 
 bool SessionActionRunner::lockThenSuspendDetached() const {
   m_lockScreen.runAfterSessionLocked([this]() { (void)requestSuspendDetached(); });
+  m_lockScreen.prepareForSleep();
   return true;
 }
 

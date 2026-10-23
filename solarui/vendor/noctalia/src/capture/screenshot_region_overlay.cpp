@@ -47,10 +47,9 @@ namespace capture {
     constexpr float kDimensionPaddingY = 4.0F;
     constexpr float kSelectionBorderWidth = 2.0F;
     constexpr float kDimOpacity = 0.65F;
+    constexpr double kHandleMargin = 15.0; // Hitbox size in pixels
 
     [[nodiscard]] capture::DragMode hitTestSelection(double x, double y, double x0, double y0, double x1, double y1) {
-      constexpr double kHandleMargin = 15.0; // Hitbox size in pixels
-
       const bool withinX = x >= x0 - kHandleMargin && x <= x1 + kHandleMargin;
       const bool withinY = y >= y0 - kHandleMargin && y <= y1 + kHandleMargin;
 
@@ -102,6 +101,39 @@ namespace capture {
       if (x > x0 && x < x1 && y > y0 && y < y1)
         return capture::DragMode::Move;
 
+      return capture::DragMode::None;
+    }
+
+    // Right-button resize zones: outer thirds of each axis pick the matching edge or corner.
+    [[nodiscard]] capture::DragMode
+    hitTestRegionThirds(double x, double y, double x0, double y0, double x1, double y1) {
+      if (x < x0 - kHandleMargin || x > x1 + kHandleMargin || y < y0 - kHandleMargin || y > y1 + kHandleMargin) {
+        return capture::DragMode::None;
+      }
+
+      const double thirdW = (x1 - x0) / 3.0;
+      const double thirdH = (y1 - y0) / 3.0;
+      const bool left = x < x0 + thirdW;
+      const bool right = x >= x1 - thirdW;
+      const bool top = y < y0 + thirdH;
+      const bool bottom = y >= y1 - thirdH;
+
+      if (left && top)
+        return capture::DragMode::TopLeftCorner;
+      if (right && top)
+        return capture::DragMode::TopRightCorner;
+      if (left && bottom)
+        return capture::DragMode::BottomLeftCorner;
+      if (right && bottom)
+        return capture::DragMode::BottomRightCorner;
+      if (top)
+        return capture::DragMode::TopEdge;
+      if (bottom)
+        return capture::DragMode::BottomEdge;
+      if (left)
+        return capture::DragMode::LeftEdge;
+      if (right)
+        return capture::DragMode::RightEdge;
       return capture::DragMode::None;
     }
 
@@ -265,6 +297,33 @@ namespace capture {
     m_copyKeybindLabel = std::move(copyLabel);
     m_saveKeybindLabel = std::move(saveLabel);
     m_cancelKeybindLabel = std::move(cancelLabel);
+  }
+
+  void ScreenshotRegionOverlay::setRegionModifier(std::uint32_t mask) { m_regionModifierMask = mask; }
+
+  void ScreenshotRegionOverlay::applyCursorShape(std::uint32_t shape) {
+    for (auto& instance : m_instances) {
+      if (instance->input != nullptr) {
+        instance->input->setCursorShape(shape);
+      }
+    }
+    // Stored shapes only reach the compositor on pointer events, so push it explicitly.
+    if (m_wayland != nullptr) {
+      m_wayland->setCursorShape(0, shape);
+    }
+  }
+
+  void ScreenshotRegionOverlay::onModifiersChanged() {
+    if (m_regionModifierMask == 0 || m_dragging || !m_confirming) {
+      return;
+    }
+    applyCursorShape(
+        modifierHeld() ? WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_ALL_SCROLL : WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_CROSSHAIR
+    );
+  }
+
+  bool ScreenshotRegionOverlay::modifierHeld() const {
+    return m_regionModifierMask != 0 && (m_wayland->keyboardModifiers() & m_regionModifierMask) != 0;
   }
 
   void ScreenshotRegionOverlay::setFrozenScreenshots(std::vector<FrozenScreenshot> screenshots) {
@@ -486,7 +545,8 @@ namespace capture {
     });
 
     auto input = ui::inputArea({
-        .acceptedButtons = InputArea::buttonMask(BTN_LEFT),
+        .acceptedButtons =
+            m_regionModifierMask == 0 ? InputArea::buttonMask(BTN_LEFT) : InputArea::buttonMask({BTN_LEFT, BTN_RIGHT}),
         .cursorShape = WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_CROSSHAIR,
         .focusable = true,
     });
@@ -510,17 +570,21 @@ namespace capture {
       });
     } else {
       input->setOnPress([this, output = inst.output](const InputArea::PointerData& data) {
-        if (data.button != BTN_LEFT)
+        if (data.button != BTN_LEFT && data.button != BTN_RIGHT)
           return;
 
         if (!data.pressed) {
-          if (!m_dragging)
+          if (!m_dragging || data.button != m_dragButton)
             return;
           m_dragging = false;
+          m_dragButton = 0;
           // completeSelection() tears down surfaces; defer past InputDispatcher::pointerButton.
           DeferredCall::callLater([this]() { completeSelection(); });
           return;
         }
+
+        if (m_dragging)
+          return;
 
         const auto* out = findOutput(*m_wayland, output);
         if (out == nullptr)
@@ -530,22 +594,40 @@ namespace capture {
         const double globalY = static_cast<double>(out->logicalY) + static_cast<double>(data.localY);
 
         m_dragging = true;
+        m_dragButton = data.button;
 
-        if (m_confirming) {
+        if (m_confirming && (m_regionModifierMask == 0 || modifierHeld())) {
           const double x0 = std::min(m_startGlobalX, m_currentGlobalX);
           const double y0 = std::min(m_startGlobalY, m_currentGlobalY);
           const double x1 = std::max(m_startGlobalX, m_currentGlobalX);
           const double y1 = std::max(m_startGlobalY, m_currentGlobalY);
 
-          m_dragMode = hitTestSelection(globalX, globalY, x0, y0, x1, y1);
-
-          if (m_dragMode == DragMode::None) {
-            // Clicked outside the selection, start a new one
-            m_confirming = false;
-            m_dragMode = DragMode::NewSelection;
+          if (m_regionModifierMask == 0) {
+            // Default: a plain drag hits edges/corners, outside starts a new selection.
+            m_dragMode = hitTestSelection(globalX, globalY, x0, y0, x1, y1);
+            if (m_dragMode == DragMode::None) {
+              m_confirming = false;
+              m_dragMode = DragMode::NewSelection;
+            }
+          } else if (data.button == BTN_LEFT) {
+            // Modifier + left drag moves the region from anywhere.
+            m_dragMode = DragMode::Move;
+          } else {
+            // Modifier + right drag resizes from the outer thirds; the center does nothing.
+            m_dragMode = hitTestRegionThirds(globalX, globalY, x0, y0, x1, y1);
+            if (m_dragMode == DragMode::None) {
+              m_dragging = false;
+              m_dragButton = 0;
+              return;
+            }
           }
-        } else {
+        } else if (data.button == BTN_LEFT) {
+          m_confirming = false;
           m_dragMode = DragMode::NewSelection;
+        } else {
+          m_dragging = false;
+          m_dragButton = 0;
+          return;
         }
 
         if (m_dragMode == DragMode::NewSelection) {
@@ -556,6 +638,8 @@ namespace capture {
 
           m_cursorGlobalX = globalX;
           m_cursorGlobalY = globalY;
+          m_resizeBaseX = 0.0;
+          m_resizeBaseY = 0.0;
         } else if (m_dragMode == DragMode::Move) {
           m_moveOffsetX = globalX;
           m_moveOffsetY = globalY;
@@ -566,38 +650,48 @@ namespace capture {
           const double x1 = std::max(m_startGlobalX, m_currentGlobalX);
           const double y1 = std::max(m_startGlobalY, m_currentGlobalY);
 
+          m_resizeBaseX = 0.0;
+          m_resizeBaseY = 0.0;
+
           if (m_dragMode == DragMode::LeftEdge
               || m_dragMode == DragMode::TopLeftCorner
               || m_dragMode == DragMode::BottomLeftCorner) {
             m_startGlobalX = x1;
-            m_currentGlobalX = globalX;
+            m_resizeBaseX = x0 - globalX;
+            // Modifier resize keeps the edge relative to the grab point; plain drag snaps to it.
+            m_currentGlobalX = m_regionModifierMask != 0 ? x0 : globalX;
           } else if (
               m_dragMode == DragMode::RightEdge
               || m_dragMode == DragMode::TopRightCorner
               || m_dragMode == DragMode::BottomRightCorner
           ) {
             m_startGlobalX = x0;
-            m_currentGlobalX = globalX;
+            m_resizeBaseX = x1 - globalX;
+            m_currentGlobalX = m_regionModifierMask != 0 ? x1 : globalX;
           }
 
           if (m_dragMode == DragMode::TopEdge
               || m_dragMode == DragMode::TopLeftCorner
               || m_dragMode == DragMode::TopRightCorner) {
             m_startGlobalY = y1;
-            m_currentGlobalY = globalY;
+            m_resizeBaseY = y0 - globalY;
+            m_currentGlobalY = m_regionModifierMask != 0 ? y0 : globalY;
           } else if (
               m_dragMode == DragMode::BottomEdge
               || m_dragMode == DragMode::BottomLeftCorner
               || m_dragMode == DragMode::BottomRightCorner
           ) {
             m_startGlobalY = y0;
-            m_currentGlobalY = globalY;
+            m_resizeBaseY = y1 - globalY;
+            m_currentGlobalY = m_regionModifierMask != 0 ? y1 : globalY;
           }
 
           m_cursorGlobalX = globalX;
           m_cursorGlobalY = globalY;
         }
 
+        // Set the gesture cursor on press, without waiting for motion.
+        applyCursorShape(cursorShapeForDragMode(m_dragMode));
         updateSelectionVisuals();
         for (auto& instance : m_instances) {
           if (instance->surface != nullptr)
@@ -615,13 +709,22 @@ namespace capture {
 
         if (!m_dragging) {
           if (m_confirming) {
-            const double x0 = std::min(m_startGlobalX, m_currentGlobalX);
-            const double y0 = std::min(m_startGlobalY, m_currentGlobalY);
-            const double x1 = std::max(m_startGlobalX, m_currentGlobalX);
-            const double y1 = std::max(m_startGlobalY, m_currentGlobalY);
+            if (m_regionModifierMask != 0) {
+              // Modifier drives the gesture: move cursor while held, crosshair otherwise.
+              inputPtr->setCursorShape(
+                  modifierHeld() ? WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_ALL_SCROLL
+                                 : WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_CROSSHAIR
+              );
+            } else {
+              // Default mode: preview the edge/corner hit zones on hover.
+              const double x0 = std::min(m_startGlobalX, m_currentGlobalX);
+              const double y0 = std::min(m_startGlobalY, m_currentGlobalY);
+              const double x1 = std::max(m_startGlobalX, m_currentGlobalX);
+              const double y1 = std::max(m_startGlobalY, m_currentGlobalY);
 
-            DragMode hoverMode = hitTestSelection(globalX, globalY, x0, y0, x1, y1);
-            inputPtr->setCursorShape(cursorShapeForDragMode(hoverMode));
+              DragMode hoverMode = hitTestSelection(globalX, globalY, x0, y0, x1, y1);
+              inputPtr->setCursorShape(cursorShapeForDragMode(hoverMode));
+            }
           } else {
             inputPtr->setCursorShape(WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_CROSSHAIR);
           }
@@ -640,11 +743,14 @@ namespace capture {
           m_moveOffsetX = globalX;
           m_moveOffsetY = globalY;
         } else {
-          if (m_dragMode != DragMode::TopEdge && m_dragMode != DragMode::BottomEdge) {
-            m_currentGlobalX = globalX;
+          const bool resizeX = m_dragMode != DragMode::TopEdge && m_dragMode != DragMode::BottomEdge;
+          const bool resizeY = m_dragMode != DragMode::LeftEdge && m_dragMode != DragMode::RightEdge;
+          if (resizeX) {
+            // Relative resize keeps the grabbed edge; other modes track the pointer.
+            m_currentGlobalX = globalX + (m_regionModifierMask != 0 ? m_resizeBaseX : 0.0);
           }
-          if (m_dragMode != DragMode::LeftEdge && m_dragMode != DragMode::RightEdge) {
-            m_currentGlobalY = globalY;
+          if (resizeY) {
+            m_currentGlobalY = globalY + (m_regionModifierMask != 0 ? m_resizeBaseY : 0.0);
           }
 
           m_cursorGlobalX = globalX;

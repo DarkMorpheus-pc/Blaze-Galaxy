@@ -25,6 +25,7 @@ namespace noctalia::config::schema {
   const Schema<ControlCenterConfig>& controlCenterSchema();
   const Schema<PluginsConfig>& pluginsSchema();
   const Schema<HotCornersConfig>& hotCornersSchema();
+  const Schema<CalendarConfig::Reminders>& calendarRemindersSchema();
   const Schema<CalendarConfig>& calendarSchema();
   const Schema<KeybindsConfig>& keybindsSchema();
   const Schema<HooksConfig>& hooksSchema();
@@ -43,7 +44,6 @@ namespace noctalia::config::schema {
   void liftTemplateConfigCustomColors(const toml::table& root, Config& config);
   const Schema<ShellConfig>& shellSchema();
   const Schema<AccessibilityConfig>& accessibilitySchema();
-  const Schema<SolarUIConfig>& solaruiSchema();
 
   // Bar is handled at the config root (named [bar.<name>] tables + an `order`
   // array live on Config::bars directly, not in a section struct), so its

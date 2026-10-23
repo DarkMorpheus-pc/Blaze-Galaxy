@@ -19,6 +19,7 @@
 #include "ui/controls/spacer.h"
 #include "ui/controls/toggle.h"
 #include "ui/drag_drop_controller.h"
+#include "ui/scroll_into_view.h"
 #include "ui/style.h"
 #include "ui/ui_tree.h"
 #include "ui/ui_tree_reconciler.h"
@@ -46,7 +47,9 @@ namespace {
     ) override {
       return TextMetrics{.width = static_cast<float>(text.size()) * fontSize * 0.5F, .bottom = fontSize};
     }
-    TextMetrics measureFont(float fontSize, FontWeight) override { return TextMetrics{.bottom = fontSize}; }
+    TextMetrics measureFont(float fontSize, FontWeight, std::string_view) override {
+      return TextMetrics{.bottom = fontSize};
+    }
     void measureTextCursorStops(
         std::string_view, float, const std::vector<std::size_t>&, std::vector<float>&, FontWeight
     ) override {}
@@ -1029,6 +1032,73 @@ int main() {
     }
   }
 
+  // revealKey scrolls the keyed child into view by the minimum distance and
+  // re-applies only when the key changes or the child reappears.
+  {
+    ui::UiTreeReconciler reconciler;
+    Flex host;
+
+    // Rows sit in a column inside the scroll, so the key lookup has to recurse.
+    const auto makeTree = [](int rowCount, const std::string& revealKey) {
+      ui::UiTreeNode rows = makeNode("column");
+      rows.key = "rows";
+      for (int i = 1; i <= rowCount; ++i) {
+        ui::UiTreeNode row = makeNode("box");
+        row.key = "row-" + std::to_string(i);
+        row.props.emplace("height", 40.0);
+        rows.children.push_back(std::move(row));
+      }
+      ui::UiTreeNode scroll = makeNode("scroll");
+      scroll.key = "list";
+      if (!revealKey.empty()) {
+        scroll.props.emplace("revealKey", revealKey);
+      }
+      scroll.children.push_back(std::move(rows));
+      ui::UiTreeNode tree = makeNode("column");
+      tree.children.push_back(std::move(scroll));
+      return tree;
+    };
+
+    (void)reconciler.reconcile(host, makeTree(10, "row-1"), renderer);
+    auto* column = dynamic_cast<Flex*>(host.children().front().get());
+    auto* sv = column != nullptr ? dynamic_cast<ScrollView*>(column->children()[0].get()) : nullptr;
+    ok = expect(sv != nullptr, "reveal scroll built") && ok;
+    if (sv != nullptr) {
+      const auto render = [&](int rowCount, const std::string& revealKey) {
+        (void)reconciler.reconcile(host, makeTree(rowCount, revealKey), renderer);
+        sv->setSize(200.0F, 100.0F);
+        sv->layout(renderer);
+      };
+      const float viewport = 100.0F - sv->viewportPaddingV() * 2.0F;
+
+      render(10, "row-1");
+      ok = expect(sv->maxScrollOffset() == 400.0F - viewport, "reveal list overflows its viewport") && ok;
+      ok = expect(sv->scrollOffset() == 0.0F, "revealing a visible row does not scroll") && ok;
+
+      render(10, "row-5");
+      ok = expect(sv->scrollOffset() == 200.0F - viewport, "a row below the fold lands at the viewport bottom") && ok;
+
+      render(10, "row-4");
+      ok = expect(sv->scrollOffset() == 200.0F - viewport, "a fully visible row leaves the offset alone") && ok;
+
+      render(10, "row-2");
+      ok = expect(sv->scrollOffset() == 40.0F, "a row above the fold lands at the viewport top") && ok;
+
+      sv->setScrollOffset(300.0F);
+      render(10, "row-2");
+      ok = expect(sv->scrollOffset() == 300.0F, "an unchanged revealKey does not undo a manual scroll") && ok;
+
+      render(10, "row-12");
+      ok = expect(sv->scrollOffset() == 300.0F, "a key no child carries does not scroll") && ok;
+      render(12, "row-12");
+      ok = expect(sv->scrollOffset() == 480.0F - viewport, "the reveal lands on the render that adds the child") && ok;
+
+      render(1, "row-12");
+      render(12, "row-12");
+      ok = expect(sv->scrollOffset() == 480.0F - viewport, "a child that reappears is revealed again") && ok;
+    }
+  }
+
   // A button tooltip reaches the InputArea, and dropping the prop clears it on
   // the retained control.
   {
@@ -1051,6 +1121,56 @@ int main() {
       tree.children[0].props.erase("tooltip");
       (void)reconciler.reconcile(host, tree, renderer);
       ok = expect(!control->inputArea()->hasTooltip(), "dropped tooltip prop clears the tooltip") && ok;
+    }
+  }
+
+  // A tooltip on a plain container wraps it in a hover-only InputArea; dropping
+  // the only wrapper-requiring prop unwraps it. Alongside onClick, dropping just
+  // the tooltip keeps the wrapper and clears the tooltip on the retained node.
+  {
+    ui::UiTreeReconciler reconciler;
+    Flex host;
+
+    ui::UiTreeNode tree = makeNode("column");
+    ui::UiTreeNode box = makeNode("box");
+    box.props.emplace("tooltip", std::string("More info"));
+    tree.children.push_back(box);
+    (void)reconciler.reconcile(host, tree, renderer);
+
+    auto* column = dynamic_cast<Flex*>(host.children().front().get());
+    auto* area = column != nullptr && !column->children().empty()
+        ? dynamic_cast<InputArea*>(column->children()[0].get())
+        : nullptr;
+    ok = expect(area != nullptr, "tooltip-only box is wrapped in an InputArea") && ok;
+    if (area != nullptr) {
+      ok = expect(area->hasTooltip(), "container tooltip applied") && ok;
+      ok = expect(
+               area->acceptedButtons() == 0 && !area->focusable(),
+               "tooltip-only wrapper does not accept clicks or take focus"
+           )
+          && ok;
+    }
+
+    tree.children[0].props.erase("tooltip");
+    (void)reconciler.reconcile(host, tree, renderer);
+    Node* unwrapped = column != nullptr && !column->children().empty() ? column->children()[0].get() : nullptr;
+    ok = expect(dynamic_cast<Box*>(unwrapped) != nullptr, "box unwrapped after tooltip removed") && ok;
+
+    tree.children[0].props.emplace("onClick", std::string("activate"));
+    tree.children[0].props.emplace("tooltip", std::string("More info"));
+    (void)reconciler.reconcile(host, tree, renderer);
+    auto* clickable = column != nullptr && !column->children().empty()
+        ? dynamic_cast<InputArea*>(column->children()[0].get())
+        : nullptr;
+    ok = expect(clickable != nullptr && clickable->hasTooltip(), "clickable box carries a tooltip") && ok;
+    if (clickable != nullptr) {
+      tree.children[0].props.erase("tooltip");
+      (void)reconciler.reconcile(host, tree, renderer);
+      ok = expect(
+               dynamic_cast<InputArea*>(column->children()[0].get()) == clickable && !clickable->hasTooltip(),
+               "dropping tooltip keeps the click wrapper but clears the tooltip"
+           )
+          && ok;
     }
   }
 
@@ -2316,6 +2436,13 @@ int main() {
       source->inputArea()->dispatchPress(targetX, targetY, BTN_LEFT, false);
       ok = expect(callbackCount == 0, "release after reset cannot drop") && ok;
     }
+  }
+
+  // content() hangs off the viewport clip node, not the ScrollView itself.
+  {
+    ScrollView scrollView;
+    Node* row = scrollView.content()->addChild(std::make_unique<Box>());
+    ok = expect(findEnclosingScrollView(row) == &scrollView, "a content child resolves to its scroll view") && ok;
   }
 
   {

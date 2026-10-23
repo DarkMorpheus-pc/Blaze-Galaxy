@@ -263,6 +263,17 @@ public:
   }
   void setOnActivate(ActivateCallback callback) { m_onActivate = std::move(callback); }
   void setOnStarToggle(StarCallback callback) { m_onStarToggle = std::move(callback); }
+  void setShowNames(bool showNames) {
+    if (m_showNames == showNames) {
+      return;
+    }
+    m_showNames = showNames;
+    for (WallpaperTile* tile : m_pool) {
+      if (tile != nullptr) {
+        tile->setShowName(showNames);
+      }
+    }
+  }
 
   void refreshVisibleThumbnails(Renderer& renderer) {
     for (WallpaperTile* tile : m_pool) {
@@ -277,6 +288,7 @@ public:
   [[nodiscard]] std::unique_ptr<Node> createTile() override {
     auto tile = std::make_unique<WallpaperTile>(0.0F, 0.0F, m_scale);
     tile->setThumbnailService(m_thumbnails);
+    tile->setShowName(m_showNames);
     tile->setOnStarClick([this](const WallpaperEntry& entry) {
       if (m_onStarToggle) {
         m_onStarToggle(entry);
@@ -288,6 +300,7 @@ public:
 
   void bindTile(Node& tile, std::size_t index, bool selected, bool hovered) override {
     auto* wt = static_cast<WallpaperTile*>(&tile);
+    wt->setShowName(m_showNames);
     wt->setCellSize(wt->width(), wt->height());
     if (m_renderer != nullptr && m_entries != nullptr && index < m_entries->size()) {
       const auto& entry = (*m_entries)[index];
@@ -345,6 +358,24 @@ public:
     static_cast<WallpaperTile&>(tile).setStarHovered(hovered);
   }
 
+  [[nodiscard]] std::string overlayTooltip(std::size_t index) const override {
+    if (m_config == nullptr || m_entries == nullptr || index >= m_entries->size() || (*m_entries)[index].isDir) {
+      return {};
+    }
+    return i18n::tr(
+        m_config->isWallpaperFavorite((*m_entries)[index].absPath.string()) ? "wallpaper.panel.favorite-remove"
+                                                                            : "wallpaper.panel.favorite-add"
+    );
+  }
+
+  [[nodiscard]] std::optional<TooltipAnchorInsets>
+  itemTooltipAnchorInsets(std::size_t index, float cellWidth, float cellHeight) const override {
+    if (m_entries == nullptr || index >= m_entries->size() || (*m_entries)[index].isDir) {
+      return std::nullopt;
+    }
+    return WallpaperTile::starTooltipAnchorInsets(cellWidth, cellHeight, m_scale);
+  }
+
   void onActivate(std::size_t index) override {
     if (!m_onActivate || m_entries == nullptr || index >= m_entries->size()) {
       return;
@@ -359,6 +390,7 @@ private:
   Renderer* m_renderer = nullptr;
   ThumbnailService* m_thumbnails = nullptr;
   ConfigService* m_config = nullptr;
+  bool m_showNames = true;
 
   std::vector<WallpaperTile*> m_pool;
   ActivateCallback m_onActivate;
@@ -372,6 +404,7 @@ WallpaperPanel::WallpaperPanel(
     : m_wayland(wayland), m_config(config), m_thumbnails(thumbnails), m_scanner(scanner), m_themeService(themeService) {
   if (m_config != nullptr) {
     m_flatten = m_config->stateBool("wallpaper_panel", "flatten").value_or(false);
+    m_showNames = m_config->config().shell.panel.wallpaperShowNames;
     if (const std::optional<std::string> sort = m_config->stateString("wallpaper_panel", "sort")) {
       m_sortMode = sortModeFromState(*sort);
     }
@@ -572,19 +605,21 @@ void WallpaperPanel::create() {
       })
   );
 
-  toolbar->addChild(
-      ui::button({
-          .out = &m_closeButton,
-          .glyph = "close",
-          .glyphSize = Style::fontSizeBody * scale,
-          .tooltip = i18n::tr("wallpaper.panel.close"),
-          .minWidth = Style::controlHeightSm * scale,
-          .minHeight = Style::controlHeightSm * scale,
-          .padding = Style::spaceXs * scale,
-          .radius = Style::scaledRadiusMd(scale),
-          .onClick = []() { PanelManager::instance().close(); },
-      })
-  );
+  if (Style::closeButtonsEnabled()) {
+    toolbar->addChild(
+        ui::button({
+            .out = &m_closeButton,
+            .glyph = "close",
+            .glyphSize = Style::fontSizeBody * scale,
+            .tooltip = i18n::tr("wallpaper.panel.close"),
+            .minWidth = Style::controlHeightSm * scale,
+            .minHeight = Style::controlHeightSm * scale,
+            .padding = Style::spaceXs * scale,
+            .radius = Style::scaledRadiusMd(scale),
+            .onClick = []() { PanelManager::instance().close(); },
+        })
+    );
+  }
 
   root->addChild(std::move(toolbar));
 
@@ -717,6 +752,7 @@ void WallpaperPanel::create() {
   // ── Body: virtualized scrolling grid ──────────────────────────────────
   m_adapter = std::make_unique<WallpaperGridAdapter>(scale);
   m_adapter->setThumbnailService(m_thumbnails);
+  m_adapter->setShowNames(m_showNames);
   m_adapter->setConfig(m_config);
   m_adapter->setEntries(&m_visibleEntries);
   m_adapter->setOnActivate([this](const WallpaperEntry& entry) {
@@ -839,8 +875,12 @@ void WallpaperPanel::doLayout(Renderer& renderer, float width, float height) {
 
   // Drive cell height from current tile width via VirtualGridView's resolved
   // geometry: configure the cell height to follow the chosen tile aspect.
+  // Hiding the captions only removes the row they reserved, so the thumbnails
+  // keep the exact size and framing they have with a caption.
   if (m_grid != nullptr) {
-    m_grid->setCellHeight(kMinTileWidth * contentScale() * kTileAspect);
+    const float scale = contentScale();
+    const float captionH = m_showNames ? 0.0F : WallpaperTile::captionHeight(scale);
+    m_grid->setCellHeight(kMinTileWidth * scale * kTileAspect - captionH);
   }
 
   m_rootLayout->setSize(width, height);
@@ -890,6 +930,13 @@ void WallpaperPanel::onOpen(std::string_view /*context*/) {
   }
   if (m_flattenToggle != nullptr) {
     m_flattenToggle->setCheckedImmediate(m_flatten);
+  }
+  const bool showNames = m_config == nullptr || m_config->config().shell.panel.wallpaperShowNames;
+  if (showNames != m_showNames) {
+    m_showNames = showNames;
+    if (m_adapter != nullptr) {
+      m_adapter->setShowNames(m_showNames);
+    }
   }
   m_navStack.clear();
   populateMonitorChoices();
@@ -1267,7 +1314,9 @@ void WallpaperPanel::applyThemeFromControls() {
 
   if (!path.empty() && m_config->isWallpaperFavorite(path)) {
     // Edit the selected wallpaper's favorite preset and apply it live (also re-asserts the wallpaper).
-    m_config->setWallpaperFavoriteThemeMode(path, theme.themeMode);
+    if (theme.themeMode.has_value()) {
+      m_config->setWallpaperFavoriteThemeMode(path, *theme.themeMode);
+    }
     m_config->setWallpaperFavoritePaletteSource(path, theme.paletteSource);
     m_config->setWallpaperFavoritePaletteSelection(path, paletteSelectionValue(theme));
     applyWallpaperPath(path, &theme);
@@ -1275,7 +1324,9 @@ void WallpaperPanel::applyThemeFromControls() {
   }
 
   // No favorite target, so behave like the Settings window and change the global theme only.
-  m_config->setThemeMode(theme.themeMode);
+  if (theme.themeMode.has_value()) {
+    m_config->setThemeMode(*theme.themeMode);
+  }
   if (theme.paletteSource.has_value()) {
     (void)m_config->setThemeColorScheme(*theme.paletteSource, paletteSelectionValue(theme));
   }
@@ -1290,7 +1341,10 @@ void WallpaperPanel::syncThemeControls() {
 
   m_syncingFavoriteControls = true;
 
-  m_favoriteThemeSegmented->setSelectedIndex(themeModeSegmentIndex(themeSettings.themeMode));
+  // A favorite without a stored mode keeps the global mode, so show that.
+  m_favoriteThemeSegmented->setSelectedIndex(
+      themeModeSegmentIndex(themeSettings.themeMode.value_or(m_config->config().theme.mode))
+  );
 
   if (m_favoritePaletteSourceSegmented != nullptr) {
     const std::size_t sourceIndex =
