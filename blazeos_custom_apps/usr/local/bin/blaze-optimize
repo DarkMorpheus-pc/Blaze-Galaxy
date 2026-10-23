@@ -1,0 +1,210 @@
+#!/bin/bash
+# ==============================================================================
+# Blaze OS / SolarEvolution System Optimization Tool
+# ==============================================================================
+set -e
+
+COLOR_RESET="\033[0m"
+COLOR_BOLD="\033[1m"
+COLOR_CYAN="\033[36m"
+COLOR_GREEN="\033[32m"
+COLOR_YELLOW="\033[33m"
+COLOR_RED="\033[31m"
+COLOR_BLUE="\033[34m"
+
+print_banner() {
+    echo -e "${COLOR_CYAN}${COLOR_BOLD}"
+    echo "  ____  _                  ___  ____  "
+    echo " | __ )| | __ _ _______   / _ \/ ___| "
+    echo " |  _ \| |/ _\` |_  / _ \ | | | \___ \ "
+    echo " | |_) | | (_| |/ /  __/ | |_| |___) |"
+    echo " |____/|_|\__,_/___\___|  \___/|____/ "
+    echo "   SolarEvolution System Optimizer    "
+    echo -e "${COLOR_RESET}"
+}
+
+check_root() {
+    if [ "$(id -u)" -ne 0 ]; then
+        echo -e "${COLOR_RED}Hata: Bu komut sistem ayarlarını değiştirmek için root (sudo) yetkisi gerektirir.${COLOR_RESET}"
+        exit 1
+    fi
+}
+
+show_status() {
+    print_banner
+    echo -e "${COLOR_BOLD}=== [ Sistem ve Donanım Durumu ] ===${COLOR_RESET}"
+    
+    # CPU Governor
+    if [ -f /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor ]; then
+        gov=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)
+        echo -e "  ${COLOR_CYAN}CPU Governor:${COLOR_RESET}        ${COLOR_GREEN}${gov}${COLOR_RESET}"
+    fi
+
+    # CPU Energy Performance Preference (EPP)
+    if [ -f /sys/devices/system/cpu/cpu0/cpufreq/energy_performance_preference ]; then
+        epp=$(cat /sys/devices/system/cpu/cpu0/cpufreq/energy_performance_preference)
+        echo -e "  ${COLOR_CYAN}CPU EPP:${COLOR_RESET}             ${COLOR_GREEN}${epp}${COLOR_RESET}"
+    fi
+
+    # ZRAM Status
+    echo ""
+    echo -e "${COLOR_BOLD}=== [ ZRAM Sıkıştırılmış Bellek Durumu ] ===${COLOR_RESET}"
+    if command -v zramctl >/dev/null 2>&1 && [ -e /dev/zram0 ]; then
+        zramctl
+        algo=$(cat /sys/block/zram0/comp_algorithm 2>/dev/null | grep -o '\[.*\]' || echo "bilinmiyor")
+        echo -e "  ${COLOR_CYAN}Sıkıştırma Algoritması:${COLOR_RESET} ${COLOR_GREEN}${algo}${COLOR_RESET}"
+    else
+        echo -e "  ${COLOR_YELLOW}ZRAM cihazı henüz aktif değil veya yüklenmedi.${COLOR_RESET}"
+    fi
+
+    # Swappiness & Page Cluster
+    echo ""
+    echo -e "${COLOR_BOLD}=== [ Çekirdek (Kernel) Ayarları ] ===${COLOR_RESET}"
+    echo -e "  ${COLOR_CYAN}vm.swappiness:${COLOR_RESET}       $(sysctl -n vm.swappiness 2>/dev/null || echo 'N/A')"
+    echo -e "  ${COLOR_CYAN}vm.page-cluster:${COLOR_RESET}     $(sysctl -n vm.page-cluster 2>/dev/null || echo 'N/A')"
+    echo -e "  ${COLOR_CYAN}vm.vfs_cache_pressure:${COLOR_RESET} $(sysctl -n vm.vfs_cache_pressure 2>/dev/null || echo 'N/A')"
+    echo -e "  ${COLOR_CYAN}vm.max_map_count:${COLOR_RESET}    $(sysctl -n vm.max_map_count 2>/dev/null || echo 'N/A')"
+    echo -e "  ${COLOR_CYAN}tcp_congestion:${COLOR_RESET}      $(sysctl -n net.ipv4.tcp_congestion_control 2>/dev/null || echo 'N/A')"
+    echo ""
+}
+
+apply_sysctl() {
+    echo -e "${COLOR_CYAN}-> Çekirdek parametreleri uygulanıyor...${COLOR_RESET}"
+    if [ -f /etc/sysctl.d/99-blaze-optimization.conf ]; then
+        sysctl -p /etc/sysctl.d/99-blaze-optimization.conf >/dev/null 2>&1 || true
+    fi
+}
+
+apply_zram() {
+    echo -e "${COLOR_CYAN}-> ZRAM servisi kontrol ediliyor ve yapılandırılıyor...${COLOR_RESET}"
+    if command -v zram-generator >/dev/null 2>&1 || [ -f /etc/systemd/zram-generator.conf ]; then
+        systemctl restart systemd-zram-setup@zram0.service 2>/dev/null || true
+    fi
+}
+
+set_gaming_profile() {
+    check_root
+    print_banner
+    echo -e "${COLOR_GREEN}${COLOR_BOLD}=== [ Oyun & Yüksek Performans Modu Uygulanıyor ] ===${COLOR_RESET}"
+
+    # 1. Sysctl
+    apply_sysctl
+
+    # 2. CPU Governors
+    echo -e "${COLOR_CYAN}-> CPU performans profiline ayarlanıyor...${COLOR_RESET}"
+    for cpu in /sys/devices/system/cpu/cpu*/cpufreq; do
+        if [ -d "$cpu" ]; then
+            if [ -f "$cpu/scaling_governor" ]; then
+                echo "performance" > "$cpu/scaling_governor" 2>/dev/null || true
+            fi
+            if [ -f "$cpu/energy_performance_preference" ]; then
+                echo "performance" > "$cpu/energy_performance_preference" 2>/dev/null || true
+            fi
+        fi
+    done
+
+    # 3. GPU DPM / Power (AMD & Intel)
+    if [ -d /sys/class/drm/card0/device ]; then
+        # AMD
+        if [ -f /sys/class/drm/card0/device/power_dpm_force_performance_level ]; then
+            echo "high" > /sys/class/drm/card0/device/power_dpm_force_performance_level 2>/dev/null || true
+        fi
+    fi
+
+    # 4. Storage I/O
+    for queue in /sys/block/*/queue/scheduler; do
+        if [ -f "$queue" ]; then
+            # Use none / mq-deadline for NVMe
+            if echo "$queue" | grep -q "nvme"; then
+                echo "none" > "$queue" 2>/dev/null || true
+            fi
+        fi
+    done
+
+    # 5. Disable Split Lock Mitigation for gaming if supported
+    if [ -f /proc/sys/kernel/split_lock_mitigate ]; then
+        echo 0 > /proc/sys/kernel/split_lock_mitigate 2>/dev/null || true
+    fi
+
+    echo -e "${COLOR_GREEN}✓ Oyun & Yüksek Performans Modu Başarıyla Etkinleştirildi!${COLOR_RESET}\n"
+    show_status
+}
+
+set_balanced_profile() {
+    check_root
+    print_banner
+    echo -e "${COLOR_BLUE}${COLOR_BOLD}=== [ Dengeli (Masaüstü) Profil Uygulanıyor ] ===${COLOR_RESET}"
+
+    apply_sysctl
+
+    echo -e "${COLOR_CYAN}-> CPU dengeli profile ayarlanıyor...${COLOR_RESET}"
+    for cpu in /sys/devices/system/cpu/cpu*/cpufreq; do
+        if [ -d "$cpu" ]; then
+            if grep -q "schedutil" "$cpu/scaling_available_governors" 2>/dev/null; then
+                echo "schedutil" > "$cpu/scaling_governor" 2>/dev/null || true
+            elif grep -q "powersave" "$cpu/scaling_available_governors" 2>/dev/null; then
+                echo "powersave" > "$cpu/scaling_governor" 2>/dev/null || true
+            fi
+            if [ -f "$cpu/energy_performance_preference" ]; then
+                echo "balance_performance" > "$cpu/energy_performance_preference" 2>/dev/null || true
+            fi
+        fi
+    done
+
+    if [ -f /sys/class/drm/card0/device/power_dpm_force_performance_level ]; then
+        echo "auto" > /sys/class/drm/card0/device/power_dpm_force_performance_level 2>/dev/null || true
+    fi
+
+    echo -e "${COLOR_GREEN}✓ Dengeli Profil Başarıyla Etkinleştirildi!${COLOR_RESET}\n"
+    show_status
+}
+
+set_powersave_profile() {
+    check_root
+    print_banner
+    echo -e "${COLOR_YELLOW}${COLOR_BOLD}=== [ Güç Tasarrufu (Pil) Profili Uygulanıyor ] ===${COLOR_RESET}"
+
+    apply_sysctl
+
+    echo -e "${COLOR_CYAN}-> CPU güç tasarrufuna ayarlanıyor...${COLOR_RESET}"
+    for cpu in /sys/devices/system/cpu/cpu*/cpufreq; do
+        if [ -d "$cpu" ]; then
+            if grep -q "powersave" "$cpu/scaling_available_governors" 2>/dev/null; then
+                echo "powersave" > "$cpu/scaling_governor" 2>/dev/null || true
+            fi
+            if [ -f "$cpu/energy_performance_preference" ]; then
+                echo "power" > "$cpu/energy_performance_preference" 2>/dev/null || true
+            fi
+        fi
+    done
+
+    if [ -f /sys/class/drm/card0/device/power_dpm_force_performance_level ]; then
+        echo "low" > /sys/class/drm/card0/device/power_dpm_force_performance_level 2>/dev/null || true
+    fi
+
+    echo -e "${COLOR_GREEN}✓ Güç Tasarrufu Profili Başarıyla Etkinleştirildi!${COLOR_RESET}\n"
+    show_status
+}
+
+case "${1:-status}" in
+    status)
+        show_status
+        ;;
+    gaming|performance)
+        set_gaming_profile
+        ;;
+    balanced)
+        set_balanced_profile
+        ;;
+    powersave)
+        set_powersave_profile
+        ;;
+    auto)
+        apply_sysctl
+        apply_zram
+        ;;
+    *)
+        echo "Kullanım: $0 {status|gaming|balanced|powersave|auto}"
+        exit 1
+        ;;
+esac

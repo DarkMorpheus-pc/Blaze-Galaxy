@@ -4,10 +4,11 @@ import time
 import socket
 import subprocess
 
-ISO_PATH = "/home/darkmorpheus/BlazeFedora/Blaze-SolarEvolution-5-x86_64.iso"
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ISO_PATH = os.environ.get("ISO_PATH", os.path.join(REPO_ROOT, "Blaze-SolarEvolution-5-x86_64.iso"))
 SOCK_PATH = "/tmp/qemu-monitor-2.sock"
 SCREEN_PPM = "/tmp/qemu_screen_2.ppm"
-BRAIN_DIR = "/home/darkmorpheus/.gemini/antigravity/brain/cafdcfba-10e8-4d85-b938-c1121a5b7023"
+BRAIN_DIR = os.environ.get("BRAIN_DIR", os.path.join(os.path.expanduser("~"), ".gemini/antigravity/brain/cafdcfba-10e8-4d85-b938-c1121a5b7023"))
 
 def send_qemu_cmd(cmd):
     s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)

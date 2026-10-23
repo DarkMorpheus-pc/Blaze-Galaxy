@@ -1,0 +1,359 @@
+#!/usr/bin/env python3
+# ==============================================================================
+# BlazeOS GameZone Console Mini-Browser
+# Lightweight, hardware-accelerated GTK4 + WebKit 6.0 in-console webview.
+# Prevents spawning external desktop browser tabs and keeps the console UX.
+# ==============================================================================
+
+import os
+import sys
+import socket
+import threading
+import signal
+
+# Ensure Wayland and Mesa acceleration flags
+os.environ.setdefault("GDK_BACKEND", "wayland,x11")
+os.environ.setdefault("MOZ_ENABLE_WAYLAND", "1")
+os.environ.setdefault("WEBKIT_DISABLE_DMABUF_RENDERER", "0")
+
+import gi
+gi.require_version("Gtk", "4.0")
+gi.require_version("Gdk", "4.0")
+gi.require_version("WebKit", "6.0")
+gi.require_version("GLib", "2.0")
+from gi.repository import Gtk, WebKit, GLib, Gdk
+
+DEFAULT_URL = "https://www.xbox.com/play"
+
+STORES = [
+    ("Xbox Cloud", "https://www.xbox.com/play"),
+    ("Steam Store", "https://store.steampowered.com"),
+    ("Epic Games", "https://store.epicgames.com"),
+    ("GOG.com", "https://www.gog.com"),
+]
+
+def get_socket_path():
+    runtime_dir = os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
+    return os.path.join(runtime_dir, "blaze-gamezone-browser.sock")
+
+def send_to_existing_instance(url):
+    sock_path = get_socket_path()
+    if not os.path.exists(sock_path):
+        return False
+    try:
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        s.settimeout(1.0)
+        s.connect(sock_path)
+        s.sendall(url.encode("utf-8"))
+        s.close()
+        return True
+    except Exception:
+        try:
+            os.remove(sock_path)
+        except OSError:
+            pass
+        return False
+
+class GameZoneBrowserWindow(Gtk.ApplicationWindow):
+    def __init__(self, app, initial_url):
+        super().__init__(application=app)
+        self.set_title("Blaze GameZone Web")
+        self.set_default_size(1280, 760)
+        self.maximize()
+
+        self.setup_ui(initial_url)
+        self.setup_key_controller()
+
+    def setup_ui(self, initial_url):
+        root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        root.add_css_class("gz-browser-root")
+
+        # Top HUD Navigation Bar
+        nav_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        nav_bar.set_margin_top(8)
+        nav_bar.set_margin_bottom(8)
+        nav_bar.set_margin_start(12)
+        nav_bar.set_margin_end(12)
+        nav_bar.add_css_class("gz-browser-nav")
+
+        # Close / Return to GameZone button
+        btn_close = Gtk.Button(label="✕ GameZone'a Dön (Esc)")
+        btn_close.add_css_class("gz-close-btn")
+        btn_close.connect("clicked", lambda _: self.close())
+        nav_bar.append(btn_close)
+
+        # Navigation Controls: Back, Forward, Reload
+        btn_back = Gtk.Button(label="◀")
+        btn_back.add_css_class("gz-nav-btn")
+        btn_back.connect("clicked", lambda _: self.webview.go_back())
+        nav_bar.append(btn_back)
+
+        btn_forward = Gtk.Button(label="▶")
+        btn_forward.add_css_class("gz-nav-btn")
+        btn_forward.connect("clicked", lambda _: self.webview.go_forward())
+        nav_bar.append(btn_forward)
+
+        btn_reload = Gtk.Button(label="↻")
+        btn_reload.add_css_class("gz-nav-btn")
+        btn_reload.connect("clicked", lambda _: self.webview.reload())
+        nav_bar.append(btn_reload)
+
+        # Quick Store Selector Tabs
+        store_group = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        store_group.set_margin_start(16)
+        self.store_buttons = []
+        for name, url in STORES:
+            btn = Gtk.Button(label=name)
+            btn.add_css_class("gz-store-tab")
+            btn.connect("clicked", self.create_store_click_handler(url))
+            store_group.append(btn)
+            self.store_buttons.append((name, url, btn))
+        nav_bar.append(store_group)
+
+        # Spacer
+        spacer = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        spacer.set_hexpand(True)
+        nav_bar.append(spacer)
+
+        # Status / Title Label
+        self.status_lbl = Gtk.Label(label="Yükleniyor...")
+        self.status_lbl.add_css_class("gz-status-lbl")
+        self.status_lbl.set_halign(Gtk.Align.END)
+        nav_bar.append(self.status_lbl)
+
+        root.append(nav_bar)
+
+        # WebKit Web View
+        settings = WebKit.Settings()
+        settings.set_enable_developer_extras(False)
+        settings.set_enable_webgl(True)
+        settings.set_enable_webaudio(True)
+        settings.set_enable_smooth_scrolling(True)
+        settings.set_hardware_acceleration_policy(WebKit.HardwareAccelerationPolicy.ALWAYS)
+        settings.set_enable_media_stream(True)
+        settings.set_enable_mediasource(True)
+        settings.set_media_playback_requires_user_gesture(False)
+        settings.set_user_agent(
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+        )
+
+        self.webview = WebKit.WebView(settings=settings)
+        self.webview.set_hexpand(True)
+        self.webview.set_vexpand(True)
+
+        self.webview.connect("notify::estimated-load-progress", self.on_progress)
+        self.webview.connect("notify::title", self.on_title)
+
+        root.append(self.webview)
+        self.set_child(root)
+
+        # Load initial URL
+        self.load_url(initial_url)
+
+    def create_store_click_handler(self, url):
+        return lambda _: self.load_url(url)
+
+    def load_url(self, url):
+        if not url.startswith("http://") and not url.startswith("https://"):
+            url = "https://" + url
+        self.status_lbl.set_text(f"Bağlanıyor: {url}")
+        self.webview.load_uri(url)
+
+        # Update active tab styling
+        for _, s_url, btn in self.store_buttons:
+            if s_url in url or url in s_url:
+                btn.add_css_class("active")
+            else:
+                btn.remove_css_class("active")
+
+    def on_progress(self, webview, _param):
+        progress = int(webview.get_estimated_load_progress() * 100)
+        if progress < 100:
+            self.status_lbl.set_text(f"Yükleniyor %{progress}")
+        else:
+            title = webview.get_title() or "Tamamlandı"
+            self.status_lbl.set_text(title[:40])
+
+    def on_title(self, webview, _param):
+        title = webview.get_title()
+        if title:
+            self.set_title(f"{title} - Blaze GameZone")
+            self.status_lbl.set_text(title[:40])
+
+    def setup_key_controller(self):
+        controller = Gtk.EventControllerKey.new()
+        controller.connect("key-pressed", self.on_key_pressed)
+        self.add_controller(controller)
+
+    def on_key_pressed(self, _controller, keyval, _keycode, state):
+        if keyval == Gdk.KEY_Escape:
+            self.close()
+            return Gdk.EVENT_STOP
+        if keyval == Gdk.KEY_F11:
+            if self.is_fullscreen():
+                self.unfullscreen()
+            else:
+                self.fullscreen()
+            return Gdk.EVENT_STOP
+        if keyval == Gdk.KEY_F5 or (keyval == Gdk.KEY_r and (state & Gdk.ModifierType.CONTROL_MASK)):
+            self.webview.reload()
+            return Gdk.EVENT_STOP
+        if keyval == Gdk.KEY_Left and (state & Gdk.ModifierType.ALT_MASK):
+            self.webview.go_back()
+            return Gdk.EVENT_STOP
+        if keyval == Gdk.KEY_Right and (state & Gdk.ModifierType.ALT_MASK):
+            self.webview.go_forward()
+            return Gdk.EVENT_STOP
+        return Gdk.EVENT_PROPAGATE
+
+class GameZoneBrowserApp(Gtk.Application):
+    def __init__(self, target_url):
+        super().__init__(application_id="org.blazeos.gamezone.browser")
+        self.target_url = target_url
+        self.window = None
+        self.server_sock = None
+
+    def do_activate(self):
+        if not self.window:
+            self.window = GameZoneBrowserWindow(self, self.target_url)
+            self.apply_css()
+            self.start_ipc_server()
+        self.window.present()
+
+    def apply_css(self):
+        css_data = b"""
+        .gz-browser-root {
+            background-color: #0b0d14;
+        }
+        .gz-browser-nav {
+            background: linear-gradient(180deg, rgba(22, 26, 38, 0.95), rgba(15, 18, 26, 0.95));
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 8px;
+            padding: 4px;
+        }
+        .gz-close-btn {
+            background-color: #2b1d28;
+            color: #ff6b6b;
+            font-weight: 600;
+            border-radius: 6px;
+            padding: 6px 14px;
+            border: 1px solid rgba(255, 107, 107, 0.3);
+        }
+        .gz-close-btn:hover {
+            background-color: #d63031;
+            color: #ffffff;
+        }
+        .gz-nav-btn {
+            background-color: rgba(255, 255, 255, 0.06);
+            color: #ffffff;
+            border-radius: 6px;
+            padding: 6px 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .gz-nav-btn:hover {
+            background-color: rgba(255, 255, 255, 0.15);
+        }
+        .gz-store-tab {
+            background-color: rgba(255, 255, 255, 0.04);
+            color: #bbbeca;
+            border-radius: 6px;
+            padding: 6px 12px;
+            font-weight: 500;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+        .gz-store-tab:hover {
+            background-color: rgba(255, 255, 255, 0.12);
+            color: #ffffff;
+        }
+        .gz-store-tab.active {
+            background: linear-gradient(135deg, #0984e3, #00cec9);
+            color: #ffffff;
+            font-weight: bold;
+            border-color: #00cec9;
+        }
+        .gz-status-lbl {
+            color: #7f8c8d;
+            font-size: 12px;
+            padding-right: 8px;
+        }
+        """
+        provider = Gtk.CssProvider()
+        provider.load_from_data(css_data)
+        Gtk.StyleContext.add_provider_for_display(
+            Gdk.Display.get_default(),
+            provider,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+        )
+
+    def start_ipc_server(self):
+        sock_path = get_socket_path()
+        try:
+            if os.path.exists(sock_path):
+                os.remove(sock_path)
+            self.server_sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            self.server_sock.bind(sock_path)
+            self.server_sock.listen(5)
+
+            def listener():
+                while True:
+                    try:
+                        conn, _ = self.server_sock.accept()
+                        data = conn.recv(4096)
+                        if data:
+                            new_url = data.decode("utf-8").strip()
+                            if new_url and self.window:
+                                GLib.idle_add(self.window.load_url, new_url)
+                                GLib.idle_add(self.window.present)
+                        conn.close()
+                    except Exception:
+                        break
+
+            t = threading.Thread(target=listener, daemon=True)
+            t.start()
+        except Exception as e:
+            sys.stderr.write(f"Failed to start IPC server: {e}\n")
+
+    def do_shutdown(self):
+        sock_path = get_socket_path()
+        if os.path.exists(sock_path):
+            try:
+                os.remove(sock_path)
+            except OSError:
+                pass
+        if self.server_sock:
+            try:
+                self.server_sock.close()
+            except Exception:
+                pass
+
+def main():
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
+    url = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_URL
+
+    if send_to_existing_instance(url):
+        sys.exit(0)
+
+    try:
+        app = GameZoneBrowserApp(url)
+        sys.exit(app.run([]))
+    except Exception as e:
+        sys.stderr.write(f"GameZone browser GTK4 error: {e}. Falling back to system browser...\n")
+        import subprocess
+        # Try chromium app mode
+        if shutil.which("chromium"):
+            subprocess.run(["chromium", f"--app={url}"])
+            sys.exit(0)
+        # Try epiphany
+        if shutil.which("epiphany"):
+            subprocess.run(["epiphany", "--application-mode", "--new-window", url])
+            sys.exit(0)
+        # Fallback to firefox or xdg-open
+        if shutil.which("firefox"):
+            subprocess.run(["firefox", "--new-window", url])
+            sys.exit(0)
+        subprocess.run(["xdg-open", url])
+        sys.exit(0)
+
+if __name__ == "__main__":
+    import shutil
+    main()

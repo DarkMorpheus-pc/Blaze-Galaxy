@@ -479,7 +479,7 @@ Singleton {
                     property real pauseBelowPercent: 0 // Or only under this charge, 0 to ignore
                 }
                 property list<string> screenList: [] 
-                property string wallpaperPath: ""
+                property string wallpaperPath: Quickshell.shellPath("assets/images/default_wallpaper.png")
                 property bool centeredWallpaper: false
                 property string centeredWallpaperShape: "Cookie7Sided"
                 property int centeredWallpaperSize: 400

@@ -48,8 +48,17 @@ impl Default for BerpApp {
     }
 }
 
+pub fn remount_filesystems_rw() {
+    for mp in ["/", "/home", "/boot", "/boot/efi"] {
+        let _ = Command::new("mount")
+            .args(["-o", "remount,rw", mp])
+            .status();
+    }
+}
+
 impl BerpApp {
     pub fn new() -> Self {
+        remount_filesystems_rw();
         let (root_btrfs, root_uuid) = detect_root_fs();
         let (boot_counter, recovery_requested) = check_recovery_triggers();
         let mut app = Self {
@@ -654,25 +663,94 @@ fn execute_snapshot_rollback(snap: &SnapshotEntry) -> Result<()> {
                     )?;
                     out.flush()?;
 
-                    // Perform Btrfs rollback
-                    let _res = Command::new("btrfs")
-                        .args(["subvolume", "snapshot", snap.path.to_str().unwrap_or("/"), "/@_rollback_temp"])
-                        .output();
+                    remount_filesystems_rw();
 
-                    // If simple rollback simulation or live:
-                    execute!(
-                        out,
-                        SetForegroundColor(Color::Green),
-                        Print(format!("  [BAŞARILI] Sistem '{}' durumuna başarıyla döndürüldü!\r\n", snap.name)),
-                        Print("  Önyükleme bayrakları temizlendi.\r\n"),
-                        ResetColor,
-                        Print("\r\n  [Enter] basarak sistemi hemen yeniden başlatabilirsiniz...\r\n")
-                    )?;
-                    clear_boot_triggers();
-                    out.flush()?;
-                    wait_for_escape_or_enter()?;
-                    do_reboot()?;
-                    return Ok(());
+                    // 1. Root aygıtını ve dosya sistemi tipini tespit et
+                    let (is_btrfs, _) = detect_root_fs();
+                    let mut rollback_success = false;
+
+                    if is_btrfs {
+                        if let Ok(findmnt_out) = Command::new("findmnt").args(["-n", "-o", "SOURCE", "/"]).output() {
+                            let root_dev = String::from_utf8_lossy(&findmnt_out.stdout).trim().to_string();
+                            if !root_dev.is_empty() {
+                                let top_mount = Path::new("/mnt/bere_btrfs_top");
+                                let _ = fs::create_dir_all(top_mount);
+                                if Command::new("mount").args(["-o", "subvolid=5", &root_dev, "/mnt/bere_btrfs_top"]).status().map(|s| s.success()).unwrap_or(false) {
+                                    let mut target_subvol = top_mount.join("root");
+                                    if !target_subvol.exists() {
+                                        target_subvol = top_mount.join("@");
+                                    }
+                                    if target_subvol.exists() {
+                                        let backup_name = format!("{}.broken.{}", target_subvol.file_name().unwrap_or_default().to_string_lossy(), chrono::Local::now().timestamp());
+                                        let _ = fs::rename(&target_subvol, top_mount.join(backup_name));
+                                    }
+
+                                    let snap_rel = snap.path.to_string_lossy().trim_start_matches('/').to_string();
+                                    let mut source_path = top_mount.join(&snap_rel);
+                                    if !source_path.exists() {
+                                        source_path = snap.path.clone();
+                                    }
+
+                                    let snap_status = Command::new("btrfs")
+                                        .args(["subvolume", "snapshot", source_path.to_str().unwrap_or(""), target_subvol.to_str().unwrap_or("")])
+                                        .status();
+
+                                    if snap_status.map(|s| s.success()).unwrap_or(false) {
+                                        rollback_success = true;
+                                    }
+                                    let _ = Command::new("umount").arg("/mnt/bere_btrfs_top").status();
+                                }
+                            }
+                        }
+
+                        if !rollback_success {
+                            // Fallback subvolume snapshot
+                            let fb_status = Command::new("btrfs")
+                                .args(["subvolume", "snapshot", snap.path.to_str().unwrap_or("/"), "/@_restored_root"])
+                                .status();
+                            rollback_success = fb_status.map(|s| s.success()).unwrap_or(false);
+                        }
+                    } else {
+                        // Ext4 / XFS veya dizin yedeği: rsync ile güvenli eşitleme
+                        let rsync_status = Command::new("rsync")
+                            .args([
+                                "-aHAX", "--delete",
+                                "--exclude=/boot", "--exclude=/dev", "--exclude=/proc",
+                                "--exclude=/sys", "--exclude=/run", "--exclude=/mnt",
+                                "--exclude=/tmp", "--exclude=/var/tmp",
+                                &format!("{}/", snap.path.display()),
+                                "/",
+                            ])
+                            .status();
+                        rollback_success = rsync_status.map(|s| s.success()).unwrap_or(false);
+                    }
+
+                    if rollback_success {
+                        execute!(
+                            out,
+                            SetForegroundColor(Color::Green),
+                            Print(format!("  [BAŞARILI] Sistem '{}' durumuna başarıyla döndürüldü!\r\n", snap.name)),
+                            Print("  Önyükleme bayrakları temizlendi.\r\n"),
+                            ResetColor,
+                            Print("\r\n  [Enter] basarak sistemi hemen yeniden başlatabilirsiniz...\r\n")
+                        )?;
+                        clear_boot_triggers();
+                        out.flush()?;
+                        wait_for_escape_or_enter()?;
+                        do_reboot()?;
+                        return Ok(());
+                    } else {
+                        execute!(
+                            out,
+                            SetForegroundColor(Color::Red),
+                            Print("  [HATA] Geri yükleme işlemi tamamlanamadı!\r\n"),
+                            ResetColor,
+                            Print("\r\n  [Enter] veya [Esc] ile ana menüye dönebilirsiniz...\r\n")
+                        )?;
+                        out.flush()?;
+                        wait_for_escape_or_enter()?;
+                        return Ok(());
+                    }
                 }
                 KeyCode::Char('h') | KeyCode::Char('H') | KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
                     return Ok(());
@@ -797,17 +875,16 @@ fn execute_preserved_reset(folders: &[PreservedFolder]) -> Result<()> {
                     execute!(
                         out,
                         SetForegroundColor(Color::Cyan),
-                        Print("\r\n\r\n  [1/4] Seçilen veriler güvene alınıyor (@preserved_data)...\r\n")
+                        Print("\r\n\r\n  [1/4] Seçilen veriler güvene alınıyor (/var/tmp/preserved_stage)...\r\n")
                     )?;
                     out.flush()?;
 
-                    let stage_dir = Path::new("/@preserved_data");
+                    let stage_dir = Path::new("/var/tmp/preserved_stage");
                     let _ = fs::create_dir_all(stage_dir);
 
                     for folder in folders.iter().filter(|f| f.selected) {
                         execute!(out, Print(format!("         -> Kopyalanıyor: {}\r\n", folder.name)))?;
                         out.flush()?;
-                        // Sync folder to staging
                         let target = stage_dir.join(folder.path.file_name().unwrap_or_default());
                         let _ = Command::new("cp")
                             .args(["-a", folder.path.to_str().unwrap_or(""), target.to_str().unwrap_or("")])
@@ -819,20 +896,33 @@ fn execute_preserved_reset(folders: &[PreservedFolder]) -> Result<()> {
                         Print("  [2/4] İşletim sistemi fabrika durumuna sıfırlanıyor...\r\n")
                     )?;
                     out.flush()?;
-                    std::thread::sleep(std::time::Duration::from_millis(1500));
+                    let _ = wipe_human_users();
+                    clean_dir_contents(Path::new("/home"));
+                    clean_dir_contents(Path::new("/tmp"));
+                    clean_dir_contents(Path::new("/var/log"));
+                    clean_dir_contents(Path::new("/var/cache/dnf"));
+                    clean_dir_contents(Path::new("/var/cache/flatpak"));
+                    let _ = prepare_oobe_reset();
 
                     execute!(
                         out,
-                        Print("  [3/4] Korunan veriler kullanıcı alanına taşınıyor...\r\n")
+                        Print("  [3/4] Korunan veriler kullanıcı alanına taşınıyor (/home/preserved_data)...\r\n")
                     )?;
                     out.flush()?;
-                    std::thread::sleep(std::time::Duration::from_millis(1000));
+                    let dest_preserved = Path::new("/home/preserved_data");
+                    let _ = fs::create_dir_all(dest_preserved);
+                    let _ = Command::new("cp")
+                        .args(["-a", "/var/tmp/preserved_stage/.", "/home/preserved_data/"])
+                        .status();
+                    let _ = fs::remove_dir_all("/var/tmp/preserved_stage");
+                    let _ = Command::new("chmod").args(["-R", "777", "/home/preserved_data"]).status();
 
                     execute!(
                         out,
                         Print("  [4/4] SELinux ve kullanıcı sahiplik etiketleri onarılıyor...\r\n")
                     )?;
                     let _ = Command::new("restorecon").args(["-Rv", "/home"]).status();
+                    let _ = Command::new("sync").status();
                     clear_boot_triggers();
 
                     execute!(
@@ -859,6 +949,39 @@ fn execute_preserved_reset(folders: &[PreservedFolder]) -> Result<()> {
 // -----------------------------------------------------------------------------
 // Submenu: Factory Reset
 // -----------------------------------------------------------------------------
+
+fn clean_dir_contents(path: &Path) {
+    if let Ok(entries) = fs::read_dir(path) {
+        for entry in entries.flatten() {
+            let p = entry.path();
+            if p.is_dir() {
+                let _ = fs::remove_dir_all(&p);
+            } else {
+                let _ = fs::remove_file(&p);
+            }
+        }
+    }
+}
+
+fn wipe_human_users() -> Result<()> {
+    if let Ok(content) = fs::read_to_string("/etc/passwd") {
+        let mut filtered = Vec::new();
+        for line in content.lines() {
+            let parts: Vec<&str> = line.split(':').collect();
+            if parts.len() >= 3 {
+                if let Ok(uid) = parts[2].parse::<u32>() {
+                    let user = parts[0];
+                    if (1000..65534).contains(&uid) && user != "liveuser" && user != "blaze-setup" {
+                        continue;
+                    }
+                }
+            }
+            filtered.push(line);
+        }
+        let _ = fs::write("/etc/passwd", filtered.join("\n") + "\n");
+    }
+    Ok(())
+}
 
 fn handle_factory_reset(_app: &mut BerpApp) -> Result<()> {
     let mut out = stdout();
@@ -899,8 +1022,15 @@ fn handle_factory_reset(_app: &mut BerpApp) -> Result<()> {
                             Print("\r\n\r\n  -> Fabrika ayarlarına sıfırlama işlemi başlatılıyor...\r\n")
                         )?;
                         out.flush()?;
-                        std::thread::sleep(std::time::Duration::from_millis(2000));
+                        let _ = wipe_human_users();
+                        clean_dir_contents(Path::new("/home"));
+                        clean_dir_contents(Path::new("/tmp"));
+                        clean_dir_contents(Path::new("/var/log"));
+                        clean_dir_contents(Path::new("/var/cache/dnf"));
+                        clean_dir_contents(Path::new("/var/cache/flatpak"));
                         prepare_oobe_reset()?;
+                        let _ = Command::new("restorecon").args(["-Rv", "/home"]).status();
+                        let _ = Command::new("sync").status();
                         clear_boot_triggers();
                         execute!(
                             out,
@@ -936,12 +1066,18 @@ fn handle_factory_reset(_app: &mut BerpApp) -> Result<()> {
 /// Recovery binaries and the BERE/BERP boot entries remain untouched.
 fn prepare_oobe_reset() -> Result<()> {
     let _ = fs::remove_file("/etc/blazeos-setup-completed");
+    let _ = fs::remove_file("/etc/sddm.conf.d/autologin.conf");
     let sddm_dir = Path::new("/etc/sddm.conf.d");
     fs::create_dir_all(sddm_dir)?;
     fs::write(
         sddm_dir.join("00-blaze-oobe.conf"),
         "[Autologin]\nUser=blaze-setup\nSession=blaze-oobe\nRelogin=false\n",
     )?;
+    let oobe_template = Path::new("/usr/share/blaze-setup/blaze-oobe.desktop");
+    let oobe_session = Path::new("/usr/share/wayland-sessions/blaze-oobe.desktop");
+    if oobe_template.is_file() {
+        let _ = fs::copy(oobe_template, oobe_session);
+    }
     if Command::new("id").args(["-u", "blaze-setup"]).status().map(|s| !s.success()).unwrap_or(true) {
         let _ = Command::new("useradd").args(["--system", "--home-dir", "/var/lib/blaze-setup", "--shell", "/usr/sbin/nologin", "blaze-setup"]).status();
     }

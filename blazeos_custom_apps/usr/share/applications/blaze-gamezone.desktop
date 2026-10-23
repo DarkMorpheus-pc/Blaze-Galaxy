@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name=Blaze GameZone
+GenericName=Gaming Shell
+GenericName[tr]=Oyun Kabuğu
+Comment=Fullscreen gaming console shell and launcher for BlazeOS
+Comment[tr]=BlazeOS için tam ekran oyun konsolu kabuğu ve başlatıcı
+Exec=setsid -f /usr/bin/solar-shell gamezone
+Icon=input-gaming
+Terminal=false
+Categories=Game;Console;Emulator;
+Keywords=game;games;steam;gamezone;xbox;play;heroic;lutris;oyun;konsol;
+StartupNotify=true
+StartupWMClass=solar-gamezone

@@ -42,7 +42,7 @@ use std::process::Command;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 pub fn get_user_home() -> PathBuf {
     if let Ok(home) = std::env::var("HOME") {
@@ -509,10 +509,66 @@ pub fn is_system_online() -> bool {
     false
 }
 
+static LAST_BROWSER_OPEN: Mutex<Option<Instant>> = Mutex::new(None);
+
 pub fn open_browser_url(url: &str) {
-    if Command::new("xdg-open").arg(url).spawn().is_err()
-        && Command::new("firefox").arg(url).spawn().is_err() {
-        let _ = Command::new("chromium").arg(url).spawn();
+    {
+        let mut last = LAST_BROWSER_OPEN.lock().unwrap();
+        if let Some(t) = *last {
+            if t.elapsed() < Duration::from_millis(1500) {
+                println!("Ignoring rapid duplicate browser activation for: {}", url);
+                return;
+            }
+        }
+        *last = Some(Instant::now());
+    }
+
+    // 1. Primary: Blaze GameZone dedicated console mini-browser
+    if Path::new("/usr/bin/blaze-gamezone-browser").exists() {
+        if let Ok(mut child) = Command::new("/usr/bin/blaze-gamezone-browser").arg(url).spawn() {
+            std::thread::spawn(move || {
+                let _ = child.wait();
+            });
+            return;
+        }
+    }
+
+    // 2. Secondary: Chromium app / kiosk mode if installed
+    let has_chromium = Command::new("which")
+        .arg("chromium")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false);
+    if has_chromium {
+        if let Ok(mut child) = Command::new("chromium").arg(format!("--app={}", url)).spawn() {
+            std::thread::spawn(move || {
+                let _ = child.wait();
+            });
+            return;
+        }
+    }
+
+    // 3. Epiphany standalone application mode
+    let has_epiphany = Command::new("which")
+        .arg("epiphany")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false);
+    if has_epiphany {
+        if let Ok(mut child) = Command::new("epiphany")
+            .args(["--application-mode", "--new-window", url])
+            .spawn()
+        {
+            std::thread::spawn(move || {
+                let _ = child.wait();
+            });
+            return;
+        }
+    }
+
+    // 4. Fallback: xdg-open or firefox
+    if Command::new("xdg-open").arg(url).spawn().is_err() {
+        let _ = Command::new("firefox").arg(url).spawn();
     }
 }
 
@@ -612,11 +668,67 @@ pub fn start_linux_gamepad_listener() -> async_channel::Receiver<GamepadNavActio
 
     thread::spawn(move || {
         loop {
-            // Find active joystick device in /dev/input/js0..js4
+            // Find active genuine gamepad device in /dev/input/js0..js7
+            // Filter out mice, touchpads, and virtual tablets (such as QEMU VirtIO Tablet)
             let mut active_file = None;
-            for i in 0..4 {
+            for i in 0..8 {
                 let dev_path = format!("/dev/input/js{}", i);
+                let name_path = format!("/sys/class/input/js{}/device/name", i);
+                let mut dev_name = std::fs::read_to_string(&name_path)
+                    .unwrap_or_default()
+                    .trim()
+                    .to_lowercase();
+
+                let is_blacklist = dev_name.contains("mouse")
+                    || dev_name.contains("tablet")
+                    || dev_name.contains("touchpad")
+                    || dev_name.contains("trackpoint")
+                    || dev_name.contains("keyboard")
+                    || dev_name.contains("pen")
+                    || dev_name.contains("touchscreen")
+                    || dev_name.contains("virtio")
+                    || dev_name.contains("qemu");
+
+                if is_blacklist {
+                    continue;
+                }
+
                 if let Ok(file) = File::open(&dev_path) {
+                    use std::os::unix::io::AsRawFd;
+                    let fd = file.as_raw_fd();
+
+                    // If sysfs didn't provide name, query via JSIOCGNAME(128)
+                    if dev_name.is_empty() {
+                        let mut name_buf = [0u8; 128];
+                        let res = unsafe { libc::ioctl(fd, 0x80806a13, name_buf.as_mut_ptr()) };
+                        if res > 0 {
+                            let len = (res as usize).min(127);
+                            dev_name = String::from_utf8_lossy(&name_buf[..len]).to_lowercase();
+                        }
+                    }
+
+                    if dev_name.contains("mouse")
+                        || dev_name.contains("tablet")
+                        || dev_name.contains("touchpad")
+                        || dev_name.contains("trackpoint")
+                        || dev_name.contains("keyboard")
+                        || dev_name.contains("pen")
+                        || dev_name.contains("touchscreen")
+                        || dev_name.contains("virtio")
+                        || dev_name.contains("qemu")
+                    {
+                        continue;
+                    }
+
+                    // Check button count via JSIOCGBUTTONS
+                    let mut num_buttons: u8 = 0;
+                    let res = unsafe { libc::ioctl(fd, 0x80016a11, &mut num_buttons) };
+                    if res == 0 && num_buttons < 6 {
+                        // Mice / tablets typically have only 2 or 3 buttons
+                        continue;
+                    }
+
+                    println!("[GameZone] Genuine gamepad connected: {} ('{}', {} buttons)", dev_path, dev_name, num_buttons);
                     active_file = Some((dev_path, file));
                     break;
                 }
@@ -625,7 +737,7 @@ pub fn start_linux_gamepad_listener() -> async_channel::Receiver<GamepadNavActio
             let (_dev_path, mut file) = match active_file {
                 Some(f) => f,
                 None => {
-                    thread::sleep(Duration::from_millis(1500));
+                    thread::sleep(Duration::from_millis(2000));
                     continue;
                 }
             };
@@ -789,12 +901,29 @@ fn create_nav_button(label_text: &str, icon_name_base: &str) -> Button {
         format!("{}/.local/share/solarui/icons/{}.svg", get_user_home().to_string_lossy(), icon_name_base),
         format!("{}/.local/share/solarui/icons/{}.png", get_user_home().to_string_lossy(), icon_name_base),
     ];
+    let mut attached = false;
     for ic in &icon_candidates {
         if Path::new(ic).exists() {
             pic.set_filename(Some(Path::new(ic)));
             b_box.append(&pic);
+            attached = true;
             break;
         }
+    }
+
+    if !attached {
+        let fallback_name = match icon_name_base {
+            "xbox_nav_library" => "applications-games-symbolic",
+            "xbox_nav_store" => "software-store-symbolic",
+            "xbox_nav_gamepass" => "input-gaming-symbolic",
+            "xbox_nav_search" => "system-search-symbolic",
+            "xbox_nav_settings" => "preferences-system-symbolic",
+            _ => "applications-games-symbolic",
+        };
+        let icon_img = gtk4::Image::from_icon_name(fallback_name);
+        icon_img.set_pixel_size(18);
+        icon_img.add_css_class("xbox-nav-btn-icon");
+        b_box.append(&icon_img);
     }
 
     let lbl = Label::new(Some(label_text));
@@ -1101,19 +1230,20 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
             margin-bottom: 8px;
             min-width: 156px;
             min-height: 156px;
-            transition: transform 220ms ease-out, border 220ms ease-out, box-shadow 220ms ease-out;
+            transition: transform 260ms cubic-bezier(0.1, 0.9, 0.2, 1.0), border 220ms ease, box-shadow 260ms ease;
             box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
         }
 
         .xbox-game-card:hover {
             border: 2px solid rgba(255, 255, 255, 0.6);
-            transform: scale(1.04);
+            transform: scale(1.05) translateY(-4px);
+            box-shadow: 0 10px 22px rgba(0, 0, 0, 0.55);
         }
 
         .xbox-game-card:focus, .xbox-game-card.active-focus {
             border: 3px solid #52b7ff;
-            box-shadow: 0 0 28px rgba(82, 183, 255, 0.75), 0 10px 30px rgba(0, 0, 0, 0.8);
-            transform: scale(1.08);
+            box-shadow: 0 0 32px rgba(82, 183, 255, 0.75), 0 14px 34px rgba(0, 0, 0, 0.85);
+            transform: scale(1.10) translateY(-6px);
         }
 
         .xbox-game-card-img {
@@ -1409,34 +1539,13 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
     } else if let Some(ref e) = epic_account {
         e.clone()
     } else {
-        lang.guest_player().to_string()
+        std::env::var("USER").unwrap_or_else(|_| "blaze".to_string())
     };
 
     let lbl_tag = Label::new(Some(&gamertag_text));
     lbl_tag.add_css_class("xbox-gamertag");
     lbl_tag.set_valign(gtk4::Align::Center);
     user_box.append(&lbl_tag);
-
-    let lbl_ultimate = Label::new(Some("ULTIMATE"));
-    lbl_ultimate.add_css_class("xbox-badge-tag");
-    lbl_ultimate.set_valign(gtk4::Align::Center);
-    user_box.append(&lbl_ultimate);
-
-    let score_box = GtkBox::new(Orientation::Horizontal, 2);
-    score_box.set_valign(gtk4::Align::Center);
-    score_box.set_margin_start(10);
-
-    let lbl_score_icon = Label::new(Some("G"));
-    lbl_score_icon.add_css_class("xbox-score-icon");
-    lbl_score_icon.set_valign(gtk4::Align::Center);
-
-    let lbl_score = Label::new(Some("21,337"));
-    lbl_score.add_css_class("xbox-gamerscore");
-    lbl_score.set_valign(gtk4::Align::Center);
-
-    score_box.append(&lbl_score_icon);
-    score_box.append(&lbl_score);
-    user_box.append(&score_box);
 
     top_bar.append(&user_box);
 
@@ -1535,10 +1644,13 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
     content_box.add_css_class("xbox-content-box");
     content_box.set_hexpand(true);
 
+    let library_view = GtkBox::new(Orientation::Vertical, 0);
+    library_view.set_hexpand(true);
+
     // Upper Hero Spacer (Shows the clean wallpaper art in upper 55-60% of viewport)
     let hero_spacer = GtkBox::new(Orientation::Vertical, 0);
     hero_spacer.add_css_class("xbox-hero-spacer");
-    content_box.append(&hero_spacer);
+    library_view.append(&hero_spacer);
 
     // Active Focused Game Title Label
     let title_row = GtkBox::new(Orientation::Horizontal, 8);
@@ -1554,7 +1666,7 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
 
     title_row.append(&active_title_lbl);
     title_row.append(&active_badge_lbl);
-    content_box.append(&title_row);
+    library_view.append(&title_row);
 
     // ── 1. PRIMARY HORIZONTAL GAME CAROUSEL (RESUME ROW) ──
     let carousel_scroll = ScrolledWindow::builder()
@@ -1658,7 +1770,7 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
     }
 
     carousel_scroll.set_child(Some(&carousel_box));
-    content_box.append(&carousel_scroll);
+    library_view.append(&carousel_scroll);
 
     // ── STORE SELECTION DRAWER / MODAL ──
     let store_drawer = GtkBox::new(Orientation::Vertical, 12);
@@ -1677,8 +1789,14 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
     let store_close_btn = Button::with_label(lang.back_to_home());
     store_close_btn.add_css_class("xbox-apps-close-btn");
     let st_toggle = store_drawer.clone();
+    let lib_toggle_st = library_view.clone();
+    let btn_lib_close_st = btn_library.clone();
+    let btn_st_close_st = btn_store.clone();
     store_close_btn.connect_clicked(move |_| {
         st_toggle.set_visible(false);
+        lib_toggle_st.set_visible(true);
+        btn_st_close_st.remove_css_class("active");
+        btn_lib_close_st.add_css_class("active");
     });
     store_hdr.append(&store_title);
     store_hdr.append(&store_close_btn);
@@ -1792,7 +1910,7 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
     content_box.append(&store_drawer);
 
     // ── SETTINGS DRAWER / MODAL ──
-    let settings_drawer = GtkBox::new(Orientation::Vertical, 12);
+    let settings_drawer = GtkBox::new(Orientation::Vertical, 14);
     settings_drawer.add_css_class("xbox-modal-drawer");
     settings_drawer.set_visible(false);
 
@@ -1808,14 +1926,21 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
     let set_close_btn = Button::with_label(lang.back_to_home());
     set_close_btn.add_css_class("xbox-apps-close-btn");
     let set_toggle = settings_drawer.clone();
+    let lib_toggle_set = library_view.clone();
+    let btn_lib_close_set = btn_library.clone();
+    let btn_set_close_set = btn_settings.clone();
     set_close_btn.connect_clicked(move |_| {
         set_toggle.set_visible(false);
+        lib_toggle_set.set_visible(true);
+        btn_set_close_set.remove_css_class("active");
+        btn_lib_close_set.add_css_class("active");
     });
     set_hdr.append(&set_title);
     set_hdr.append(&set_close_btn);
     settings_drawer.append(&set_hdr);
 
-    let set_cards_row = GtkBox::new(Orientation::Horizontal, 14);
+    // Row 1: System & Gaming Engine
+    let set_row1 = GtkBox::new(Orientation::Horizontal, 14);
 
     // Setting 1: ProtonUp-Qt
     let card_set_proton = Button::new();
@@ -1836,7 +1961,7 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
     card_set_proton.connect_clicked(|_| {
         let _ = Command::new("protonup-qt").spawn();
     });
-    set_cards_row.append(&card_set_proton);
+    set_row1.append(&card_set_proton);
 
     // Setting 2: SolarUI Desktop Settings
     let card_set_solar = Button::new();
@@ -1860,7 +1985,7 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
     card_set_solar.connect_clicked(|_| {
         let _ = Command::new("solar-settings").spawn();
     });
-    set_cards_row.append(&card_set_solar);
+    set_row1.append(&card_set_solar);
 
     // Setting 3: BORE Performance Governor
     let card_set_perf = Button::new();
@@ -1887,7 +2012,12 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
             .args(["-a", "Blaze GameZone", "-i", "preferences-system", "Performans Modu", "BORE Düşük Gecikme Profili yenilendi."])
             .spawn();
     });
-    set_cards_row.append(&card_set_perf);
+    set_row1.append(&card_set_perf);
+
+    settings_drawer.append(&set_row1);
+
+    // Row 2: Diagnostics & Operations
+    let set_row2 = GtkBox::new(Orientation::Horizontal, 14);
 
     // Setting 4: Clear Poster Cache
     let card_set_cache = Button::new();
@@ -1908,9 +2038,63 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
     card_set_cache.connect_clicked(|_| {
         clean_gamezone_cache();
     });
-    set_cards_row.append(&card_set_cache);
+    set_row2.append(&card_set_cache);
 
-    settings_drawer.append(&set_cards_row);
+    // Setting 5: Gamepad Test
+    let card_set_gamepad = Button::new();
+    card_set_gamepad.add_css_class("xbox-modal-card");
+    let cgp_box = GtkBox::new(Orientation::Vertical, 4);
+    let cgp_title = Label::new(Some(match lang {
+        Language::TR => "Oyun Kumandası Testi",
+        Language::EN => "Gamepad Diagnostic & Test",
+    }));
+    cgp_title.add_css_class("xbox-modal-card-title");
+    cgp_title.set_halign(gtk4::Align::Start);
+    let cgp_desc = Label::new(Some(match lang {
+        Language::TR => "D-Pad, Analog ve Tetik Tuşlarını Doğrula",
+        Language::EN => "Verify D-Pad, Sticks & Triggers",
+    }));
+    cgp_desc.add_css_class("xbox-modal-card-desc");
+    cgp_desc.set_halign(gtk4::Align::Start);
+    cgp_box.append(&cgp_title);
+    cgp_box.append(&cgp_desc);
+    card_set_gamepad.set_child(Some(&cgp_box));
+    card_set_gamepad.connect_clicked(|_| {
+        if Command::new("jstest-gtk").spawn().is_err() {
+            let _ = Command::new("notify-send")
+                .args(["-a", "Blaze GameZone", "-i", "input-gaming", "Oyun Kumandası", "Kumanda dinleyicisi arka planda aktif."])
+                .spawn();
+        }
+    });
+    set_row2.append(&card_set_gamepad);
+
+    // Setting 6: Return to Desktop
+    let card_set_quit = Button::new();
+    card_set_quit.add_css_class("xbox-modal-card");
+    let cq_box = GtkBox::new(Orientation::Vertical, 4);
+    let cq_title = Label::new(Some(match lang {
+        Language::TR => "Masaüstüne Dön",
+        Language::EN => "Return to Desktop",
+    }));
+    cq_title.add_css_class("xbox-modal-card-title");
+    cq_title.set_halign(gtk4::Align::Start);
+    let cq_desc = Label::new(Some(match lang {
+        Language::TR => "SolarUI Masaüstü Kabuğuna Geç",
+        Language::EN => "Switch back to SolarUI Desktop Shell",
+    }));
+    cq_desc.add_css_class("xbox-modal-card-desc");
+    cq_desc.set_halign(gtk4::Align::Start);
+    cq_box.append(&cq_title);
+    cq_box.append(&cq_desc);
+    card_set_quit.set_child(Some(&cq_box));
+    let loop_set_quit = main_loop.clone();
+    card_set_quit.connect_clicked(move |_| {
+        println!("User clicked Return to Desktop from GameZone Settings.");
+        loop_set_quit.quit();
+    });
+    set_row2.append(&card_set_quit);
+
+    settings_drawer.append(&set_row2);
     content_box.append(&settings_drawer);
 
     // ── ALL APPLICATIONS DRAWER (COLLAPSIBLE / FULLSCREEN OVERLAY) ──
@@ -1933,8 +2117,14 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
     let apps_close_btn = Button::with_label(lang.back_to_home());
     apps_close_btn.add_css_class("xbox-apps-close-btn");
     let drawer_toggle = apps_drawer.clone();
+    let lib_toggle_apps = library_view.clone();
+    let btn_lib_close_apps = btn_library.clone();
+    let btn_srch_close_apps = btn_search.clone();
     apps_close_btn.connect_clicked(move |_| {
         drawer_toggle.set_visible(false);
+        lib_toggle_apps.set_visible(true);
+        btn_srch_close_apps.remove_css_class("active");
+        btn_lib_close_apps.add_css_class("active");
     });
 
     apps_header_box.append(&apps_title_lbl);
@@ -2159,15 +2349,6 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
     b3_content.append(&b3_sub);
     bento3_overlay.add_overlay(&b3_content);
     bento_store.set_child(Some(&bento3_overlay));
-
-    let alert_st = trigger_offline_alert.clone();
-    bento_store.connect_clicked(move |_| {
-        if !is_system_online() {
-            alert_st("İnternete bağlı değilsiniz. Sadece yüklü oyunları çalıştırabilirsiniz.");
-        } else {
-            open_browser_url("https://store.steampowered.com/");
-        }
-    });
     bento_row.append(&bento_store);
 
     // Tile 4: "Play like a Pro / Settings & Proton"
@@ -2211,7 +2392,8 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
     });
     bento_row.append(&bento_pro);
 
-    content_box.append(&bento_row);
+    library_view.append(&bento_row);
+    content_box.prepend(&library_view);
 
     main_scroll.set_child(Some(&content_box));
     root_box.append(&main_scroll);
@@ -2269,24 +2451,57 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
     }
 
     // Top buttons connections
-    let drawer_lib = apps_drawer.clone();
+    let drawer_lib_apps = apps_drawer.clone();
     let drawer_st_lib = store_drawer.clone();
     let drawer_set_lib = settings_drawer.clone();
+    let lib_view_main = library_view.clone();
+    let carousel_btns_lib = game_buttons.clone();
+    let btn_lib_c = btn_library.clone();
+    let btn_st_c1 = btn_store.clone();
+    let btn_disc_c1 = btn_discover.clone();
+    let btn_srch_c1 = btn_search.clone();
+    let btn_set_c1 = btn_settings.clone();
+
     btn_library.connect_clicked(move |_| {
+        drawer_lib_apps.set_visible(false);
         drawer_st_lib.set_visible(false);
         drawer_set_lib.set_visible(false);
-        let is_v = drawer_lib.is_visible();
-        drawer_lib.set_visible(!is_v);
+        lib_view_main.set_visible(true);
+        btn_lib_c.add_css_class("active");
+        btn_st_c1.remove_css_class("active");
+        btn_disc_c1.remove_css_class("active");
+        btn_srch_c1.remove_css_class("active");
+        btn_set_c1.remove_css_class("active");
+        if let Some(first_btn) = carousel_btns_lib.first() {
+            first_btn.grab_focus();
+        }
     });
 
     let drawer_st_open = store_drawer.clone();
     let drawer_apps_st = apps_drawer.clone();
     let drawer_set_st = settings_drawer.clone();
+    let lib_view_st = library_view.clone();
+    let btn_lib_c2 = btn_library.clone();
+    let btn_st_c2 = btn_store.clone();
+    let btn_disc_c2 = btn_discover.clone();
+    let btn_srch_c2 = btn_search.clone();
+    let btn_set_c2 = btn_settings.clone();
     btn_store.connect_clicked(move |_| {
         drawer_apps_st.set_visible(false);
         drawer_set_st.set_visible(false);
         let is_v = drawer_st_open.is_visible();
         drawer_st_open.set_visible(!is_v);
+        lib_view_st.set_visible(is_v);
+        if !is_v {
+            btn_st_c2.add_css_class("active");
+            btn_lib_c2.remove_css_class("active");
+        } else {
+            btn_st_c2.remove_css_class("active");
+            btn_lib_c2.add_css_class("active");
+        }
+        btn_disc_c2.remove_css_class("active");
+        btn_srch_c2.remove_css_class("active");
+        btn_set_c2.remove_css_class("active");
     });
 
     let alert_cloud_top = trigger_offline_alert.clone();
@@ -2299,37 +2514,95 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
     });
 
     let drawer_search = apps_drawer.clone();
+    let drawer_st_srch = store_drawer.clone();
+    let drawer_set_srch = settings_drawer.clone();
+    let lib_view_srch = library_view.clone();
     let search_inp_foc = search_input.clone();
+    let btn_lib_c3 = btn_library.clone();
+    let btn_st_c3 = btn_store.clone();
+    let btn_disc_c3 = btn_discover.clone();
+    let btn_srch_c3 = btn_search.clone();
+    let btn_set_c3 = btn_settings.clone();
     btn_search.connect_clicked(move |_| {
+        drawer_st_srch.set_visible(false);
+        drawer_set_srch.set_visible(false);
         let is_v = drawer_search.is_visible();
         drawer_search.set_visible(!is_v);
+        lib_view_srch.set_visible(is_v);
         if !is_v {
             search_inp_foc.grab_focus();
+            btn_srch_c3.add_css_class("active");
+            btn_lib_c3.remove_css_class("active");
+        } else {
+            btn_srch_c3.remove_css_class("active");
+            btn_lib_c3.add_css_class("active");
         }
+        btn_st_c3.remove_css_class("active");
+        btn_disc_c3.remove_css_class("active");
+        btn_set_c3.remove_css_class("active");
     });
 
     let drawer_set_open = settings_drawer.clone();
     let drawer_apps_set = apps_drawer.clone();
     let drawer_st_set = store_drawer.clone();
+    let lib_view_set = library_view.clone();
+    let btn_lib_c4 = btn_library.clone();
+    let btn_st_c4 = btn_store.clone();
+    let btn_disc_c4 = btn_discover.clone();
+    let btn_srch_c4 = btn_search.clone();
+    let btn_set_c4 = btn_settings.clone();
     btn_settings.connect_clicked(move |_| {
         drawer_apps_set.set_visible(false);
         drawer_st_set.set_visible(false);
         let is_v = drawer_set_open.is_visible();
         drawer_set_open.set_visible(!is_v);
+        lib_view_set.set_visible(is_v);
+        if !is_v {
+            btn_set_c4.add_css_class("active");
+            btn_lib_c4.remove_css_class("active");
+        } else {
+            btn_set_c4.remove_css_class("active");
+            btn_lib_c4.add_css_class("active");
+        }
+        btn_st_c4.remove_css_class("active");
+        btn_disc_c4.remove_css_class("active");
+        btn_srch_c4.remove_css_class("active");
     });
 
     // Bento Store Card opens store_drawer
     let bento_st_drawer = store_drawer.clone();
+    let lib_view_bento_st = library_view.clone();
+    let btn_st_bento = btn_store.clone();
+    let btn_lib_bento_st = btn_library.clone();
     bento_store.connect_clicked(move |_| {
         let is_v = bento_st_drawer.is_visible();
         bento_st_drawer.set_visible(!is_v);
+        lib_view_bento_st.set_visible(is_v);
+        if !is_v {
+            btn_st_bento.add_css_class("active");
+            btn_lib_bento_st.remove_css_class("active");
+        } else {
+            btn_st_bento.remove_css_class("active");
+            btn_lib_bento_st.add_css_class("active");
+        }
     });
 
     // Bento Pro Card opens settings_drawer
     let bento_set_drawer = settings_drawer.clone();
+    let lib_view_bento_set = library_view.clone();
+    let btn_set_bento = btn_settings.clone();
+    let btn_lib_bento_set = btn_library.clone();
     bento_pro.connect_clicked(move |_| {
         let is_v = bento_set_drawer.is_visible();
         bento_set_drawer.set_visible(!is_v);
+        lib_view_bento_set.set_visible(is_v);
+        if !is_v {
+            btn_set_bento.add_css_class("active");
+            btn_lib_bento_set.remove_css_class("active");
+        } else {
+            btn_set_bento.remove_css_class("active");
+            btn_lib_bento_set.add_css_class("active");
+        }
     });
 
     // Keyboard & Gamepad Controller
@@ -2338,10 +2611,8 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
     let all_g_key = active_game_list.clone();
     let c_btns_key = game_buttons.clone();
     let loop_key = main_loop.clone();
-    let title_k = active_title_lbl.clone();
-    let badge_k = active_badge_lbl.clone();
-    let bg_pic_k = bg_picture.clone();
     let alert_key = trigger_offline_alert.clone();
+    let win_key = window.clone();
 
     key_controller.connect_key_pressed(move |_ctrl, keyval, _code, _state| {
         match keyval {
@@ -2351,37 +2622,43 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
                 glib::Propagation::Stop
             }
             gdk::Key::Left => {
-                let mut idx = s_idx_key.lock().unwrap();
-                if *idx > 0 {
-                    *idx -= 1;
-                    if let Some(btn) = c_btns_key.get(*idx) {
-                        btn.grab_focus();
+                let target_btn = {
+                    let mut idx = s_idx_key.lock().unwrap();
+                    if *idx > 0 {
+                        *idx -= 1;
+                        c_btns_key.get(*idx).cloned()
+                    } else {
+                        None
                     }
-                    if let Some(game) = all_g_key.lock().unwrap().get(*idx) {
-                        title_k.set_text(&game.title);
-                        badge_k.set_text(if game.is_installed { "READY TO PLAY" } else { "STORE AVAILABLE" });
-                        update_backdrop(Some(game), &bg_pic_k);
-                    }
+                };
+                if let Some(btn) = target_btn {
+                    btn.grab_focus();
                 }
                 glib::Propagation::Stop
             }
             gdk::Key::Right => {
-                let mut idx = s_idx_key.lock().unwrap();
-                let total = all_g_key.lock().unwrap().len();
-                if *idx + 1 < total {
-                    *idx += 1;
-                    if let Some(btn) = c_btns_key.get(*idx) {
-                        btn.grab_focus();
+                let target_btn = {
+                    let total = all_g_key.lock().unwrap().len();
+                    let mut idx = s_idx_key.lock().unwrap();
+                    if *idx + 1 < total {
+                        *idx += 1;
+                        c_btns_key.get(*idx).cloned()
+                    } else {
+                        None
                     }
-                    if let Some(game) = all_g_key.lock().unwrap().get(*idx) {
-                        title_k.set_text(&game.title);
-                        badge_k.set_text(if game.is_installed { "READY TO PLAY" } else { "STORE AVAILABLE" });
-                        update_backdrop(Some(game), &bg_pic_k);
-                    }
+                };
+                if let Some(btn) = target_btn {
+                    btn.grab_focus();
                 }
                 glib::Propagation::Stop
             }
             gdk::Key::Return | gdk::Key::KP_Enter => {
+                if let Some(focused) = gtk4::prelude::GtkWindowExt::focus(&win_key) {
+                    let on_carousel = c_btns_key.iter().any(|b| b.upcast_ref::<gtk4::Widget>() == &focused);
+                    if !on_carousel {
+                        return glib::Propagation::Proceed;
+                    }
+                }
                 let idx = *s_idx_key.lock().unwrap();
                 if let Some(game) = all_g_key.lock().unwrap().get(idx) {
                     handle_game_activation(game, &*alert_key);
@@ -2400,9 +2677,6 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
     let all_g_gp = active_game_list.clone();
     let c_btns_gp = game_buttons.clone();
     let loop_gp = main_loop.clone();
-    let title_gp = active_title_lbl.clone();
-    let badge_gp = active_badge_lbl.clone();
-    let bg_pic_gp = bg_picture.clone();
     let alert_gp = trigger_offline_alert.clone();
 
     glib::spawn_future_local(async move {
@@ -2419,32 +2693,32 @@ fn build_gamezone_ui(main_loop: glib::MainLoop) {
                     }
                 }
                 GamepadNavAction::Left => {
-                    let mut idx = s_idx_gp.lock().unwrap();
-                    if *idx > 0 {
-                        *idx -= 1;
-                        if let Some(btn) = c_btns_gp.get(*idx) {
-                            btn.grab_focus();
+                    let target_btn = {
+                        let mut idx = s_idx_gp.lock().unwrap();
+                        if *idx > 0 {
+                            *idx -= 1;
+                            c_btns_gp.get(*idx).cloned()
+                        } else {
+                            None
                         }
-                        if let Some(game) = all_g_gp.lock().unwrap().get(*idx) {
-                            title_gp.set_text(&game.title);
-                            badge_gp.set_text(if game.is_installed { "READY TO PLAY" } else { "STORE AVAILABLE" });
-                            update_backdrop(Some(game), &bg_pic_gp);
-                        }
+                    };
+                    if let Some(btn) = target_btn {
+                        btn.grab_focus();
                     }
                 }
                 GamepadNavAction::Right => {
-                    let mut idx = s_idx_gp.lock().unwrap();
-                    let total = all_g_gp.lock().unwrap().len();
-                    if *idx + 1 < total {
-                        *idx += 1;
-                        if let Some(btn) = c_btns_gp.get(*idx) {
-                            btn.grab_focus();
+                    let target_btn = {
+                        let total = all_g_gp.lock().unwrap().len();
+                        let mut idx = s_idx_gp.lock().unwrap();
+                        if *idx + 1 < total {
+                            *idx += 1;
+                            c_btns_gp.get(*idx).cloned()
+                        } else {
+                            None
                         }
-                        if let Some(game) = all_g_gp.lock().unwrap().get(*idx) {
-                            title_gp.set_text(&game.title);
-                            badge_gp.set_text(if game.is_installed { "READY TO PLAY" } else { "STORE AVAILABLE" });
-                            update_backdrop(Some(game), &bg_pic_gp);
-                        }
+                    };
+                    if let Some(btn) = target_btn {
+                        btn.grab_focus();
                     }
                 }
                 GamepadNavAction::OptionsX => {
@@ -2509,9 +2783,10 @@ fn update_hero_showcase(
 fn get_default_wallpaper_path() -> String {
     let home = get_user_home();
     let candidates = [
+        "/usr/share/blazeos/wallpapers/Wallpaperdefault.jpg".to_string(),
+        "/usr/share/blazeos/wallpapers/default.png".to_string(),
         "/usr/share/blazeos/wallpapers/xbox_dynamic.png".to_string(),
         "/usr/share/blazeos/wallpapers/galaxy.png".to_string(),
-        "/usr/share/blazeos/wallpapers/default.png".to_string(),
         "/usr/share/blazeos/wallpapers/blazeos-wallpaper-1.png".to_string(),
         "/usr/share/backgrounds/default.png".to_string(),
         format!("{}/.local/share/blazeos/wallpapers/xbox_dynamic.png", home.to_string_lossy()),
@@ -2544,7 +2819,19 @@ fn update_backdrop(game: Option<&GameEntry>, bg_picture: &Picture) {
     }
 }
 
+static LAST_ACTIVATION: Mutex<Option<Instant>> = Mutex::new(None);
+
 fn handle_game_activation(game: &GameEntry, on_offline_alert: &dyn Fn(&str)) {
+    {
+        let mut last = LAST_ACTIVATION.lock().unwrap();
+        if let Some(t) = *last {
+            if t.elapsed() < Duration::from_millis(1000) {
+                return;
+            }
+        }
+        *last = Some(Instant::now());
+    }
+
     if !game.is_installed {
         if !is_system_online() {
             on_offline_alert("İnternete bağlı değilsiniz. Sadece yüklü oyunları ve uygulamaları çalıştırabilirsiniz.");

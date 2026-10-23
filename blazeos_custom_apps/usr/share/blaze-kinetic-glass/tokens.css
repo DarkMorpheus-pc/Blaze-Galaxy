@@ -1,0 +1,36 @@
+/* Blaze Kinetic Glass (BCDL) — Design Tokens v1.0.0 */
+:root {
+  /* Surfaces */
+  --blz-surface-canvas: oklch(0.12 0.010 255);
+  --blz-surface-glass-base: oklch(0.16 0.012 255 / 0.72);
+  --blz-surface-glass-elevated: oklch(0.22 0.015 255 / 0.82);
+  --blz-surface-scrim: oklch(0.10 0.008 255 / 0.45);
+
+  /* Specular Refractive Edges */
+  --blz-border-specular-top: oklch(0.95 0.005 255 / 0.16);
+  --blz-border-specular-bottom: oklch(0.95 0.005 255 / 0.05);
+
+  /* Accents & Status Indicators */
+  --blz-accent-mineral: oklch(0.82 0.035 255);
+  --blz-status-syncing: oklch(0.78 0.050 75);
+  --blz-status-stable: oklch(0.80 0.045 145);
+  --blz-status-error: oklch(0.68 0.065 25);
+
+  /* Typography Colors */
+  --blz-text-primary: oklch(0.96 0.004 255);
+  --blz-text-secondary: oklch(0.74 0.010 255);
+  --blz-text-muted: oklch(0.54 0.012 255);
+
+  /* Typography Families */
+  --blz-font-sans: "Inter Display", -apple-system, system-ui, sans-serif;
+  --blz-font-mono: "JetBrains Mono", "Fira Code", monospace;
+
+  /* Geometry & Radii */
+  --blz-radius-sm: 4px;
+  --blz-radius-md: 8px;
+  --blz-radius-lg: 12px;
+  --blz-radius-pill: 9999px;
+
+  /* Optical Filter Settings */
+  --blz-backdrop-blur: blur(10px) saturate(92%);
+}

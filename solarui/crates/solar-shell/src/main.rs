@@ -24,6 +24,7 @@ use gui::launch_gui_window;
 use ipc::ShellIpcClient;
 use shelf::ShelfViewModel;
 use solar_common::{M3Theme, SolarConfig, SolarSystemState};
+use providers::ShellProvider;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::info;
@@ -470,6 +471,12 @@ async fn main() -> Result<()> {
 }
 
 async fn run_gamezone_shell_session() -> Result<()> {
+    // 0. Detach from parent process group so that stopping the parent shell (e.g. quickshell)
+    // does not deliver SIGHUP/SIGTERM to GameZone.
+    unsafe {
+        libc::setsid();
+    }
+
     // 1. Mevcut aktif/istenen masaüstü kabuk motorunu tespit et ve kaydet
     let supervisor = supervisor::SolarShellSupervisor::new();
     let desired = supervisor.load_desired_state().unwrap_or_default();
@@ -489,22 +496,27 @@ async fn run_gamezone_shell_session() -> Result<()> {
         prev_engine
     );
 
-    // 2. Arka plan masaüstü kabuklarını (Noctalia, Caelestia, Taskbar) durdurarak RAM ve GPU'yu tamamen oyuna aç
+    // 2. Arka plan masaüstü kabuklarını (Noctalia, Caelestia, End4) durdurarak RAM ve GPU'yu tamamen oyuna aç
+    let noctalia = providers::NoctaliaProvider::default();
+    let _ = noctalia.stop().await;
+
+    let caelestia = providers::CaelestiaProvider::default();
+    let _ = caelestia.stop().await;
+
+    let end4 = providers::End4PcProvider::default();
+    let _ = end4.stop().await;
+
     let _ = std::process::Command::new("pkill")
         .args(["-TERM", "-x", "noctalia"])
         .status();
     let _ = std::process::Command::new("pkill")
-        .args(["-TERM", "-f", "caelestia"])
+        .args(["-TERM", "-f", "(qs|quickshell).*caelestia"])
         .status();
-    if let Ok(end4) = std::env::var("SOLARUI_END4_PC_DIR") {
-        let _ = std::process::Command::new("qs").args(["--path", &end4, "kill"]).status();
-    } else {
-        let _ = std::process::Command::new("qs")
-            .args(["--path", "/usr/share/quickshell/end4-pC", "kill"])
-            .status();
-    }
     let _ = std::process::Command::new("pkill")
-        .args(["-f", "solar-shell (run|gui|taskbar|window)"])
+        .args(["-TERM", "-f", "(qs|quickshell).*end4"])
+        .status();
+    let _ = std::process::Command::new("pkill")
+        .args(["-TERM", "-f", "solar-shell (run|gui|taskbar|window)"])
         .status();
 
     // 3. GameZone 10-Foot UI Kabuğunu çalıştır (kullanıcı çıkana kadar bekler)

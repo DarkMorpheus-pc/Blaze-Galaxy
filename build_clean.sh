@@ -1,9 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 
-ORIG_ISO="/home/darkmorpheus/BlazeFedora/BlazeOS-Galaxy-SolarEvolution-x86_64-T1.iso"
-OUT_ISO="/home/darkmorpheus/BlazeFedora/BlazeOS-Galaxy-SolarEvolution2-x86_64-T2.iso"
-WORK="/home/darkmorpheus/BlazeFedora/work"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ORIG_ISO="${ORIG_ISO:-$SCRIPT_DIR/BlazeOS-Galaxy-SolarEvolution-x86_64-T1.iso}"
+OUT_ISO="${OUT_ISO:-$SCRIPT_DIR/BlazeOS-Galaxy-SolarEvolution2-x86_64-T2.iso}"
+WORK="${WORK:-$SCRIPT_DIR/work}"
 CUSTOM_ROOTFS="$WORK/squashfs_root"
 NEW_SQUASHFS="$WORK/iso_root/LiveOS/squashfs.img"
 
@@ -55,7 +56,11 @@ cp "'"$CUSTOM_ROOTFS"'"/usr/local/bin/blazeos-limine-install "$ROOTFS/usr/local/
 cp "'"$CUSTOM_ROOTFS"'"/etc/blazeos-release "$ROOTFS/etc/"
 
 echo "  -> Applying new boot logo..."
-cp /home/darkmorpheus/İndirilenler/logo.icon/boot.png "$ROOTFS/usr/share/plymouth/themes/blazeos/logo.png"
+if [ -f "$SCRIPT_DIR/blazeos_custom_apps/usr/share/plymouth/themes/blazeos/logo.png" ]; then
+    cp "$SCRIPT_DIR/blazeos_custom_apps/usr/share/plymouth/themes/blazeos/logo.png" "$ROOTFS/usr/share/plymouth/themes/blazeos/logo.png"
+elif [ -f "${HOME:-/root}/İndirilenler/logo.icon/boot.png" ]; then
+    cp "${HOME:-/root}/İndirilenler/logo.icon/boot.png" "$ROOTFS/usr/share/plymouth/themes/blazeos/logo.png"
+fi
 
 echo "  -> Setting SELinux contexts with setfiles..."
 LD_LIBRARY_PATH="$ROOTFS/usr/lib64" "$ROOTFS/usr/sbin/setfiles" -r "$ROOTFS" "$ROOTFS/etc/selinux/targeted/contexts/files/file_contexts" "$ROOTFS" 2>&1 | tail -5 || true
@@ -90,9 +95,17 @@ xorriso \
   -padding 0
 
 echo "=== [5/6] Implanting MD5 checksum ==="
-/home/darkmorpheus/bin/implantisomd5 "$OUT_ISO"
+if command -v implantisomd5 >/dev/null 2>&1; then
+    implantisomd5 "$OUT_ISO"
+elif [ -x "${HOME}/bin/implantisomd5" ]; then
+    "${HOME}/bin/implantisomd5" "$OUT_ISO"
+fi
 
 echo "=== [6/6] Verifying ISO with checkisomd5 ==="
-/home/darkmorpheus/bin/checkisomd5 --verbose "$OUT_ISO"
+if command -v checkisomd5 >/dev/null 2>&1; then
+    checkisomd5 --verbose "$OUT_ISO"
+elif [ -x "${HOME}/bin/checkisomd5" ]; then
+    "${HOME}/bin/checkisomd5" --verbose "$OUT_ISO"
+fi
 
 echo "=== ALL DONE SUCCESSFULLY! ==="

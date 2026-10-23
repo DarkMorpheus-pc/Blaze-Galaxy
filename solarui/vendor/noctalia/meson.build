@@ -306,7 +306,12 @@ _luau_selective_dep = declare_dependency(
 
 # ── Wayland protocol generation ───────────────────────────────────────────────
 wayland_scanner    = find_program('wayland-scanner')
-wayland_protos_dir = '/home/darkmorpheus/solarui/vendor/wayland-protocols'
+wayland_protos     = dependency('wayland-protocols', required: false)
+if wayland_protos.found()
+  wayland_protos_dir = wayland_protos.get_variable('pkgdatadir')
+else
+  wayland_protos_dir = meson.current_source_dir() / '../wayland-protocols'
+endif
 
 # Generates a (header, source) pair from a protocol XML path/target.
 # Returns [h_target, c_target]: add c_target to sources.

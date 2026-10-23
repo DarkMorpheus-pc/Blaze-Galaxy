@@ -28,3 +28,4 @@ cairo-rs = "0.22"
 pangocairo = "0.22"
 async-channel = "2.3"
 async-trait = { workspace = true }
+libc = "0.2"

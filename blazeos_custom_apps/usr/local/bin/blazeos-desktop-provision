@@ -145,24 +145,32 @@ fi
 
 case "$USAGE_PROFILE" in
     light)
-        remove_optional gnome-boxes gnome-calendar gnome-contacts gnome-maps \
-            gnome-weather gnome-connections libreoffice-calc libreoffice-writer \
-            libreoffice-impress libreoffice-emailmerge ;;
+        # Low RAM footprint: strip out memory-intensive terminals (kitty), LibreOffice,
+        # heavy GNOME background services, and indexers.
+        remove_optional kitty kitty-terminfo gnome-boxes gnome-calendar gnome-contacts gnome-maps \
+            gnome-weather gnome-connections gnome-software libreoffice-core libreoffice-calc \
+            libreoffice-writer libreoffice-impress libreoffice-emailmerge rhythmbox cheese \
+            evolution-data-server tracker tracker-miners ;;
     daily)
         install_optional firefox celluloid papers loupe file-roller ;;
     office)
         install_optional libreoffice-writer libreoffice-calc libreoffice-impress \
             libreoffice-draw papers thunderbird ;;
     gaming)
-        install_optional lutris gamemode mangohud gamescope ;;
+        install_optional mangohud gamemode gamescope lutris steam-devices wine protonup-qt ;;
     standard)
         # Keep the normal desktop profile lean. The full office suite belongs
         # to the explicit Office/Work profile and otherwise adds hundreds of
         # MB plus Java/UNO dependencies to every installation.
         install_optional firefox celluloid papers loupe file-roller ;;
     developer)
-        install_optional git gcc gcc-c++ make cmake meson ninja-build rust cargo \
-            podman toolbox ;;
+        # OS & Distro Development & Remastering suite (Debian, Fedora, Arch forking tools)
+        install_optional \
+            git gcc gcc-c++ make cmake meson ninja-build rust cargo podman toolbox distrobox \
+            debootstrap dpkg-dev devscripts fakeroot \
+            mock rpm-build rpmdevtools lorax livecd-tools createrepo_c dnf-plugins-core pykickstart fedora-packager \
+            arch-install-scripts pacman \
+            qemu-system-x86 qemu-img xorriso squashfs-tools dosfstools mtools btrfs-progs parted e2fsprogs ;;
 esac
 
 case "$DESKTOP" in

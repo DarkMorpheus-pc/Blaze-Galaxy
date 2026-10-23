@@ -18,7 +18,7 @@ import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Gtk, Adw, GLib, Gio
+from gi.repository import Gtk, Adw, GLib, Gio, Gdk
 
 APP_ID = "org.blazeos.control"
 DISTRO_NAME = "Blaze SolarEvolution 5.04"
@@ -498,6 +498,18 @@ class BlazeControlWindow(Adw.PreferencesWindow):
         )
         page.add(pref_group)
 
+        # BlazeHouse System Center
+        row_bh = Adw.ActionRow(
+            title="BlazeHouse Sistem Merkezi" if self.is_tr else "BlazeHouse System Center",
+            subtitle="Donanım telemetrisi, ZRAM yönetimi, görünüm ve sistem kontrol paneli." if self.is_tr
+                     else "Hardware telemetry, ZRAM management, appearance and system dashboard."
+        )
+        btn_bh = Gtk.Button(label="Başlat" if self.is_tr else "Launch", valign=Gtk.Align.CENTER)
+        btn_bh.add_css_class("suggested-action")
+        btn_bh.connect("clicked", lambda _: subprocess.Popen(["/usr/bin/blaze-house"]))
+        row_bh.add_suffix(btn_bh)
+        pref_group.add(row_bh)
+
         # FireHub App Store
         row_fh = Adw.ActionRow(
             title="FireHub Uygulama Mağazası" if self.is_tr else "FireHub App Store",
@@ -766,11 +778,83 @@ class BlazeControlWindow(Adw.PreferencesWindow):
         self.add_toast(toast)
 
 
+def setup_kinetic_glass_style():
+    """Apply BCDL Kinetic Glass design system to GTK4 / Libadwaita window."""
+    css = """
+    window.preferences-window {
+        background-color: #0d0f12;
+        color: #e5e9f0;
+    }
+    .navigation-sidebar {
+        background-color: #121519;
+        border-right: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    preferencesgroup > box {
+        background-color: rgba(22, 27, 34, 0.78);
+        border-radius: 12px;
+        border-top: 1px solid rgba(255, 255, 255, 0.16);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        border-left: 1px solid rgba(255, 255, 255, 0.10);
+        border-right: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
+    }
+    preferencesgroup list {
+        background-color: transparent;
+    }
+    row {
+        transition: background-color 120ms cubic-bezier(0.16, 1, 0.3, 1);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    }
+    row:hover {
+        background-color: rgba(255, 255, 255, 0.04);
+    }
+    button {
+        border-radius: 8px;
+        font-weight: 500;
+        transition: all 120ms cubic-bezier(0.16, 1, 0.3, 1);
+        border-top: 1px solid rgba(255, 255, 255, 0.14);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+        border-left: 1px solid rgba(255, 255, 255, 0.08);
+        border-right: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    button.suggested-action {
+        background-color: #2b384e;
+        color: #A9C7FF;
+        border: 1px solid rgba(169, 199, 255, 0.35);
+    }
+    button.suggested-action:hover {
+        background-color: #384865;
+        border-color: rgba(169, 199, 255, 0.55);
+    }
+    label {
+        font-feature-settings: "tnum" 1, "lnum" 1;
+    }
+    textview, textview text {
+        background-color: #0a0c0e;
+        color: #A9C7FF;
+        font-family: "JetBrains Mono", monospace;
+        font-feature-settings: "tnum" 1, "lnum" 1;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    """
+    provider = Gtk.CssProvider()
+    provider.load_from_string(css)
+    display = Gdk.Display.get_default()
+    if display:
+        Gtk.StyleContext.add_provider_for_display(
+            display,
+            provider,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
+
+
 class BlazeControlApp(Adw.Application):
     def __init__(self):
         super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.FLAGS_NONE)
 
     def do_activate(self):
+        setup_kinetic_glass_style()
         win = self.props.active_window
         if not win:
             win = BlazeControlWindow(application=self)

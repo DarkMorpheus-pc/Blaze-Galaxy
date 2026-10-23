@@ -72,6 +72,28 @@ find_root_spec() {
     echo "$spec"
 }
 
+find_root_subvol() {
+    local fstab="${SYSROOT}/etc/fstab"
+    local subvol=""
+    if [[ -f "$fstab" ]]; then
+        local opts
+        opts=$(awk '$2 == "/" && $1 !~ /^#/ { print $4; exit }' "$fstab")
+        if [[ "$opts" =~ subvol=([^,]+) ]]; then
+            subvol="${BASH_REMATCH[1]}"
+        fi
+    fi
+    if [[ -z "$subvol" ]]; then
+        local fs_root
+        fs_root=$(findmnt -n -o FSROOT "${SYSROOT:-/}" 2>/dev/null || true)
+        if [[ -n "$fs_root" && "$fs_root" != "/" ]]; then
+            subvol="${fs_root#/}"
+        fi
+    fi
+    if [[ -n "$subvol" ]]; then
+        echo "rootflags=subvol=${subvol}"
+    fi
+}
+
 do_status() {
     echo -e "${C_CYAN}${C_BOLD}=== [ BlazeOS Önyükleyici (Bootloader) Durumu ] ===${C_RESET}\n"
     
@@ -171,6 +193,8 @@ do_switch_to_limine() {
     if [[ -z "$root_spec" ]]; then
         root_spec="LABEL=BlazeOS"
     fi
+    local root_subvol_flag
+    root_subvol_flag=$(find_root_subvol)
 
     cat > "$esp/EFI/limine/limine.conf" << LIMEOF
 # ==============================================================================
@@ -188,19 +212,25 @@ interface_branding_colour: 6
     protocol: linux
     kernel_path: boot():/blazeos/vmlinuz
     module_path: boot():/blazeos/initramfs.img
-    cmdline: root=${root_spec} ro quiet rhgb splash
+    cmdline: root=${root_spec} ${root_subvol_flag} ro quiet rhgb splash
 
-/Blaze Emergency Recovery Protocol (BERP)
+/BlazeOS Recovery Environment (BERE - GUI)
     protocol: linux
     kernel_path: boot():/blazeos/vmlinuz
     module_path: boot():/blazeos/initramfs.img
-    cmdline: root=${root_spec} ro systemd.unit=blaze-recovery.target single
+    cmdline: root=${root_spec} ${root_subvol_flag} ro quiet rhgb systemd.unit=blaze-recovery-gui.target systemd.mask=sddm.service systemd.mask=display-manager.service
+
+/Blaze Emergency Recovery Protocol (BERP - Console TUI)
+    protocol: linux
+    kernel_path: boot():/blazeos/vmlinuz
+    module_path: boot():/blazeos/initramfs.img
+    cmdline: root=${root_spec} ${root_subvol_flag} ro quiet rhgb console=tty1 systemd.unit=blaze-recovery.target
 
 /Blaze SolarEvolution (Kurtarma Modu)
     protocol: linux
     kernel_path: boot():/blazeos/vmlinuz
     module_path: boot():/blazeos/initramfs.img
-    cmdline: root=${root_spec} ro single
+    cmdline: root=${root_spec} ${root_subvol_flag} ro single
 
 /GNU GRUB2 (Fedora)
     protocol: efi

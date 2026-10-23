@@ -13,8 +13,9 @@ OVERLAY="${BLAZEOS_ROOT:-$(pwd)}/blazeos_custom_apps"
 SOLARUI_SRC="${BLAZEOS_ROOT:-$(pwd)}/solarui"
 
 echo "=== [0/5] Building SolarUI controller and validating tracked code ==="
-cargo build --manifest-path "$SOLARUI_SRC/Cargo.toml" --release -p solar-shell
+cargo build --manifest-path "$SOLARUI_SRC/Cargo.toml" --release -p solar-shell -p blaze-recovery
 install -m 0755 "$SOLARUI_SRC/target/release/solar-shell" "$OVERLAY/usr/bin/solar-shell"
+install -m 0755 "$SOLARUI_SRC/target/release/blaze-recovery" "$OVERLAY/usr/bin/blaze-recovery"
 SOLAR_SHELL_PROBE="$($OVERLAY/usr/bin/solar-shell switch __blazeos_build_probe__ 2>&1 || true)"
 if ! grep -q 'end4-pc' <<<"$SOLAR_SHELL_PROBE"; then
     echo "Refusing to build: solar-shell does not contain the End4 switch implementation" >&2
@@ -45,6 +46,7 @@ grep -q 'spawn-at-startup "/usr/libexec/blazeos-wayland-session-ready"' "$OVERLA
 python3 -c 'compile(open("'"$OVERLAY/usr/bin/blaze-setup"'", encoding="utf-8").read(), "blaze-setup", "exec")'
 python3 -c 'compile(open("'"$OVERLAY/usr/bin/berp-recovery-gui"'", encoding="utf-8").read(), "berp-recovery-gui", "exec")'
 python3 -c 'compile(open("'"$OVERLAY/usr/bin/blaze-style-center"'", encoding="utf-8").read(), "blaze-style-center", "exec")'
+python3 -c 'compile(open("'"$OVERLAY/usr/bin/blaze-gamezone-browser"'", encoding="utf-8").read(), "blaze-gamezone-browser", "exec")'
 if grep -Eq '/root/var/lib/mock|image-root' "$OVERLAY/boot/efi/EFI/fedora/grub.cfg"; then
     echo "Refusing to build: EFI grub.cfg contains a build-host path" >&2
     exit 1
@@ -281,6 +283,8 @@ chmod 755 "$ROOTFS/usr/bin/qs" 2>/dev/null || true
 chmod 755 "$ROOTFS/usr/bin/sddm" 2>/dev/null || true
 chmod 755 "$ROOTFS/usr/bin/weston" 2>/dev/null || true
 chmod 755 "$ROOTFS/usr/bin/berp-recovery-gui" 2>/dev/null || true
+chmod 755 "$ROOTFS/usr/bin/blaze-recovery-gui-launcher" 2>/dev/null || true
+chmod 755 "$ROOTFS/usr/bin/blaze-gamezone-browser" 2>/dev/null || true
 chmod 755 "$ROOTFS/usr/bin/blaze-setup" 2>/dev/null || true
 chmod 755 "$ROOTFS/usr/bin/blaze-system-monitor" 2>/dev/null || true
 chmod 755 "$ROOTFS/usr/libexec/blazeos-wayland-session-ready" 2>/dev/null || true
@@ -295,6 +299,9 @@ chmod 755 "$ROOTFS/etc/grub.d/09_berp" 2>/dev/null || true
 chmod 755 "$ROOTFS/etc/grub.d/99_berp" 2>/dev/null || true
 chmod 755 "$ROOTFS/usr/local/bin/solar-torture" 2>/dev/null || true
 chmod 600 "$ROOTFS/etc/NetworkManager/system-connections/"*.nmconnection 2>/dev/null || true
+
+echo "  -> Compiling GSettings schemas..."
+glib-compile-schemas "$ROOTFS/usr/share/glib-2.0/schemas" 2>/dev/null || true
 
 echo "  -> Ensuring SDDM default display manager and masking GDM..."
 mkdir -p "$ROOTFS/etc/systemd/system"
@@ -356,6 +363,7 @@ setfattr -n security.selinux -v "system_u:object_r:systemd_unit_file_t:s0" "$ROO
 setfattr -n security.selinux -v "system_u:object_r:systemd_unit_file_t:s0" "$ROOTFS/etc/systemd/system/blaze-boot-success.service" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/solar-shell" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/blaze-gamezone" 2>/dev/null || true
+setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/blaze-gamezone-browser" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/solar-omnibar" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/protonup-qt" 2>/dev/null || true
 setfattr -n security.selinux -v "system_u:object_r:bin_t:s0" "$ROOTFS/usr/bin/solar-session" 2>/dev/null || true

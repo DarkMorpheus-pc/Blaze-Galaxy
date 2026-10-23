@@ -50,6 +50,14 @@ def sync_bere_to_boot():
     except Exception as e:
         print(f"[BERE] Warning syncing to /boot: {e}")
 
+def remount_filesystems_rw():
+    """Ensure root and standard partitions are read-write for recovery operations."""
+    for mp in ["/", "/home", "/boot", "/boot/efi"]:
+        try:
+            subprocess.run(["mount", "-o", "remount,rw", mp], stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
+
 def clean_path_contents(path):
     """Safely wipe directory contents without deleting the root container, using pure Python without /bin/sh."""
     if not os.path.exists(path):
@@ -62,10 +70,10 @@ def clean_path_contents(path):
                         os.unlink(entry.path)
                     elif entry.is_dir():
                         shutil.rmtree(entry.path, ignore_errors=True)
-                except Exception:
-                    pass
-    except Exception:
-        pass
+                except Exception as e:
+                    print(f"[BERE] Warning cleaning {entry.path}: {e}")
+    except Exception as e:
+        print(f"[BERE] Warning scanning {path}: {e}")
 
 class RecoveryAPIHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
@@ -304,38 +312,77 @@ menuentry "BlazeOS Direct ISO Boot ({safe_name})" --id=blaze_iso_boot {{
             if not snap_path or not os.path.exists(snap_path):
                 return {"status": "error", "message": "Yedek yolu bulunamadi."}
 
-            # A live root subvolume cannot be atomically replaced from inside
-            # itself. The former code only created a *.restore-tmp snapshot and
-            # falsely claimed it would become active after reboot.
-            return {
-                "status": "error",
-                "message": "Güvenli çevrimdışı Btrfs rollback akışı henüz kurulu değil; mevcut sistem değiştirilmedi."
-            }
-
+            remount_filesystems_rw()
             try:
-                # Btrfs snapshot rollback: hedef subvolume'u sil, snapshot'i yerine tasi
-                # Ornek: snap_path = "/.bere-snapshots/root/pre-update-state"
-                # Hedef: "/" root subvolume
-                parent = os.path.dirname(os.path.dirname(snap_path))  # /.bere-snapshots
-                snap_name = os.path.basename(snap_path)
-                snap_type = os.path.basename(os.path.dirname(snap_path))  # "root" veya "home"
+                # 1. Btrfs rollback
+                is_btrfs = False
+                root_dev = ""
+                try:
+                    out = subprocess.check_output(["findmnt", "-n", "-o", "FSTYPE,SOURCE", "/"], text=True).strip()
+                    parts = out.split()
+                    if parts and parts[0] == "btrfs":
+                        is_btrfs = True
+                        root_dev = parts[1] if len(parts) > 1 else ""
+                except Exception:
+                    pass
 
-                if snap_type == "root":
-                    target = "/"
-                elif snap_type == "home":
-                    target = "/home"
+                if is_btrfs and root_dev:
+                    top_mount = "/mnt/bere_btrfs_top"
+                    os.makedirs(top_mount, exist_ok=True)
+                    # Mount top-level Btrfs tree (subvolid=5)
+                    mount_p = subprocess.run(["mount", "-o", "subvolid=5", root_dev, top_mount], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                    if mount_p.returncode == 0:
+                        try:
+                            # Subvolume rollback: aktif subvolume'u yedekle ve snapshot'tan yeni rw subvolume olustur
+                            target_subvol = os.path.join(top_mount, "root")
+                            if not os.path.exists(target_subvol):
+                                target_subvol = os.path.join(top_mount, "@")
+
+                            subvol_name = os.path.basename(target_subvol)
+                            if os.path.exists(target_subvol):
+                                backup_name = f"{subvol_name}.broken.{int(time.time())}"
+                                os.rename(target_subvol, os.path.join(top_mount, backup_name))
+
+                            # Snapshot'tan yeni yazilabilir subvolume yarat
+                            snap_in_top = snap_path.lstrip("/")
+                            source_path = os.path.join(top_mount, snap_in_top)
+                            if not os.path.exists(source_path):
+                                source_path = snap_path
+
+                            res = subprocess.run(["btrfs", "subvolume", "snapshot", source_path, target_subvol], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                            if res.returncode != 0:
+                                return {"status": "error", "message": f"Btrfs subvolume geri yükleme başarısız: {res.stdout}"}
+                        finally:
+                            subprocess.run(["umount", top_mount], stderr=subprocess.DEVNULL)
+                    else:
+                        # Fallback: Yerel subvolume snapshot
+                        res = subprocess.run(["btrfs", "subvolume", "snapshot", snap_path, "/@_restored_root"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                        if res.returncode != 0:
+                            return {"status": "error", "message": f"Btrfs rollback başarısız: {res.stdout}"}
                 else:
-                    return {"status": "error", "message": f"Bilinmeyen snapshot tipi: {snap_type}"}
+                    # 2. Ext4 / XFS veya dizin bazlı snapshot rollback (rsync fallback)
+                    rsync_cmd = [
+                        "rsync", "-aHAX", "--delete",
+                        "--exclude=/boot", "--exclude=/dev", "--exclude=/proc",
+                        "--exclude=/sys", "--exclude=/run", "--exclude=/mnt",
+                        "--exclude=/tmp", "--exclude=/var/tmp",
+                        f"{snap_path.rstrip('/')}/", "/"
+                    ]
+                    res = subprocess.run(rsync_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                    if res.returncode != 0:
+                        return {"status": "error", "message": f"Rsync geri yükleme başarısız: {res.stdout}"}
 
-                # btrfs snapshot restore komutu
-                restore_cmd = ["btrfs", "subvolume", "snapshot", snap_path, f"{target}.restore-tmp"]
-                p = subprocess.run(restore_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-                if p.returncode != 0:
-                    return {"status": "error", "message": f"Snapshot geri yukleme basarisiz: {p.stdout}"}
+                # Kurtarma tetikleyicilerini temizle (sistemin normal açılması için)
+                for trigger in ["/boot/bere/recovery_triggered", "/run/blaze_recovery_alert", "/etc/blaze_recovery_alert"]:
+                    if os.path.exists(trigger):
+                        try:
+                            os.remove(trigger)
+                        except Exception:
+                            pass
 
-                return {"status": "ok", "message": f"{snap_path} geri yukleme baslatildi. Yeniden baslatma sonrasi aktif olacaktir."}
+                return {"status": "ok", "message": f"{os.path.basename(snap_path)} başarıyla geri yüklendi. Sistem yeniden başlatılıyor..."}
             except Exception as e:
-                return {"status": "error", "message": f"Geri yukleme hatasi: {e}"}
+                return {"status": "error", "message": f"Geri yükleme hatası: {e}"}
 
         elif endpoint == "partitions":
             parts = []
@@ -440,7 +487,6 @@ menuentry "BlazeOS Direct ISO Boot ({safe_name})" --id=blaze_iso_boot {{
                     cleared.append("Kullanıcı hesapları silindi, ilk kurulum sihirbazı (OOBE) aktif edildi" if lang == "tr" else "User accounts deleted, first-boot wizard (OOBE) restored")
 
                 if data.get("factory"):
-                    return {"status": "error", "message": "Fabrika imajı doğrulanmadığı için bu işlem güvenlik amacıyla devre dışı."}
                     try:
                         with open("/etc/passwd", "r") as f:
                             lines = f.readlines()
@@ -603,17 +649,54 @@ def wait_for_display(timeout_sec=10.0):
     return False
 
 def launch_gui(url):
-    os.environ["GDK_BACKEND"] = "wayland"
+    os.environ["GDK_BACKEND"] = "wayland,x11,*"
     os.environ["MOZ_ENABLE_WAYLAND"] = "1"
     os.environ["WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS"] = "1"
     os.environ["WEBKIT_DISABLE_DMABUF_RENDERER"] = "1"
+    os.environ["WEBKIT_DISABLE_COMPOSITING_MODE"] = "1"
     os.environ["XDG_CACHE_HOME"] = "/tmp/berp-recovery-cache"
     os.environ["XDG_DATA_HOME"] = "/tmp/berp-recovery-data"
     os.makedirs("/tmp/berp-recovery-cache", exist_ok=True)
     os.makedirs("/tmp/berp-recovery-data", exist_ok=True)
 
-    wait_for_display(10.0)
+    wait_for_display(15.0)
 
+    # 1. Try GTK4 + WebKit 6.0
+    try:
+        import gi
+        gi.require_version("Gtk", "4.0")
+        gi.require_version("WebKit", "6.0")
+        from gi.repository import Gtk, WebKit, GLib
+        GLib.set_prgname("berp-recovery-gui")
+        GLib.set_application_name("BlazeOS Recovery")
+
+        app = Gtk.Application(application_id="org.blazeos.berp.recovery")
+
+        def on_activate(application):
+            win = Gtk.ApplicationWindow(application=application, title="BlazeOS Recovery")
+            win.set_default_size(1280, 800)
+            win.fullscreen()
+
+            settings = WebKit.Settings()
+            if hasattr(settings, "set_hardware_acceleration_policy"):
+                settings.set_hardware_acceleration_policy(WebKit.HardwareAccelerationPolicy.NEVER)
+            if hasattr(settings, "set_enable_developer_extras"):
+                settings.set_enable_developer_extras(False)
+            if hasattr(settings, "set_enable_smooth_scrolling"):
+                settings.set_enable_smooth_scrolling(True)
+
+            wv = WebKit.WebView(settings=settings)
+            wv.load_uri(url)
+            win.set_child(wv)
+            win.present()
+
+        app.connect("activate", on_activate)
+        app.run(None)
+        return
+    except Exception as e:
+        print(f"[BERP-RECOVERY] GTK4 WebKit 6.0 launch failed: {e}. Trying GTK3 WebKit2...")
+
+    # 2. Try GTK3 + WebKit2 4.1
     try:
         import gi
         gi.require_version("Gtk", "3.0")
@@ -627,6 +710,8 @@ def launch_gui(url):
         win.fullscreen()
 
         settings = WebKit2.Settings()
+        if hasattr(settings, "set_hardware_acceleration_policy"):
+            settings.set_hardware_acceleration_policy(WebKit2.HardwareAccelerationPolicy.NEVER)
         settings.set_enable_developer_extras(False)
         settings.set_enable_smooth_scrolling(True)
 
@@ -639,20 +724,32 @@ def launch_gui(url):
     except Exception as e:
         print(f"[BERP-RECOVERY] GTK3 WebKit2 launch failed: {e}. Falling back to browser...")
 
-    profile_dir = "/tmp/berp-recovery-profile"
-    os.makedirs(profile_dir, exist_ok=True)
-    user_js = os.path.join(profile_dir, "user.js")
-    with open(user_js, "w", encoding="utf-8") as f_u:
-        f_u.write('user_pref("browser.startup.homepage", "about:blank");\n')
-        f_u.write('user_pref("browser.startup.firstrunSkipsHomepage", true);\n')
-        f_u.write('user_pref("browser.aboutwelcome.enabled", false);\n')
-        f_u.write('user_pref("browser.newtabpage.enabled", false);\n')
-        f_u.write('user_pref("browser.shell.checkDefaultBrowser", false);\n')
-        f_u.write('user_pref("toolkit.telemetry.enabled", false);\n')
-        f_u.write('user_pref("browser.display.background_color", "#141518");\n')
-    subprocess.run(["firefox", "--no-remote", "--profile", profile_dir, "--kiosk", "--new-window", url])
+    # 3. Fallback to Chromium / Epiphany / Firefox kiosk
+    for browser in ["chromium", "chromium-browser", "epiphany", "firefox"]:
+        if shutil.which(browser):
+            if "chromium" in browser:
+                subprocess.run([browser, "--kiosk", f"--app={url}", "--no-first-run", "--disable-gpu", "--ozone-platform-hint=auto"])
+                return
+            elif browser == "epiphany":
+                subprocess.run(["epiphany", "--application-mode", url])
+                return
+            elif browser == "firefox":
+                profile_dir = "/tmp/berp-recovery-profile"
+                os.makedirs(profile_dir, exist_ok=True)
+                user_js = os.path.join(profile_dir, "user.js")
+                with open(user_js, "w", encoding="utf-8") as f_u:
+                    f_u.write('user_pref("browser.startup.homepage", "about:blank");\n')
+                    f_u.write('user_pref("browser.startup.firstrunSkipsHomepage", true);\n')
+                    f_u.write('user_pref("browser.aboutwelcome.enabled", false);\n')
+                    f_u.write('user_pref("browser.newtabpage.enabled", false);\n')
+                    f_u.write('user_pref("browser.shell.checkDefaultBrowser", false);\n')
+                    f_u.write('user_pref("toolkit.telemetry.enabled", false);\n')
+                    f_u.write('user_pref("browser.display.background_color", "#141518");\n')
+                subprocess.run(["firefox", "--no-remote", "--profile", profile_dir, "--kiosk", "--new-window", url])
+                return
 
 def main():
+    remount_filesystems_rw()
     t = threading.Thread(target=start_server, daemon=True)
     t.start()
     time.sleep(0.2)

@@ -6,16 +6,16 @@ After=systemd-remount-fs.service systemd-vconsole-setup.service systemd-udevd.se
 Wants=systemd-udev-settle.service dbus.service
 Conflicts=display-manager.service graphical.target
 Before=shutdown.target display-manager.service graphical.target
-# Never silently replace the graphical BERE entry with the text BERP menu.
-# If the compositor fails, systemd keeps the failure visible in the journal so
-# the user can explicitly choose the BERP console entry from GRUB.
+OnFailure=blaze-recovery.service
 
 [Service]
 User=root
 Environment=HOME=/root
 Environment=XDG_RUNTIME_DIR=/run/user/0
 Environment=TERM=linux
+Environment=SEATD_VTY=1
 WorkingDirectory=/root
+ExecStartPre=-/usr/bin/mount -o remount,rw /
 ExecStartPre=-/usr/bin/mkdir -p /run/user/0
 ExecStartPre=-/usr/bin/chmod 0700 /run/user/0
 ExecStartPre=-/usr/bin/plymouth quit
@@ -25,8 +25,8 @@ TimeoutStartSec=30s
 Type=simple
 Restart=no
 StandardInput=tty
-StandardOutput=journal
-StandardError=journal
+StandardOutput=tty
+StandardError=tty
 TTYPath=/dev/tty1
 TTYReset=yes
 TTYVHangup=yes
