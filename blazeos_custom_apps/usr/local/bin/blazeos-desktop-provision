@@ -80,9 +80,13 @@ case "$DESKTOP:$PROFILE" in
         install_standard plasma-lookandfeel-fedora arc-kde materia-kde \
             papirus-icon-theme kvantum ;;
     kde:full)
-        install_environment kde-desktop-environment
-        install_minimal plasma-workspace
-        install_standard arc-kde materia-kde papirus-icon-theme kvantum ;;
+        # Install core desktop first so plasma.desktop is guaranteed immediately
+        install_minimal plasma-desktop plasma-workspace kwin dolphin konsole \
+            plasma-systemsettings plasma-nm plasma-pa \
+            xdg-desktop-portal-kde sddm-breeze
+        install_standard plasma-lookandfeel-fedora arc-kde materia-kde papirus-icon-theme kvantum
+        # Install extra full environment group with skip-unavailable so optional map/font mirrors never block session
+        install_optional @kde-desktop-environment || true ;;
     gnome:minimal)
         # The remastered Fedora beta image contains prerelease GNOME schemas.
         # dnf5 install leaves already-installed prerelease packages untouched,
@@ -97,26 +101,36 @@ case "$DESKTOP:$PROFILE" in
             papirus-icon-theme arc-theme ;;
     gnome:full)
         upgrade_required gsettings-desktop-schemas gnome-desktop3 gnome-desktop4
-        install_environment workstation-product-environment
-        install_minimal gnome-shell gnome-session gnome-session-wayland-session mutter \
-            gnome-settings-daemon gnome-keyring gnome-keyring-pam \
+        install_minimal gnome-shell gnome-session gnome-session-wayland-session gnome-control-center \
+            mutter nautilus ptyxis gnome-settings-daemon gnome-keyring gnome-keyring-pam \
             xdg-desktop-portal-gnome python3-gobject python3-cairo gtk4 libadwaita
         install_standard gnome-shell-extension-dash-to-dock \
             gnome-shell-extension-dash-to-panel gnome-shell-extension-apps-menu \
-            papirus-icon-theme arc-theme ;;
+            papirus-icon-theme arc-theme
+        install_optional @workstation-product-environment || true ;;
     cosmic:minimal)
         install_minimal cosmic-session cosmic-files cosmic-term xdg-desktop-portal-cosmic ;;
-    cosmic:full) install_environment cosmic-desktop-environment ;;
+    cosmic:full)
+        install_minimal cosmic-session cosmic-files cosmic-term xdg-desktop-portal-cosmic
+        install_optional @cosmic-desktop-environment || true ;;
     cinnamon:minimal)
         install_minimal cinnamon cinnamon-control-center cinnamon-settings-daemon \
             nemo xdg-desktop-portal-xapp xorg-x11-server-Xorg xorg-x11-xinit ;;
-    cinnamon:full) install_environment cinnamon-desktop-environment ;;
+    cinnamon:full)
+        install_minimal cinnamon cinnamon-control-center cinnamon-settings-daemon \
+            nemo xdg-desktop-portal-xapp xorg-x11-server-Xorg xorg-x11-xinit
+        install_optional @cinnamon-desktop-environment || true ;;
     xfce:minimal)
         install_minimal xfce4-session xfce4-panel xfce4-settings thunar \
             xfce4-terminal xfdesktop xorg-x11-server-Xorg xorg-x11-xinit ;;
-    xfce:full) install_environment xfce-desktop-environment ;;
+    xfce:full)
+        install_minimal xfce4-session xfce4-panel xfce4-settings thunar \
+            xfce4-terminal xfdesktop xorg-x11-server-Xorg xorg-x11-xinit
+        install_optional @xfce-desktop-environment || true ;;
     sway:minimal) install_minimal sway waybar foot wofi xdg-desktop-portal-wlr ;;
-    sway:full) install_environment sway-desktop-environment ;;
+    sway:full)
+        install_minimal sway waybar foot wofi xdg-desktop-portal-wlr
+        install_optional @sway-desktop-environment || true ;;
     hyprland:minimal)
         "$DNF" copr enable -y solopasha/hyprland 2>/dev/null || true
         install_minimal hyprland foot wofi waybar xdg-desktop-portal-hyprland xdg-desktop-portal-wlr ;;
@@ -261,6 +275,22 @@ rm -f "$PENDING"
 systemctl disable blazeos-desktop-provision.service 2>/dev/null || true
 logger -t blazeos "Desktop preparation completed: $DESKTOP ($PROFILE)"
 echo "Desktop preparation completed. It will be selected at the next login."
+
+# If SDDM greeter is currently on screen without a logged-in human user, restart SDDM
+# so the new desktop session appears in the session list immediately without rebooting
+if [ "${BLAZEOS_FORCE_PROVISION:-0}" != 1 ]; then
+    has_active_user=0
+    for uid in $(loginctl list-sessions --no-legend 2>/dev/null | awk '{print $3}'); do
+        if [ -n "$uid" ] && [ "$uid" -ge 1000 ] && [ "$uid" -lt 65534 ]; then
+            has_active_user=1
+            break
+        fi
+    done
+    if [ "$has_active_user" -eq 0 ] && systemctl is-active --quiet sddm.service; then
+        echo "Reloading SDDM to display newly installed desktop session..."
+        systemctl restart sddm.service 2>/dev/null || true
+    fi
+fi
 
 # Broadcast desktop notification to active graphical sessions
 for uid in $(loginctl list-sessions --no-legend 2>/dev/null | awk '{print $3}'); do
