@@ -1,4 +1,4 @@
-# Blaze SolarEvolution 5.04 (Blaze-Galaxy)
+# Blaze SolarEvolution 5.05 (Blaze-Galaxy)
 
 [**Upgrade to BlazeOS (ISO)**](https://archive.org/details/blaze-solar-evolution-5-test)
 
@@ -14,11 +14,30 @@
 
 ---
 
-## 📋 Sürüm Notları (Release Notes) — Blaze SolarEvolution 5.04
+## 📋 Sürüm Notları (Release Notes) — Blaze SolarEvolution 5.05
 
-Bu sürüm (`5.04`), 5.03 masaüstü ve Türkçe dil altyapısının üzerine güvenilir kurulum, kalıcı UEFI önyükleme, tek seferlik OOBE ve ikinci açılış kararlılığı ekler:
+Bu sürüm (`5.05`), SolarEvolution ekosistemine FireHub 1.8.0 / 1.8.1 BCDL Kinetic Glass ve Blaze Vault mimarisini, optimize edilmiş BlazeHouse kontrol merkezini, güncel stok Noctalia arama motorunu, çoklu masaüstü provizyonu ve SDDM otomatik entegrasyonunu kazandırır:
 
-### 🇹🇷 1. Caelestia Tam Türkçe Yama & Canlı Dil Seçimi
+### 🚀 1. FireHub 1.8.0 & Blaze Vault Kriptografik Zırh
+- **BCDL Kinetic Glass Tasarım Dili:** Akrilik cam yüzeyler, dinamik bulanıklık ve modern sekme arayüzü ile FireHub tamamen yenilendi.
+- **Blaze Vault:** 3-parçalı Shamir/XOR bayt parçalama, bellek temizleme (`Uint8Array.fill(0)`), AST kod karartma ve runtime anti-debug kilitleri ile güvenli API altyapısı.
+- **Güncelleme Merkezi (Updates Hub):** Canlı Flatpak ve sistem güncelleme takibi, sürüm karşılaştırması ve tek tıkla toplu güncelleme ("✦ Tümünü Güncelle").
+- **Yerleşik Çevrimdışı İkon Paketi:** 90+ popüler uygulamanın 128x128 ikonları doğrudan `app.asar` içine gömülerek harici CDN bağımlılığı ve ağ gecikmesi sıfırlandı.
+
+### ⚡ 2. BlazeHouse Performans & Akıcı Donanım İncelemesi
+- **Akıllı Donanım Ön Bellekleme:** Sekmeler arası geçişlerde yaşanan gecikmeler ve tekrarlı taramalar önlenerek anlık geçiş sağlandı.
+- **Gelişmiş Yükleme Deneyimi:** İlk tarama anında kullanıcıyı bilgilendiren dinamik *"Sisteminiz Blaze Evreninde İnceleniyor..."* bildirim animasyonu eklendi.
+- **Gerçek Zamanlı Telemetri:** Swiss tabular rakam dizilimi ile CPU/GPU sıcaklık, frekans ve ZRAM bellek optimizasyonu.
+
+### 🌐 3. Çoklu Masaüstü Ortamı (DE) & Kesintisiz SDDM Provizyonu
+- **Sağlamlaştırılmış Kurulum Altyapısı:** Anaconda üzerinden seçilen masaüstü ortamları (KDE Plasma, GNOME, COSMIC, XFCE, Cinnamon, Sway) için çekirdek paketler önceliklendirildi.
+- **SDDM Otomatik Yenileme:** Kurulum sonrası arka plan provizyonu bittiğinde SDDM anında yenilenerek seçilen oturumları (ör. KDE Plasma Wayland) giriş ekranında otomatik olarak listeler.
+
+### 🔍 4. Stok Güncel Noctalia Masaüstü Kabuğu
+- **Gelişmiş Arama Menüsü:** Stok upstream Noctalia deposundaki güncel arama ve başlatıcı bileşenleri SolarUI ile tam uyumlu hale getirildi.
+- **Entegre SolarUI Deneyimi:** Niri Wayland ile kusursuz pencere ve duvar kağıdı ölçeklemesi.
+
+### 🇹🇷 5. Caelestia Tam Türkçe Yama & Canlı Dil Seçimi
 - **%100 Türkçe Yerelleştirme:** Caelestia kaynak kodundaki 670+ arayüz dizesi (Nexus Ayarları, Yan Panel/Sidebar, Sistem Tepsisi, Bildirimler, Kilit Ekranı, Medya Oynatıcı, Hızlı Anahtarlar, Saat, Ağ ve Güç Menüleri) Türkçeleştirildi.
 - **Yerel Qt Çeviri Motoru Entegrasyonu:** C++ `CaelestiaQTranslator` geliştirilerek `QCoreApplication::installTranslator` seviyesine kancalandı. Tüm `qsTr(...)` çağrıları çalışma anında O(1) bellek erişimiyle yerel Türkçe olarak çözülüyor.
 - **Nexus Ayarlarında Canlı Dil Seçici:** Nexus Ayarları (`Dil ve Bölge` / `Language & region`) sayfasına interaktif dil değiştirme özelliği eklendi. Kullanıcılar **"Sistem Dili (Otomatik)"**, **"Türkçe"** ve **"English"** seçenekleri arasında anında geçiş yapabilir; arayüz yeniden başlatmaya gerek kalmadan canlı olarak güncellenir.
@@ -91,7 +110,7 @@ Bu sürüm (`5.04`), 5.03 masaüstü ve Türkçe dil altyapısının üzerine g�
 
 ## 🌟 About (Hakkında)
 
-**Blaze SolarEvolution 5.04** is a high-performance Linux operating system ecosystem built on Fedora Workstation, specifically optimized for gamers, developers, and content creators.
+**Blaze SolarEvolution 5.05** is a high-performance Linux operating system ecosystem built on Fedora Workstation, specifically optimized for gamers, developers, and content creators.
 
 The system ships **SolarUI (Niri Wayland + Noctalia + Caelestia)** as its only offline stock desktop. Six downloadable desktop environments and the bundled standalone Niri session can be selected when the installer verifies access to the official Fedora repositories. Each downloadable desktop offers a minimal or full application profile. GRUB2 and the bundled upstream Limine release are available as bootloader choices on supported firmware.
 
@@ -114,7 +133,8 @@ The system ships **SolarUI (Niri Wayland + Noctalia + Caelestia)** as its only o
   - **XFCE:** An extremely lightweight and fast X11 environment
   - **Sway:** An i3-compatible, keyboard-driven tiling environment
 - **Limine & GRUB2 Bootloader Support:** GRUB2 remains the Secure Boot compatible default. UEFI installations can select the bundled official Limine 12.9.0 release; no third-party COPR is enabled during installation.
-- **BlazeOS Control Center (`blazeos-control`):** A system control center built using GTK4 / Libadwaita, featuring 5 tabs: Updates, Desktop, Performance, Tools, and About.
+- **BlazeHouse & System Control:** Modern BCDL Kinetic Glass control center featuring real-time hardware telemetry with tabular numerals, instant cached navigation, and ZRAM tuning.
+- **FireHub 1.8.0 Software Center:** BCDL Kinetic Glass interface, Updates Hub for Flatpak & system packages, and cryptographic Blaze Vault armor.
 - **Low Latency & ZRAM Improvements:** DNF5 configurations for faster downloads, default ZRAM optimizations, and CachyOS kernel/animation tuning settings.
 - **Online & Offline ISO Architecture:** Build support for a lightweight 3.5 GB Online ISO and a fully bundled 10 GB+ Offline ISO.
 
@@ -123,7 +143,7 @@ The system ships **SolarUI (Niri Wayland + Noctalia + Caelestia)** as its only o
 ## 🛠️ Architecture (Sistem Yapısı)
 
 ```text
-Blaze-Galaxy / Blaze SolarEvolution 5.04
+Blaze-Galaxy / Blaze SolarEvolution 5.05
 ├── build_f45_final.sh          # Online ISO build script (Squashfs + xorriso + SELinux)
 ├── build_f45_offline.sh        # Offline ISO build script
 ├── blazeos_custom_apps/        # Custom-developed system tools and desktop configurations
