@@ -1,4 +1,4 @@
-# Blaze SolarEvolution 5.04 — Masaüstü ve Önyükleyici Kaynak Denetimi
+# Blaze SolarEvolution 5.04 (5.05 için geçerlilik gözden geçirilecek) — Masaüstü ve Önyükleyici Kaynak Denetimi
 
 ## Masaüstü kaynakları
 

@@ -1,4 +1,4 @@
-# Blaze SolarEvolution 5.04 Güncelleme Mimarisi
+# Blaze SolarEvolution 5.05 Güncelleme Mimarisi
 
 ## Kullanıcı akışı
 

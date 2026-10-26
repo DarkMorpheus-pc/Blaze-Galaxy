@@ -52,7 +52,7 @@ Bu sürüm (`5.05`), SolarEvolution ekosistemine FireHub 1.8.0 / 1.8.1 BCDL Kine
 - Uygulama içi tüm butonlar tek tek incelenerek eksik/işlevsiz olanlar tespit edildi ve doğrudan Fedora sistem araçlarına bağlanan kodları inşa edildi.
 - Sistem güncelleme mekanizması Fedora / DNF5'in çevrimdışı işlem altyapısına uyarlandı. Paketler masaüstü açıkken değiştirilmez; Blaze House önce indirip hazırlar, ardından yeniden başlatma ekranında gerçek ilerleme yüzdesiyle kurar.
 - SolarUI oturumuna grafiksel polkit aracısı eklendi; Blaze House yönetici işlemlerinin `/dev/tty` hatasıyla düşmesi giderildi.
-- Güncelleme Plymouth ekranına **“Evren güncelleniyor, daha da genişliyor…”**, gerçek paket ilerlemesi ve **Secured by Blaze** doğrulaması eklendi. Ayrıntılı mimari [UPDATE-SYSTEM-5.04.md](UPDATE-SYSTEM-5.04.md) dosyasındadır.
+- Güncelleme Plymouth ekranına **“Evren güncelleniyor, daha da genişliyor…”**, gerçek paket ilerlemesi ve **Secured by Blaze** doğrulaması eklendi. Ayrıntılı mimari [UPDATE-SYSTEM-5.05.md](docs/UPDATE-SYSTEM-5.05.md) dosyasındadır.
 
 ### 🎨 4. Tema, Görsel ve Duvar Kağıdı Düzeltmeleri
 - **Aydınlık Mod Entegrasyonu:** Caelestia çubuğu, paneller ve bileşenlerin aydınlık modda kusursuz açık renge geçmesi sağlandı.
@@ -108,6 +108,17 @@ Bu sürüm (`5.05`), SolarEvolution ekosistemine FireHub 1.8.0 / 1.8.1 BCDL Kine
 
 ---
 
+## 🧬 Blaze'e Özgü Katman — Düz Fedora'dan Farkı
+
+SolarEvolution, Fedora'nın üzerine tema atılmış hali değildir; kendi yazdığımız Rust/Python/Electron yazılımlar içerir: **SolarUI** (Niri tabanlı oturum ve kabuk motoru geçişi), **BlazeHouse** (18 sayfalı sistem merkezi), **FireHub**, **BERE** (kök silinse bile açılan grafik kurtarma), **Blaze Sentinel** (SELinux/Secure Boot/güvenlik duvarı denetçisi), **Blaze GameZone**, **solar-torture** (Vanilla Niri ile A/B dayanıklılık testi) ve deneysel **Blaze Continuum** (CRIU ile pencere/oturum ışınlama).
+
+SolarEvolution is not a themed Fedora: it ships first-party Rust/Python/Electron software, from the SolarUI session/shell engine to the BERE recovery environment and the experimental Blaze Continuum session-teleport engine.
+
+- Doğrulanmış özellik tablosu, durumları ve bilinen sınırlar: **[docs/FEATURES.md](docs/FEATURES.md)**
+- Her ikili dosyanın kaynağı ve lisansı: **[SOURCES.md](SOURCES.md)**
+
+---
+
 ## 🌟 About (Hakkında)
 
 **Blaze SolarEvolution 5.05** is a high-performance Linux operating system ecosystem built on Fedora Workstation, specifically optimized for gamers, developers, and content creators.
@@ -159,7 +170,7 @@ Blaze-Galaxy / Blaze SolarEvolution 5.05
 ├── solarui/                    # SolarUI components and source code
 │   └── vendor/caelestia-shell/ # Caelestia shell QML and C++ I18n plugin code
 ├── work_f45/rootfs/            # Live system root filesystem
-└── README.md                   # Release documentation (5.04)
+└── README.md                   # Release documentation (5.05)
 ```
 
 ---

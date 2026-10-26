@@ -1,4 +1,4 @@
-# Blaze SolarEvolution 5.04 — Kod, ISO ve Kurtarma Denetimi
+# Blaze SolarEvolution 5.04 (5.05 için geçerlilik gözden geçirilecek) — Kod, ISO ve Kurtarma Denetimi
 
 Tarih: 4 Ekim 2026  
 İncelenen çalışma kopyası: `bd0b6a4`  

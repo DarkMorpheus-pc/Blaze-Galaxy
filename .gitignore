@@ -78,3 +78,13 @@ Cargo.lock
 *.swp
 *.swo
 *~
+
+# ============================================================
+# Packaging outputs (Phase 2)
+# ============================================================
+*.rpm
+*.src.rpm
+rpmbuild/
+packaging/out/
+repo/
+*.asc.secret

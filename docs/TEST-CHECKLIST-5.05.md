@@ -1,4 +1,4 @@
-# Blaze SolarEvolution 5.04 — Kurulum ve Günlük Kullanım Test Formu
+# Blaze SolarEvolution 5.05 — Kurulum ve Günlük Kullanım Test Formu
 
 Bu formu her fiziksel bilgisayar veya sanal makine için ayrı kopyalayın. Her satırı `GEÇTİ`, `KALDI`, `UYGULANAMAZ` olarak işaretleyin; kalan maddelerde ekran görüntüsü ve günlük ekleyin.
 

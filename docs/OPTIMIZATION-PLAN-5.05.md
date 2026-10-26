@@ -1,4 +1,4 @@
-# Blaze SolarEvolution 5.04 Performans ve Açılış Optimizasyon Planı
+# Blaze SolarEvolution 5.04 (5.05 için geçerlilik gözden geçirilecek) Performans ve Açılış Optimizasyon Planı
 
 ## 1. Hedefler ve başarı ölçütleri
 

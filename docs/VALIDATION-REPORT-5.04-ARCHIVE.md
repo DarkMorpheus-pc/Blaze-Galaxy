@@ -60,4 +60,4 @@ OOBE tamamlandıktan sonra kurulum yardımcısının SDDM oturum listesinde kalm
 - BERP, hardreset, ISO doğrulama/flash ve özel ölüm ekranının yıkıcı hata enjeksiyonu testleri.
 - Uzun süreli RAM, askıya al/uyandır ve kare süresi ölçümü.
 
-Bu kontroller için `TEST-CHECKLIST-5.04.md` dosyası kullanılmalıdır.
+Bu kontroller için `TEST-CHECKLIST-5.05.md` dosyası kullanılmalıdır.
