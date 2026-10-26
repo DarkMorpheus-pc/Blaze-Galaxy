@@ -1,0 +1,9 @@
+[blaze]
+name=Blaze SolarEvolution - Packages
+baseurl=https://darkmorpheus-pc.github.io/Blaze-Galaxy/repo/
+enabled=1
+gpgcheck=1
+repo_gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-blaze
+metadata_expire=6h
+skip_if_unavailable=True

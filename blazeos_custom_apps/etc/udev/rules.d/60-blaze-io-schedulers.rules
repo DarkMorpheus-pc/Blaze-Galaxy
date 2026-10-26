@@ -1,0 +1,9 @@
+# BlazeOS I/O Scheduler Rules
+# NVMe drives: Use 'none' scheduler for hardware queue passthrough
+ACTION=="add|change", KERNEL=="nvme[0-9]*n[0-9]*", ATTR{queue/scheduler}="none"
+
+# SATA SSDs and eMMC: Use mq-deadline or bfq
+ACTION=="add|change", KERNEL=="sd[a-z]|mmcblk[0-9]*", ATTR{queue/rotational}=="0", ATTR{queue/scheduler}="mq-deadline"
+
+# Rotational HDDs: Use bfq for fair queueing
+ACTION=="add|change", KERNEL=="sd[a-z]", ATTR{queue/rotational}=="1", ATTR{queue/scheduler}="bfq"

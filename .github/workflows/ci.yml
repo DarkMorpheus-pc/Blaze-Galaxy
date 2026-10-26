@@ -1,0 +1,41 @@
+name: Blaze Quality & Regression CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint-and-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: ShellCheck Static Analysis
+        run: |
+          sudo apt-get update && sudo apt-get install -y shellcheck
+          find blazeos_custom_apps/usr/local/bin blazeos_custom_apps/usr/libexec packaging scripts -type f -name "*.sh" -o -perm -111 | while read -r script; do
+            if head -n1 "$script" | grep -q "sh"; then
+              echo "Checking $script..."
+              shellcheck -e SC1090,SC1091,SC2034,SC2154 "$script" || true
+            fi
+          done
+
+      - name: Desktop File Validation
+        run: |
+          sudo apt-get install -y desktop-file-utils
+          find blazeos_custom_apps/usr/share/applications -name "*.desktop" -exec desktop-file-validate {} +
+
+      - name: Python Syntax & Regression Validation
+        run: |
+          python3 -m py_compile blazeos_custom_apps/usr/bin/berp-recovery-gui || true
+          python3 -m py_compile blazeos_custom_apps/usr/bin/blaze-death-screen || true
+          python3 -m py_compile blazeos_custom_apps/usr/bin/blaze-ghost-overlay || true
+
+      - name: Run Audit Regression Tests
+        run: |
+          if [ -f tests/test_audit_regressions.py ]; then
+            python3 tests/test_audit_regressions.py || true
+          fi

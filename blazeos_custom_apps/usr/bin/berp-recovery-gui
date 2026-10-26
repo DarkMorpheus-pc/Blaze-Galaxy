@@ -276,7 +276,7 @@ menuentry "BlazeOS Direct ISO Boot ({safe_name})" --id=blaze_iso_boot {{
             except Exception:
                 pass
 
-            for snap_dir in ["/.snapshots", "/home/.snapshots"]:
+            for snap_dir in ["/.blaze-snapshots", "/.snapshots", "/home/.snapshots"]:
                 if os.path.isdir(snap_dir):
                     for item in os.listdir(snap_dir):
                         full = os.path.join(snap_dir, item)

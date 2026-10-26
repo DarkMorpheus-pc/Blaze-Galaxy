@@ -1,0 +1,87 @@
+[
+ {
+  "name": "blaze-sentinel",
+  "ver": "0.3.0",
+  "sum": "Blaze Sentinel security posture inspector",
+  "desc": "Reports SELinux/AppArmor state, Secure Boot, kernel lockdown, firewall and kernel hardening sysctls; supports --json and verify exit codes.",
+  "lic": "MIT or GPL-3.0-or-later",
+  "files": [
+   "/usr/bin/blaze-sentinel"
+  ],
+  "req": []
+ },
+ {
+  "name": "blaze-continuum",
+  "ver": "0.1.0",
+  "sum": "Blaze Continuum stateful session teleportation (experimental)",
+  "desc": "CRIU based freeze/restore of a window or session into a .blz-state capsule and LAN transfer over BCTP/1, with a Ghost Overlay surface. Experimental.",
+  "lic": "MIT or GPL-3.0-or-later",
+  "files": [
+   "/usr/bin/blaze-continuum",
+   "/usr/bin/blaze-ghost-overlay"
+  ],
+  "req": [
+   "criu",
+   "python3-gobject",
+   "gtk4"
+  ]
+ },
+ {
+  "name": "blaze-recovery",
+  "ver": "5.05",
+  "sum": "BlazeOS BERP/BERE emergency recovery environment",
+  "desc": "Graphical recovery environment (BERE) with swipe-to-confirm actions, recovery backend and the terminal Screen of Death.",
+  "lic": "GPL-3.0-or-later",
+  "files": [
+   "/usr/bin/blaze-recovery",
+   "/usr/bin/berp-recovery-gui",
+   "/usr/bin/blaze-recovery-gui-launcher",
+   "/usr/bin/blaze-death-screen",
+   "/usr/share/berp-recovery"
+  ],
+  "req": [
+   "python3"
+  ]
+ },
+ {
+  "name": "blaze-house",
+  "ver": "2.0.0",
+  "sum": "BlazeHouse system control center",
+  "desc": "Iced based system control center (displays, storage, optimization, ZRAM, battery, network, bluetooth, sound, security, users, accessibility, language).",
+  "lic": "GPL-3.0-or-later",
+  "files": [
+   "/usr/bin/blaze-house",
+   "/usr/share/applications/blaze-house.desktop"
+  ],
+  "req": [],
+  "icons": true
+ },
+ {
+  "name": "blaze-tools",
+  "ver": "5.05",
+  "sum": "BlazeOS helper tools and installers",
+  "desc": "Post-install, desktop provisioning, NVIDIA/Waydroid/Limine helpers, bootloader switcher, optimizer, session diagnostics and the solar-torture soak test.",
+  "lic": "GPL-3.0-or-later",
+  "noarch": true,
+  "files": [
+   "/usr/local/bin/blaze-bootloader",
+   "/usr/local/bin/blaze-optimize",
+   "/usr/local/bin/blazeos-apply-install-choices",
+   "/usr/local/bin/blazeos-control",
+   "/usr/local/bin/blazeos-desktop-provision",
+   "/usr/local/bin/blazeos-limine-install",
+   "/usr/local/bin/blazeos-nvidia-setup",
+   "/usr/local/bin/blazeos-postinstall",
+   "/usr/local/bin/blazeos-remove-solarui",
+   "/usr/local/bin/blazeos-session-diagnose",
+   "/usr/local/bin/blazeos-waydroid-setup",
+   "/usr/local/bin/blazeos-welcome",
+   "/usr/local/bin/solar-torture",
+   "/usr/local/bin/blaze-snapshot"
+  ],
+  "req": [
+   "bash",
+   "python3"
+  ]
+ }
+]

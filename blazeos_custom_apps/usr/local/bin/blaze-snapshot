@@ -1,0 +1,183 @@
+#!/usr/bin/env bash
+# blaze-snapshot - btrfs root snapshots with bootable entries and rollback.
+#
+# Layout (Fedora default btrfs): "/" is the subvolume "root" of the top-level
+# subvolume (id 5). Snapshots live in the nested subvolume /.blaze-snapshots, which
+# is NOT part of a snapshot of "/" (nested subvolumes are excluded), so snapshots
+# never contain other snapshots.
+#
+# Commands:
+#   status                    show whether snapshots are supported and why not
+#   create [description]      take a read-only snapshot of / (and /home if a subvolume)
+#   list                      list snapshots
+#   delete <name>             delete a snapshot and its boot entry
+#   prune [keep]              keep the newest N auto snapshots (default 5)
+#   boot-entries              (re)generate GRUB/BLS boot entries for all snapshots
+#   promote                   make the currently booted snapshot the new "root"
+#   pre-transaction           used by the dnf5 hook: auto snapshot before changes
+set -euo pipefail
+
+SNAPDIR="/.blaze-snapshots"
+STATE="/var/lib/blaze/snapshot"
+KEEP_DEFAULT="${BLAZE_SNAPSHOT_KEEP:-5}"
+BLS_DIR="/boot/loader/entries"
+TOP_MNT="/run/blaze-snapshot-top"
+
+die()  { echo "blaze-snapshot: $*" >&2; exit 1; }
+say()  { echo "blaze-snapshot: $*"; }
+need_root() { [ "$(id -u)" -eq 0 ] || die "must be run as root"; }
+
+root_fstype() { findmnt -no FSTYPE / 2>/dev/null || true; }
+root_subvol() {
+    # prints e.g. "root" or ".blaze-snapshots/2026-..." (no leading slash)
+    findmnt -no OPTIONS / | tr ',' '\n' | sed -n 's/^subvol=//p' | sed 's#^/##'
+}
+
+supported() {
+    command -v btrfs >/dev/null 2>&1 || { REASON="btrfs-progs is not installed"; return 1; }
+    [ "$(root_fstype)" = "btrfs" ] || { REASON="root filesystem is $(root_fstype), not btrfs"; return 1; }
+    return 0
+}
+
+require_supported() {
+    supported || die "snapshots unavailable: $REASON"
+}
+
+ensure_snapdir() {
+    if [ ! -d "$SNAPDIR" ]; then
+        btrfs subvolume create "$SNAPDIR" >/dev/null
+        chmod 0750 "$SNAPDIR"
+    fi
+    mkdir -p "$STATE"
+}
+
+snap_name() { date -u +%Y%m%dT%H%M%SZ; }
+
+kernel_of_snapshot() {
+    # newest kernel version inside the snapshot that still has files in /boot
+    local snap="$1" v
+    for v in $(ls -1 "$snap/usr/lib/modules" 2>/dev/null | sort -rV); do
+        [ -e "/boot/vmlinuz-$v" ] && { echo "$v"; return 0; }
+    done
+    return 1
+}
+
+write_boot_entry() {
+    local name="$1" snap="$SNAPDIR/$1" kver base tpl out
+    [ -d "$BLS_DIR" ] || return 0
+    kver="$(kernel_of_snapshot "$snap")" || { say "no matching kernel in /boot for $name; no boot entry"; return 0; }
+    tpl="$(ls -1t "$BLS_DIR"/*"$kver".conf 2>/dev/null | grep -v blaze-snap | head -n1 || true)"
+    [ -n "$tpl" ] || tpl="$(ls -1t "$BLS_DIR"/*.conf | grep -v blaze-snap | head -n1)"
+    [ -n "$tpl" ] || return 0
+    out="$BLS_DIR/blaze-snap-$name.conf"
+    # Reuse linux/initrd/options of the host entry; point root to the snapshot subvolume.
+    sed -E \
+        -e "s#^title .*#title Blaze snapshot $name (kernel $kver)#" \
+        -e "s#^version .*#version $kver-snapshot-$name#" \
+        -e "s#^id .*#id blaze-snap-$name#" \
+        -e "s#rootflags=subvol=[^ ]+#rootflags=subvol=.blaze-snapshots/$name#" \
+        "$tpl" > "$out"
+    grep -q '^options.*rootflags=' "$out" || sed -i -E "s#^options (.*)#options \1 rootflags=subvol=.blaze-snapshots/$name#" "$out"
+    grep -q '^id ' "$out" || echo "id blaze-snap-$name" >> "$out"
+    say "boot entry written: $(basename "$out")"
+}
+
+cmd_status() {
+    if supported; then
+        say "supported: root is btrfs (subvol=$(root_subvol))"
+        [ -d "$SNAPDIR" ] && say "snapshots: $(ls -1 "$SNAPDIR" 2>/dev/null | wc -l)" || say "snapshots: 0 (no snapshot directory yet)"
+    else
+        say "NOT supported: $REASON"
+        say "Install on btrfs (Fedora default) to enable rollback."
+        return 2
+    fi
+}
+
+cmd_create() {
+    need_root; require_supported; ensure_snapdir
+    local desc="${1:-manual}" name; name="$(snap_name)"
+    btrfs subvolume snapshot -r / "$SNAPDIR/$name" >/dev/null
+    printf '%s\n' "$desc" > "$STATE/$name.desc"
+    say "created $name ($desc)"
+    write_boot_entry "$name"
+}
+
+cmd_list() {
+    require_supported
+    [ -d "$SNAPDIR" ] || { say "no snapshots"; return 0; }
+    printf '%-18s %s\n' NAME DESCRIPTION
+    local n
+    for n in $(ls -1 "$SNAPDIR" 2>/dev/null | sort); do
+        printf '%-18s %s\n' "$n" "$(cat "$STATE/$n.desc" 2>/dev/null || echo -)"
+    done
+}
+
+cmd_delete() {
+    need_root; require_supported
+    local name="${1:-}"; [ -n "$name" ] || die "usage: delete <name>"
+    [[ "$name" =~ ^[0-9]{8}T[0-9]{6}Z$ ]] || die "invalid snapshot name"
+    [ -d "$SNAPDIR/$name" ] || die "no such snapshot: $name"
+    [ "$(root_subvol)" = ".blaze-snapshots/$name" ] && die "cannot delete the snapshot you are booted from"
+    btrfs subvolume delete "$SNAPDIR/$name" >/dev/null
+    rm -f "$STATE/$name.desc" "$BLS_DIR/blaze-snap-$name.conf"
+    say "deleted $name"
+}
+
+cmd_prune() {
+    need_root; require_supported
+    local keep="${1:-$KEEP_DEFAULT}" n total i=0
+    [ -d "$SNAPDIR" ] || return 0
+    total="$(ls -1 "$SNAPDIR" | wc -l)"
+    for n in $(ls -1 "$SNAPDIR" | sort); do
+        i=$((i+1))
+        [ $((total - i)) -ge "$keep" ] || break
+        if [ "$(root_subvol)" != ".blaze-snapshots/$n" ]; then cmd_delete "$n"; fi
+    done
+}
+
+cmd_boot_entries() {
+    need_root; require_supported
+    rm -f "$BLS_DIR"/blaze-snap-*.conf
+    local n
+    for n in $(ls -1 "$SNAPDIR" 2>/dev/null | sort); do write_boot_entry "$n"; done
+}
+
+cmd_promote() {
+    need_root; require_supported
+    local cur; cur="$(root_subvol)"
+    case "$cur" in
+        .blaze-snapshots/*) ;;
+        *) die "you are booted from '$cur'. Boot a snapshot from the boot menu first, then run promote." ;;
+    esac
+    local dev; dev="$(findmnt -no SOURCE / | sed 's/\[.*//')"
+    mkdir -p "$TOP_MNT"
+    mount -o subvolid=5 "$dev" "$TOP_MNT"
+    trap 'umount "$TOP_MNT" 2>/dev/null || true' RETURN
+    local stamp; stamp="$(snap_name)"
+    [ -d "$TOP_MNT/root" ] || die "top-level subvolume 'root' not found; unsupported layout"
+    mv "$TOP_MNT/root" "$TOP_MNT/root.before-rollback-$stamp"
+    btrfs subvolume snapshot "$TOP_MNT/$cur" "$TOP_MNT/root" >/dev/null
+    say "promoted $cur to 'root'. Previous system kept as 'root.before-rollback-$stamp'."
+    say "Reboot and choose the normal Blaze entry."
+}
+
+cmd_pre_transaction() {
+    # Called by the dnf5 actions plugin; never block package operations on failure.
+    supported || exit 0
+    [ "$(id -u)" -eq 0 ] || exit 0
+    { cmd_create "before dnf transaction" && cmd_prune "$KEEP_DEFAULT"; } || say "pre-transaction snapshot failed (continuing)" >&2
+    exit 0
+}
+
+case "${1:-status}" in
+    status) cmd_status ;;
+    create) shift; cmd_create "$@" ;;
+    list) cmd_list ;;
+    delete) shift; cmd_delete "$@" ;;
+    prune) shift; cmd_prune "$@" ;;
+    boot-entries) cmd_boot_entries ;;
+    promote) cmd_promote ;;
+    pre-transaction) cmd_pre_transaction ;;
+    -h|--help|help) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//' ;;
+    *) die "unknown command: $1 (try --help)" ;;
+esac

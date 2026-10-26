@@ -11,6 +11,11 @@ plymouth_call change-mode --updates
 plymouth_call display-message --text="Evren güncelleniyor, daha da genişliyor…"
 plymouth_call system-update --progress=0
 
+# Create automated rollback snapshot before executing offline update
+if [ -x /usr/local/bin/blaze-snapshot ]; then
+    /usr/local/bin/blaze-snapshot pre-transaction >/dev/null 2>&1 || :
+fi
+
 set +e
 /usr/bin/stdbuf -oL -eL /usr/bin/dnf5 offline _execute 2>&1 | \
     /usr/libexec/blazeos-offline-progress-filter

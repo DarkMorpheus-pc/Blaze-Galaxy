@@ -1,0 +1,3 @@
+# BlazeOS automatic Btrfs snapshot trigger for DNF5 transactions
+# Triggers blaze-snapshot before packages are changed/installed/upgraded
+pre_transaction::::/usr/local/bin/blaze-snapshot pre-transaction
